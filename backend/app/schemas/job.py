@@ -98,3 +98,14 @@ class ProcessingJobMetadataResults(BaseModel):
     # Each item maps directly to one row in the frontend results table.
     # Каждый элемент напрямую соответствует одной строке таблицы результатов.
     results: list[ProcessingJobMetadataResult] = Field(default_factory=list)
+
+
+class UpdateProcessingJobMetadataRequest(BaseModel):
+    """
+    Editable metadata fields submitted from the frontend.
+    Редактируемые поля метаданных, которые отправляет фронтенд.
+    """
+
+    title: str | None = None
+    description: str | None = None
+    keywords: list[str] | None = None
