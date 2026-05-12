@@ -69,8 +69,6 @@ def get_job_status(job_id: UUID):
         job_id=job.job_id,
         status=job.status,
         files=[
-            # Polling response should include only fields needed to update UI
-            # progress and show file-level errors.
             # Polling-ответ включает только поля для обновления прогресса
             # в UI и отображения ошибок отдельных файлов.
             ProcessingJobFileStatus(
@@ -88,7 +86,6 @@ def get_job_status(job_id: UUID):
 @router.get('/{job_id}/results', response_model=ProcessingJobMetadataResults)
 def get_job_results(job_id: UUID):
     """
-    Return metadata preview results for a job.
     Возвращает preview-результаты метаданных для задачи.
     """
 
@@ -104,7 +101,6 @@ def get_job_results(job_id: UUID):
         job_id=job.job_id,
         status=job.status,
         results=[
-            # Results response is shaped as table rows for the frontend.
             # Ответ results сформирован как строки таблицы для фронтенда.
             ProcessingJobMetadataResult(
                 file_id=file.file_id,
@@ -125,17 +121,13 @@ def get_job_results(job_id: UUID):
     '/{job_id}/files/{file_id}/metadata',
     response_model=ProcessingJobMetadataResult,
 )
-@router.put(
-    '/{job_id}/files/{file_id}/metadata',
-    response_model=ProcessingJobMetadataResult,
-)
+
 def update_file_metadata(
     job_id: UUID,
     file_id: UUID,
     payload: UpdateProcessingJobMetadataRequest,
 ):
     """
-    Update editable metadata fields for one file in a job.
     Обновляет редактируемые поля метаданных одного файла в задаче.
     """
 
@@ -158,8 +150,7 @@ def update_file_metadata(
             detail='File not found',
         )
 
-    # PATCH/PUT updates only fields sent by the frontend.
-    # PATCH/PUT обновляет только поля, которые прислал фронтенд.
+    # PATCH обновляет только поля, которые прислал фронтенд.
     if 'title' in payload.model_fields_set:
         job_file.title = payload.title
     if 'description' in payload.model_fields_set:
