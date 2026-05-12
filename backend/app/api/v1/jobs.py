@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import Response
 
 from app.schemas.job import (
     CreateProcessingJobRequest,
@@ -11,6 +12,11 @@ from app.schemas.job import (
     ProcessingJobMetadataResults,
     ProcessingJobStatus,
     UpdateProcessingJobMetadataRequest,
+)
+from app.services.csv_export import (
+    CsvExportFormat,
+    generate_metadata_csv,
+    get_csv_filename,
 )
 from app.services.storage import storage
 
@@ -117,11 +123,39 @@ def get_job_results(job_id: UUID):
     )
 
 
+@router.get('/{job_id}/export/csv')
+def export_job_csv(
+    job_id: UUID,
+    format: CsvExportFormat,
+):
+    """
+    Возвращает CSV с метаданными задачи для выбранной стоковой платформы.
+    """
+
+    job = storage.get_job(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail='Job not found',
+        )
+
+    csv_content = generate_metadata_csv(job, format)
+    filename = get_csv_filename(job, format)
+
+    return Response(
+        content=csv_content,
+        media_type='text/csv; charset=utf-8',
+        headers={
+            'Content-Disposition': f'attachment; filename="{filename}"',
+        },
+    )
+
+
 @router.patch(
     '/{job_id}/files/{file_id}/metadata',
     response_model=ProcessingJobMetadataResult,
 )
-
 def update_file_metadata(
     job_id: UUID,
     file_id: UUID,
