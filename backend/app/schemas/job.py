@@ -69,3 +69,32 @@ class ProcessingJobStatus(BaseModel):
     # Keep the response focused on progress data instead of full metadata.
     # Оставляем в ответе только данные прогресса вместо полных метаданных.
     files: list[ProcessingJobFileStatus] = Field(default_factory=list)
+
+
+class ProcessingJobMetadataResult(BaseModel):
+    """
+    Preview metadata row for the frontend results table.
+    Строка preview-метаданных для таблицы результатов на фронтенде.
+    """
+
+    file_id: UUID
+    filename: str
+    original_filename: str
+    status: FileStatus
+    title: str | None = None
+    description: str | None = None
+    keywords: list[str] = Field(default_factory=list)
+    error_message: str | None = None
+
+
+class ProcessingJobMetadataResults(BaseModel):
+    """
+    Metadata preview data generated for all files in a job.
+    Preview-данные метаданных для всех файлов в задаче.
+    """
+
+    job_id: UUID
+    status: JobStatus
+    # Each item maps directly to one row in the frontend results table.
+    # Каждый элемент напрямую соответствует одной строке таблицы результатов.
+    results: list[ProcessingJobMetadataResult] = Field(default_factory=list)

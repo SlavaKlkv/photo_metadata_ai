@@ -7,6 +7,8 @@ from app.schemas.job import (
     ProcessingJob,
     ProcessingJobFile,
     ProcessingJobFileStatus,
+    ProcessingJobMetadataResult,
+    ProcessingJobMetadataResults,
     ProcessingJobStatus,
 )
 from app.services.storage import storage
@@ -75,6 +77,42 @@ def get_job_status(job_id: UUID):
                 filename=file.filename,
                 original_filename=file.original_filename,
                 status=file.status,
+                error_message=file.error_message,
+            )
+            for file in job.files
+        ],
+    )
+
+
+@router.get('/{job_id}/results', response_model=ProcessingJobMetadataResults)
+def get_job_results(job_id: UUID):
+    """
+    Return metadata preview results for a job.
+    Возвращает preview-результаты метаданных для задачи.
+    """
+
+    job = storage.get_job(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail='Job not found',
+        )
+
+    return ProcessingJobMetadataResults(
+        job_id=job.job_id,
+        status=job.status,
+        results=[
+            # Results response is shaped as table rows for the frontend.
+            # Ответ results сформирован как строки таблицы для фронтенда.
+            ProcessingJobMetadataResult(
+                file_id=file.file_id,
+                filename=file.filename,
+                original_filename=file.original_filename,
+                status=file.status,
+                title=file.title,
+                description=file.description,
+                keywords=file.keywords,
                 error_message=file.error_message,
             )
             for file in job.files
