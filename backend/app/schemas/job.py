@@ -102,3 +102,14 @@ class UpdateProcessingJobMetadataRequest(BaseModel):
     title: str | None = None
     description: str | None = None
     keywords: list[str] | None = None
+
+
+class EmbeddedMetadataResult(BaseModel):
+    """
+    Результат записи метаданных в JPG-файл.
+    """
+
+    file_id: UUID
+    filename: str
+    original_filename: str
+    embedded: bool = True
