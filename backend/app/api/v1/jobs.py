@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
 from fastapi.responses import Response
 
 from app.schemas.job import (
@@ -20,6 +20,7 @@ from app.services.csv_export import (
     generate_metadata_csv,
     get_csv_filename,
 )
+from app.services.processing import process_job
 from app.services.storage import storage
 from app.services.upload import save_upload_file
 
@@ -30,14 +31,17 @@ router = APIRouter(
 
 
 @router.post('/upload', response_model=ProcessingJob)
-def upload_photos(files: list[UploadFile] = File(...)):
+async def upload_photos(
+    background_tasks: BackgroundTasks,
+    files: list[UploadFile] = File(...),
+):
     """
     Загружает несколько JPG/PNG файлов и создает задачу обработки.
     """
     job_files = []
 
     for file in files:
-        saved_filename = save_upload_file(file)
+        saved_filename = await save_upload_file(file)
         original_filename = file.filename or saved_filename
 
         job_files.append(
@@ -49,11 +53,14 @@ def upload_photos(files: list[UploadFile] = File(...)):
 
     job = ProcessingJob(files=job_files)
 
-    return storage.create_job(job)
+    created_job = await storage.create_job(job)
+    background_tasks.add_task(process_job, created_job.job_id)
+
+    return created_job
 
 
 @router.post('/', response_model=ProcessingJob)
-def create_job(payload: CreateProcessingJobRequest):
+async def create_job(payload: CreateProcessingJobRequest):
     """
     Создает новую задачу обработки файлов.
     """
@@ -69,15 +76,15 @@ def create_job(payload: CreateProcessingJobRequest):
         ],
     )
 
-    return storage.create_job(job)
+    return await storage.create_job(job)
 
 
 @router.get('/{job_id}', response_model=ProcessingJob)
-def get_job(job_id: UUID):
+async def get_job(job_id: UUID):
     """
     Возвращает полную информацию о задаче обработки.
     """
-    job = storage.get_job(job_id)
+    job = await storage.get_job(job_id)
 
     if job is None:
         raise HTTPException(
@@ -89,12 +96,12 @@ def get_job(job_id: UUID):
 
 
 @router.get('/{job_id}/status', response_model=ProcessingJobStatus)
-def get_job_status(job_id: UUID):
+async def get_job_status(job_id: UUID):
     """
     Возвращает текущий статус обработки задачи и ее файлов.
     """
 
-    job = storage.get_job(job_id)
+    job = await storage.get_job(job_id)
 
     if job is None:
         raise HTTPException(
@@ -121,12 +128,12 @@ def get_job_status(job_id: UUID):
 
 
 @router.get('/{job_id}/results', response_model=ProcessingJobMetadataResults)
-def get_job_results(job_id: UUID):
+async def get_job_results(job_id: UUID):
     """
     Возвращает preview-результаты метаданных для задачи.
     """
 
-    job = storage.get_job(job_id)
+    job = await storage.get_job(job_id)
 
     if job is None:
         raise HTTPException(
@@ -155,7 +162,7 @@ def get_job_results(job_id: UUID):
 
 
 @router.get('/{job_id}/export/csv')
-def export_job_csv(
+async def export_job_csv(
     job_id: UUID,
     format: CsvExportFormat,
 ):
@@ -163,7 +170,7 @@ def export_job_csv(
     Возвращает CSV с метаданными задачи для выбранной стоковой платформы.
     """
 
-    job = storage.get_job(job_id)
+    job = await storage.get_job(job_id)
 
     if job is None:
         raise HTTPException(
@@ -187,7 +194,7 @@ def export_job_csv(
     '/{job_id}/files/{file_id}/metadata',
     response_model=ProcessingJobMetadataResult,
 )
-def update_file_metadata(
+async def update_file_metadata(
     job_id: UUID,
     file_id: UUID,
     payload: UpdateProcessingJobMetadataRequest,
@@ -196,7 +203,7 @@ def update_file_metadata(
     Обновляет редактируемые поля метаданных одного файла в задаче.
     """
 
-    job = storage.get_job(job_id)
+    job = await storage.get_job(job_id)
 
     if job is None:
         raise HTTPException(
@@ -223,7 +230,7 @@ def update_file_metadata(
     if 'keywords' in payload.model_fields_set:
         job_file.keywords = payload.keywords or []
 
-    storage.update_job(job)
+    await storage.update_job(job)
 
     return ProcessingJobMetadataResult(
         file_id=job_file.file_id,
@@ -261,8 +268,8 @@ def cleanup_job(job_id: UUID):
 
 
 @router.get('/', response_model=list[ProcessingJob])
-def list_jobs():
+async def list_jobs():
     """
     Возвращает список всех задач обработки.
     """
-    return storage.list_jobs()
+    return await storage.list_jobs()
