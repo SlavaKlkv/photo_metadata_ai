@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi.responses import Response
 
 from app.schemas.job import (
     CreateProcessingJobRequest,
@@ -10,6 +11,12 @@ from app.schemas.job import (
     ProcessingJobMetadataResult,
     ProcessingJobMetadataResults,
     ProcessingJobStatus,
+    UpdateProcessingJobMetadataRequest,
+)
+from app.services.csv_export import (
+    CsvExportFormat,
+    generate_metadata_csv,
+    get_csv_filename,
 )
 from app.services.storage import storage
 from app.services.upload import save_upload_file
@@ -97,8 +104,6 @@ def get_job_status(job_id: UUID):
         job_id=job.job_id,
         status=job.status,
         files=[
-            # Polling response should include only fields needed to update UI
-            # progress and show file-level errors.
             # Polling-ответ включает только поля для обновления прогресса
             # в UI и отображения ошибок отдельных файлов.
             ProcessingJobFileStatus(
@@ -131,7 +136,6 @@ def get_job_results(job_id: UUID):
         job_id=job.job_id,
         status=job.status,
         results=[
-            # Results response is shaped as table rows for the frontend.
             # Ответ results сформирован как строки таблицы для фронтенда.
             ProcessingJobMetadataResult(
                 file_id=file.file_id,
@@ -145,6 +149,89 @@ def get_job_results(job_id: UUID):
             )
             for file in job.files
         ],
+    )
+
+
+@router.get('/{job_id}/export/csv')
+def export_job_csv(
+    job_id: UUID,
+    format: CsvExportFormat,
+):
+    """
+    Возвращает CSV с метаданными задачи для выбранной стоковой платформы.
+    """
+
+    job = storage.get_job(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail='Job not found',
+        )
+
+    csv_content = generate_metadata_csv(job, format)
+    filename = get_csv_filename(job, format)
+
+    return Response(
+        content=csv_content,
+        media_type='text/csv; charset=utf-8',
+        headers={
+            'Content-Disposition': f'attachment; filename="{filename}"',
+        },
+    )
+
+
+@router.patch(
+    '/{job_id}/files/{file_id}/metadata',
+    response_model=ProcessingJobMetadataResult,
+)
+def update_file_metadata(
+    job_id: UUID,
+    file_id: UUID,
+    payload: UpdateProcessingJobMetadataRequest,
+):
+    """
+    Обновляет редактируемые поля метаданных одного файла в задаче.
+    """
+
+    job = storage.get_job(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail='Job not found',
+        )
+
+    job_file = next(
+        (file for file in job.files if file.file_id == file_id),
+        None,
+    )
+
+    if job_file is None:
+        raise HTTPException(
+            status_code=404,
+            detail='File not found',
+        )
+
+    # PATCH обновляет только поля, которые прислал фронтенд.
+    if 'title' in payload.model_fields_set:
+        job_file.title = payload.title
+    if 'description' in payload.model_fields_set:
+        job_file.description = payload.description
+    if 'keywords' in payload.model_fields_set:
+        job_file.keywords = payload.keywords or []
+
+    storage.update_job(job)
+
+    return ProcessingJobMetadataResult(
+        file_id=job_file.file_id,
+        filename=job_file.filename,
+        original_filename=job_file.original_filename,
+        status=job_file.status,
+        title=job_file.title,
+        description=job_file.description,
+        keywords=job_file.keywords,
+        error_message=job_file.error_message,
     )
 
 
