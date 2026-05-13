@@ -2,8 +2,10 @@ from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
 
+import aiofiles
 from fastapi import HTTPException, UploadFile
 from PIL import Image, UnidentifiedImageError
+from starlette.concurrency import run_in_threadpool
 
 from app.core.constants import (
     ALLOWED_IMAGE_SUFFIXES,
@@ -13,7 +15,14 @@ from app.core.constants import (
 )
 
 
-def validate_upload_file(file: UploadFile, content: bytes) -> None:
+def verify_image(content: bytes) -> None:
+    """
+    Проверяет, что файл является валидным изображением.
+    """
+    Image.open(BytesIO(content)).verify()
+
+
+async def validate_upload_file(file: UploadFile, content: bytes) -> None:
     """
     Выполняет валидацию загружаемого файла.
     """
@@ -38,7 +47,7 @@ def validate_upload_file(file: UploadFile, content: bytes) -> None:
         )
 
     try:
-        Image.open(BytesIO(content)).verify()
+        await run_in_threadpool(verify_image, content)
     except (UnidentifiedImageError, OSError, SyntaxError):
         raise HTTPException(
             status_code=400,
@@ -46,22 +55,23 @@ def validate_upload_file(file: UploadFile, content: bytes) -> None:
         )
 
 
-def save_upload_file(file: UploadFile) -> str:
+async def save_upload_file(file: UploadFile) -> str:
     """
     Сохраняет загруженный файл на сервере и возвращает имя сохраненного файла.
     """
     original_filename = file.filename or 'uploaded_file'
     suffix = Path(original_filename).suffix.lower()
 
-    content = file.file.read()
+    content = await file.read()
 
-    validate_upload_file(file, content)
+    await validate_upload_file(file, content)
 
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
     saved_filename = f'{uuid4()}{suffix}'
     saved_file_path = UPLOAD_DIR / saved_filename
 
-    saved_file_path.write_bytes(content)
+    async with aiofiles.open(saved_file_path, 'wb') as output_file:
+        await output_file.write(content)
 
     return saved_filename
