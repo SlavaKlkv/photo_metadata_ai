@@ -79,7 +79,7 @@ def _build_csv_row(
     """
 
     keywords = _format_keywords(file.keywords)
-    title = file.title or '' # защита от None
+    title = file.title or ''  # защита от None
     description = file.description or title
 
     if export_format == CsvExportFormat.SHUTTERSTOCK:
@@ -116,7 +116,5 @@ def _format_keywords(keywords: list[str]) -> str:
     """
 
     return ', '.join(
-        keyword.strip()
-        for keyword in keywords
-        if keyword.strip()
+        keyword.strip() for keyword in keywords if keyword.strip()
     )
