@@ -48,7 +48,7 @@ async def validate_upload_file(file: UploadFile, content: bytes) -> None:
 
     try:
         await run_in_threadpool(verify_image, content)
-    except (UnidentifiedImageError, OSError):
+    except (UnidentifiedImageError, OSError, SyntaxError):
         raise HTTPException(
             status_code=400,
             detail='Invalid or corrupted image file',
