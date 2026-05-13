@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
 from fastapi.responses import Response
+from starlette.concurrency import run_in_threadpool
 
 from app.schemas.job import (
     CleanupJobResult,
@@ -245,12 +246,12 @@ async def update_file_metadata(
 
 
 @router.post('/{job_id}/cleanup', response_model=CleanupJobResult)
-def cleanup_job(job_id: UUID):
+async def cleanup_job(job_id: UUID):
     """
     Очищает временные файлы задачи по запросу фронтенда.
     """
 
-    job = storage.get_job(job_id)
+    job = await storage.get_job(job_id)
 
     if job is None:
         raise HTTPException(
@@ -258,7 +259,10 @@ def cleanup_job(job_id: UUID):
             detail='Job not found',
         )
 
-    deleted_files, deleted_directories = cleanup_job_temp_files(job)
+    deleted_files, deleted_directories = await run_in_threadpool(
+        cleanup_job_temp_files,
+        job,
+    )
 
     return CleanupJobResult(
         job_id=job.job_id,
