@@ -4,10 +4,8 @@ import piexif
 import piexif.helper
 from fastapi import HTTPException
 
-from app.core.constants import UPLOAD_DIR
+from app.core.constants import JPG_IMAGE_SUFFIXES, UPLOAD_DIR
 from app.schemas.job import ProcessingJobFile
-
-JPG_SUFFIXES = {'.jpg', '.jpeg'}
 
 
 def embed_metadata_into_jpg(file: ProcessingJobFile) -> None:
@@ -66,7 +64,7 @@ def _validate_jpg_file_path(file_path: Path) -> None:
     Проверяет, что файл существует и является JPG/JPEG.
     """
 
-    if file_path.suffix.lower() not in JPG_SUFFIXES:
+    if file_path.suffix.lower() not in JPG_IMAGE_SUFFIXES:
         raise HTTPException(
             status_code=400,
             detail='Metadata embedding is supported only for JPG files',

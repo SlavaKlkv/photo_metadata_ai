@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import Response
+from starlette.concurrency import run_in_threadpool
 
 from app.schemas.job import (
     CreateProcessingJobRequest,
@@ -22,6 +23,19 @@ from app.services.csv_export import (
 from app.services.metadata_embedding import embed_metadata_into_jpg
 from app.services.storage import storage
 from app.services.upload import save_upload_file
+
+
+async def _get_job_from_storage(job_id: UUID) -> ProcessingJob | None:
+    """
+    Получает задачу из sync или async storage layer.
+    """
+
+    job = storage.get_job(job_id)
+
+    if hasattr(job, '__await__'):
+        return await job
+
+    return job
 
 router = APIRouter(
     prefix='/jobs',
@@ -241,7 +255,7 @@ def update_file_metadata(
     '/{job_id}/files/{file_id}/embed-metadata',
     response_model=EmbeddedMetadataResult,
 )
-def embed_file_metadata(
+async def embed_file_metadata(
     job_id: UUID,
     file_id: UUID,
 ):
@@ -249,7 +263,7 @@ def embed_file_metadata(
     Записывает текущие метаданные файла в EXIF-поля JPG.
     """
 
-    job = storage.get_job(job_id)
+    job = await _get_job_from_storage(job_id)
 
     if job is None:
         raise HTTPException(
@@ -268,7 +282,7 @@ def embed_file_metadata(
             detail='File not found',
         )
 
-    embed_metadata_into_jpg(job_file)
+    await run_in_threadpool(embed_metadata_into_jpg, job_file)
 
     return EmbeddedMetadataResult(
         file_id=job_file.file_id,
