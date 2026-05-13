@@ -1,13 +1,49 @@
+from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
 
 from fastapi import HTTPException, UploadFile
+from PIL import Image, UnidentifiedImageError
 
 from app.core.constants import (
     ALLOWED_IMAGE_SUFFIXES,
     ALLOWED_IMAGE_TYPES,
+    MAX_FILE_SIZE_BYTES,
     UPLOAD_DIR,
 )
+
+
+def validate_upload_file(file: UploadFile, content: bytes) -> None:
+    """
+    Выполняет валидацию загружаемого файла.
+    """
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail='Only JPG and PNG files are allowed',
+        )
+
+    suffix = Path(file.filename or '').suffix.lower()
+
+    if suffix not in ALLOWED_IMAGE_SUFFIXES:
+        raise HTTPException(
+            status_code=400,
+            detail='Only JPG and PNG files are allowed',
+        )
+
+    if len(content) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail='File size exceeds 10 MB',
+        )
+
+    try:
+        Image.open(BytesIO(content)).verify()
+    except (UnidentifiedImageError, OSError):
+        raise HTTPException(
+            status_code=400,
+            detail='Invalid or corrupted image file',
+        )
 
 
 def save_upload_file(file: UploadFile) -> str:
@@ -15,24 +51,17 @@ def save_upload_file(file: UploadFile) -> str:
     Сохраняет загруженный файл на сервере и возвращает имя сохраненного файла.
     """
     original_filename = file.filename or 'uploaded_file'
-    file_suffix = Path(original_filename).suffix.lower()
+    suffix = Path(original_filename).suffix.lower()
 
-    if (
-        file.content_type not in ALLOWED_IMAGE_TYPES
-        or file_suffix not in ALLOWED_IMAGE_SUFFIXES
-    ):
-        raise HTTPException(
-            status_code=400,
-            detail='Only JPG and PNG files are allowed',
-        )
+    content = file.file.read()
+
+    validate_upload_file(file, content)
 
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-    saved_filename = f'{uuid4()}{file_suffix}'
+    saved_filename = f'{uuid4()}{suffix}'
     saved_file_path = UPLOAD_DIR / saved_filename
 
-    with saved_file_path.open('wb') as output_file:
-        while chunk := file.file.read(1024 * 1024):
-            output_file.write(chunk)
+    saved_file_path.write_bytes(content)
 
     return saved_filename
