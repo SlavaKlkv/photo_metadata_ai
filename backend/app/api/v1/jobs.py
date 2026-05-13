@@ -4,6 +4,7 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import Response
 
 from app.schemas.job import (
+    CleanupJobResult,
     CreateProcessingJobRequest,
     ProcessingJob,
     ProcessingJobFile,
@@ -13,6 +14,7 @@ from app.schemas.job import (
     ProcessingJobStatus,
     UpdateProcessingJobMetadataRequest,
 )
+from app.services.cleanup import cleanup_job_temp_files
 from app.services.csv_export import (
     CsvExportFormat,
     generate_metadata_csv,
@@ -232,6 +234,29 @@ def update_file_metadata(
         description=job_file.description,
         keywords=job_file.keywords,
         error_message=job_file.error_message,
+    )
+
+
+@router.post('/{job_id}/cleanup', response_model=CleanupJobResult)
+def cleanup_job(job_id: UUID):
+    """
+    Очищает временные файлы задачи по запросу фронтенда.
+    """
+
+    job = storage.get_job(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail='Job not found',
+        )
+
+    deleted_files, deleted_directories = cleanup_job_temp_files(job)
+
+    return CleanupJobResult(
+        job_id=job.job_id,
+        deleted_files=deleted_files,
+        deleted_directories=deleted_directories,
     )
 
 

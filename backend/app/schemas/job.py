@@ -102,3 +102,13 @@ class UpdateProcessingJobMetadataRequest(BaseModel):
     title: str | None = None
     description: str | None = None
     keywords: list[str] | None = None
+
+
+class CleanupJobResult(BaseModel):
+    """
+    Результат ручной очистки временных файлов задачи.
+    """
+
+    job_id: UUID
+    deleted_files: int = 0
+    deleted_directories: int = 0
