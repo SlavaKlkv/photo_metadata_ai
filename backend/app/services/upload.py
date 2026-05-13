@@ -39,7 +39,7 @@ def validate_upload_file(file: UploadFile, content: bytes) -> None:
 
     try:
         Image.open(BytesIO(content)).verify()
-    except (UnidentifiedImageError, OSError):
+    except (UnidentifiedImageError, OSError, SyntaxError):
         raise HTTPException(
             status_code=400,
             detail='Invalid or corrupted image file',
