@@ -25,19 +25,6 @@ from app.services.processing import process_job
 from app.services.storage import storage
 from app.services.upload import save_upload_file
 
-
-async def _get_job_from_storage(job_id: UUID) -> ProcessingJob | None:
-    """
-    Получает задачу из sync или async storage layer.
-    """
-
-    job = storage.get_job(job_id)
-
-    if hasattr(job, '__await__'):
-        return await job
-
-    return job
-
 router = APIRouter(
     prefix='/jobs',
     tags=['jobs'],
@@ -270,7 +257,7 @@ async def embed_file_metadata(
     Записывает текущие метаданные файла в EXIF-поля JPG.
     """
 
-    job = await _get_job_from_storage(job_id)
+    job = await storage.get_job(job_id)
 
     if job is None:
         raise HTTPException(
