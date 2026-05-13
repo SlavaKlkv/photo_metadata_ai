@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import Response
 
 from app.schemas.job import (
@@ -19,6 +19,7 @@ from app.services.csv_export import (
     get_csv_filename,
 )
 from app.services.storage import storage
+from app.services.upload import save_upload_file
 
 router = APIRouter(
     prefix='/jobs',
@@ -26,8 +27,34 @@ router = APIRouter(
 )
 
 
+@router.post('/upload', response_model=ProcessingJob)
+def upload_photos(files: list[UploadFile] = File(...)):
+    """
+    Загружает несколько JPG/PNG файлов и создает задачу обработки.
+    """
+    job_files = []
+
+    for file in files:
+        saved_filename = save_upload_file(file)
+        original_filename = file.filename or saved_filename
+
+        job_files.append(
+            ProcessingJobFile(
+                filename=saved_filename,
+                original_filename=original_filename,
+            )
+        )
+
+    job = ProcessingJob(files=job_files)
+
+    return storage.create_job(job)
+
+
 @router.post('/', response_model=ProcessingJob)
 def create_job(payload: CreateProcessingJobRequest):
+    """
+    Создает новую задачу обработки файлов.
+    """
     job = ProcessingJob(
         files=[
             ProcessingJobFile(
@@ -45,6 +72,9 @@ def create_job(payload: CreateProcessingJobRequest):
 
 @router.get('/{job_id}', response_model=ProcessingJob)
 def get_job(job_id: UUID):
+    """
+    Возвращает полную информацию о задаче обработки.
+    """
     job = storage.get_job(job_id)
 
     if job is None:
@@ -59,7 +89,6 @@ def get_job(job_id: UUID):
 @router.get('/{job_id}/status', response_model=ProcessingJobStatus)
 def get_job_status(job_id: UUID):
     """
-    Return current processing status for a job and its files.
     Возвращает текущий статус обработки задачи и ее файлов.
     """
 
@@ -208,4 +237,7 @@ def update_file_metadata(
 
 @router.get('/', response_model=list[ProcessingJob])
 def list_jobs():
+    """
+    Возвращает список всех задач обработки.
+    """
     return storage.list_jobs()
