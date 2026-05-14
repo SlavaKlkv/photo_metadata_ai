@@ -14,7 +14,6 @@ from app.services.ai_provider import (
 from app.services.metadata_embedding import get_upload_file_path
 from app.services.storage import storage
 
-
 ai_requests_semaphore = asyncio.Semaphore(MAX_CONCURRENT_AI_REQUESTS)
 
 
@@ -54,7 +53,6 @@ async def process_job(job_id: UUID) -> None:
         return
 
     job.status = JobStatus.PROCESSING
-    ai_provider = get_ai_provider()
 
     for file in job.files:
         file.status = FileStatus.PROCESSING
