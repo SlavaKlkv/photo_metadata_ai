@@ -20,17 +20,26 @@ ai_requests_semaphore = asyncio.Semaphore(MAX_CONCURRENT_AI_REQUESTS)
 async def _process_file(
     file: ProcessingJobFile,
     ai_provider: BaseAIProvider,
+    job_id: UUID,
 ) -> None:
     """
     Обрабатывает один файл с ограничением числа одновременных AI-запросов.
     """
     async with ai_requests_semaphore:
         try:
+            if await _is_job_cancelled(job_id):
+                file.status = FileStatus.CANCELLED
+                return
+
             file.status = FileStatus.PROCESSING
 
             metadata = await ai_provider.generate_metadata(
                 get_upload_file_path(file.filename),
             )
+
+            if await _is_job_cancelled(job_id):
+                file.status = FileStatus.CANCELLED
+                return
 
             file.title = metadata.title
             file.description = metadata.description
@@ -63,13 +72,18 @@ async def process_job(job_id: UUID) -> None:
 
     await asyncio.gather(
         *[
-            _process_file(file, ai_provider)
+            _process_file(file, ai_provider, job.job_id)
             for file in job.files
         ],
     )
 
+    if job.status == JobStatus.CANCELLED:
+        return
+
     if any(file.status == FileStatus.FAILED for file in job.files):
         job.status = JobStatus.FAILED
+    elif any(file.status == FileStatus.CANCELLED for file in job.files):
+        job.status = JobStatus.CANCELLED
     else:
         job.status = JobStatus.COMPLETED
 
@@ -106,16 +120,51 @@ async def retry_failed_files(job_id: UUID) -> None:
 
     await asyncio.gather(
         *[
-            _process_file(file, ai_provider)
+            _process_file(file, ai_provider, job.job_id)
             for file in failed_files
         ],
     )
 
+    if job.status == JobStatus.CANCELLED:
+        return
+
     if any(file.status == FileStatus.FAILED for file in job.files):
         job.status = JobStatus.FAILED
+    elif any(file.status == FileStatus.CANCELLED for file in job.files):
+        job.status = JobStatus.CANCELLED
     elif any(file.status == FileStatus.PROCESSING for file in job.files):
         job.status = JobStatus.PROCESSING
     else:
         job.status = JobStatus.COMPLETED
 
     await storage.update_job(job)
+
+
+async def cancel_job_processing(job_id: UUID) -> None:
+    """
+    Отменяет обработку задачи и pending/processing файлов.
+    """
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        return
+
+    job.status = JobStatus.CANCELLED
+
+    for file in job.files:
+        if file.status in {FileStatus.QUEUED, FileStatus.PROCESSING}:
+            file.status = FileStatus.CANCELLED
+
+    await storage.update_job(job)
+
+
+async def _is_job_cancelled(job_id: UUID) -> bool:
+    """
+    Проверяет, была ли задача отменена во время фоновой обработки.
+    """
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        return True
+
+    return job.status == JobStatus.CANCELLED
