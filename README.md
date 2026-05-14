@@ -60,20 +60,20 @@ Swagger UI
 http://localhost:8000/docs
 ```
 
-ReDoc:
+ReDoc
 
 ```text
 http://localhost:8000/redoc
 ```
 
-## [backend] Форматирование кода и проверка с автоисправлением
+## [ backend ] Форматирование кода и проверка с автоисправлением
 
 ```bash
 docker compose run --rm backend uv run ruff format
 docker compose run --rm backend uv run ruff check --fix
 ```
 
-## Остановка и перезапуск проекта с пересборкой без кеша
+## Перезапуск проекта с пересборкой без кеша
 
 ```bash
 docker compose down -v
