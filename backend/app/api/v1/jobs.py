@@ -8,6 +8,7 @@ from app.schemas.job import (
     CleanupJobResult,
     CreateProcessingJobRequest,
     EmbeddedMetadataResult,
+    FileStatus,
     ProcessingJob,
     ProcessingJobFile,
     ProcessingJobFileStatus,
@@ -23,7 +24,7 @@ from app.services.csv_export import (
     get_csv_filename,
 )
 from app.services.metadata_embedding import embed_metadata_into_jpg
-from app.services.processing import process_job
+from app.services.processing import process_job, retry_failed_files
 from app.services.storage import storage
 from app.services.upload import save_upload_file
 
@@ -268,6 +269,39 @@ async def cleanup_job(job_id: UUID):
         deleted_files=deleted_files,
         deleted_directories=deleted_directories,
     )
+
+
+@router.post('/{job_id}/retry-failed', response_model=ProcessingJob)
+async def retry_failed_job_files(
+    job_id: UUID,
+    background_tasks: BackgroundTasks,
+):
+    """
+    Перезапускает обработку только failed файлов в задаче.
+    """
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail='Job not found',
+        )
+
+    failed_files = [
+        file
+        for file in job.files
+        if file.status == FileStatus.FAILED
+    ]
+
+    if not failed_files:
+        raise HTTPException(
+            status_code=400,
+            detail='No failed files to retry',
+        )
+
+    background_tasks.add_task(retry_failed_files, job.job_id)
+
+    return job
 
 
 @router.post(

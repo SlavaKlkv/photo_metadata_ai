@@ -74,3 +74,48 @@ async def process_job(job_id: UUID) -> None:
         job.status = JobStatus.COMPLETED
 
     await storage.update_job(job)
+
+
+async def retry_failed_files(job_id: UUID) -> None:
+    """
+    Повторно обрабатывает только файлы со статусом failed.
+    """
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        return
+
+    failed_files = [
+        file
+        for file in job.files
+        if file.status == FileStatus.FAILED
+    ]
+
+    if not failed_files:
+        return
+
+    job.status = JobStatus.PROCESSING
+
+    for file in failed_files:
+        file.status = FileStatus.QUEUED
+        file.error_message = None
+
+    await storage.update_job(job)
+
+    ai_provider = get_ai_provider()
+
+    await asyncio.gather(
+        *[
+            _process_file(file, ai_provider)
+            for file in failed_files
+        ],
+    )
+
+    if any(file.status == FileStatus.FAILED for file in job.files):
+        job.status = JobStatus.FAILED
+    elif any(file.status == FileStatus.PROCESSING for file in job.files):
+        job.status = JobStatus.PROCESSING
+    else:
+        job.status = JobStatus.COMPLETED
+
+    await storage.update_job(job)
