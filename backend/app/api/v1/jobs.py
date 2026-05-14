@@ -5,6 +5,7 @@ from fastapi.responses import Response
 from starlette.concurrency import run_in_threadpool
 
 from app.schemas.job import (
+    CleanupJobResult,
     CreateProcessingJobRequest,
     EmbeddedMetadataResult,
     ProcessingJob,
@@ -15,6 +16,7 @@ from app.schemas.job import (
     ProcessingJobStatus,
     UpdateProcessingJobMetadataRequest,
 )
+from app.services.cleanup import cleanup_job_temp_files
 from app.services.csv_export import (
     CsvExportFormat,
     generate_metadata_csv,
@@ -245,6 +247,10 @@ async def update_file_metadata(
     )
 
 
+@router.post('/{job_id}/cleanup', response_model=CleanupJobResult)
+async def cleanup_job(job_id: UUID):
+    """
+    Очищает временные файлы задачи по запросу фронтенда.
 @router.post(
     '/{job_id}/files/{file_id}/embed-metadata',
     response_model=EmbeddedMetadataResult,
@@ -265,6 +271,15 @@ async def embed_file_metadata(
             detail='Job not found',
         )
 
+    deleted_files, deleted_directories = await run_in_threadpool(
+        cleanup_job_temp_files,
+        job,
+    )
+
+    return CleanupJobResult(
+        job_id=job.job_id,
+        deleted_files=deleted_files,
+        deleted_directories=deleted_directories,
     job_file = next(
         (file for file in job.files if file.file_id == file_id),
         None,

@@ -104,6 +104,14 @@ class UpdateProcessingJobMetadataRequest(BaseModel):
     keywords: list[str] | None = None
 
 
+class CleanupJobResult(BaseModel):
+    """
+    Результат ручной очистки временных файлов задачи.
+    """
+
+    job_id: UUID
+    deleted_files: int = 0
+    deleted_directories: int = 0
 class EmbeddedMetadataResult(BaseModel):
     """
     Результат записи метаданных в JPG-файл.
