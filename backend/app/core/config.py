@@ -7,8 +7,8 @@ class Settings(BaseSettings):
 
     # AI Providers Settings
     DEFAULT_AI_PROVIDER: str = 'openai'
-    CLAUDE_API_KEY: str = ''
-    OPENAI_API_KEY: str = ''
+    CLAUDE_API_KEY: str | None = None
+    OPENAI_API_KEY: str | None = None
     OLLAMA_BASE_URL: str = 'http://localhost:11434'
 
     class Config:
