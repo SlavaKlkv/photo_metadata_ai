@@ -13,7 +13,7 @@ def embed_metadata_into_jpg(file: ProcessingJobFile) -> None:
     Записывает title, description и keywords в EXIF-поля JPG-файла.
     """
 
-    file_path = _get_upload_file_path(file.filename)
+    file_path = get_upload_file_path(file.filename)
 
     _validate_jpg_file_path(file_path)
 
@@ -51,7 +51,7 @@ def embed_metadata_into_jpg(file: ProcessingJobFile) -> None:
         ) from error
 
 
-def _get_upload_file_path(filename: str) -> Path:
+def get_upload_file_path(filename: str) -> Path:
     """
     Формирует путь к файлу внутри директории uploads.
     """

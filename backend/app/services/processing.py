@@ -54,6 +54,7 @@ async def process_job(job_id: UUID) -> None:
         return
 
     job.status = JobStatus.PROCESSING
+    ai_provider = get_ai_provider()
 
     for file in job.files:
         file.status = FileStatus.PROCESSING

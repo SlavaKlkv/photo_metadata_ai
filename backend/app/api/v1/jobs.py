@@ -70,9 +70,7 @@ async def create_job(payload: CreateProcessingJobRequest):
     job = ProcessingJob(
         files=[
             ProcessingJobFile(
-                # Временно до санитанизации filename=file.original_filename,
-                # потом будет безопасное имя
-                filename=file.original_filename,
+                filename=file.filename,
                 original_filename=file.original_filename,
             )
             for file in payload.files
@@ -251,18 +249,7 @@ async def update_file_metadata(
 async def cleanup_job(job_id: UUID):
     """
     Очищает временные файлы задачи по запросу фронтенда.
-@router.post(
-    '/{job_id}/files/{file_id}/embed-metadata',
-    response_model=EmbeddedMetadataResult,
-)
-async def embed_file_metadata(
-    job_id: UUID,
-    file_id: UUID,
-):
     """
-    Записывает текущие метаданные файла в EXIF-поля JPG.
-    """
-
     job = await storage.get_job(job_id)
 
     if job is None:
@@ -280,6 +267,28 @@ async def embed_file_metadata(
         job_id=job.job_id,
         deleted_files=deleted_files,
         deleted_directories=deleted_directories,
+    )
+
+
+@router.post(
+    '/{job_id}/files/{file_id}/embed-metadata',
+    response_model=EmbeddedMetadataResult,
+)
+async def embed_file_metadata(
+    job_id: UUID,
+    file_id: UUID,
+):
+    """
+    Записывает текущие метаданные файла в EXIF-поля JPG.
+    """
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail='Job not found',
+        )
+
     job_file = next(
         (file for file in job.files if file.file_id == file_id),
         None,
