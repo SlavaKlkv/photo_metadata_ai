@@ -7,6 +7,7 @@ from starlette.concurrency import run_in_threadpool
 from app.schemas.job import (
     CleanupJobResult,
     CreateProcessingJobRequest,
+    EmbeddedMetadataResult,
     ProcessingJob,
     ProcessingJobFile,
     ProcessingJobFileStatus,
@@ -21,6 +22,7 @@ from app.services.csv_export import (
     generate_metadata_csv,
     get_csv_filename,
 )
+from app.services.metadata_embedding import embed_metadata_into_jpg
 from app.services.processing import process_job
 from app.services.storage import storage
 from app.services.upload import save_upload_file
@@ -249,6 +251,16 @@ async def update_file_metadata(
 async def cleanup_job(job_id: UUID):
     """
     Очищает временные файлы задачи по запросу фронтенда.
+@router.post(
+    '/{job_id}/files/{file_id}/embed-metadata',
+    response_model=EmbeddedMetadataResult,
+)
+async def embed_file_metadata(
+    job_id: UUID,
+    file_id: UUID,
+):
+    """
+    Записывает текущие метаданные файла в EXIF-поля JPG.
     """
 
     job = await storage.get_job(job_id)
@@ -268,6 +280,23 @@ async def cleanup_job(job_id: UUID):
         job_id=job.job_id,
         deleted_files=deleted_files,
         deleted_directories=deleted_directories,
+    job_file = next(
+        (file for file in job.files if file.file_id == file_id),
+        None,
+    )
+
+    if job_file is None:
+        raise HTTPException(
+            status_code=404,
+            detail='File not found',
+        )
+
+    await run_in_threadpool(embed_metadata_into_jpg, job_file)
+
+    return EmbeddedMetadataResult(
+        file_id=job_file.file_id,
+        filename=job_file.filename,
+        original_filename=job_file.original_filename,
     )
 
 

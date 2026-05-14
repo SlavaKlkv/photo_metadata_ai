@@ -112,3 +112,12 @@ class CleanupJobResult(BaseModel):
     job_id: UUID
     deleted_files: int = 0
     deleted_directories: int = 0
+class EmbeddedMetadataResult(BaseModel):
+    """
+    Результат записи метаданных в JPG-файл.
+    """
+
+    file_id: UUID
+    filename: str
+    original_filename: str
+    embedded: bool = True
