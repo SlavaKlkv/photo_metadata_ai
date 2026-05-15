@@ -6,10 +6,15 @@ class Settings(BaseSettings):
     API_V1_STR: str = '/api/v1'
 
     # AI Providers Settings
-    DEFAULT_AI_PROVIDER: str = 'mock'  # openai
+
+    DEFAULT_AI_PROVIDER: str = 'mock'
+
     CLAUDE_API_KEY: str | None = None
+
     OPENAI_API_KEY: str | None = None
+
     OLLAMA_BASE_URL: str = 'http://localhost:11434'
+    OLLAMA_MODEL: str = 'llava'
 
     class Config:
         env_file = '.env'

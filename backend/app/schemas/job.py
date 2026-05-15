@@ -23,7 +23,7 @@ class JobStatus(StrEnum):
     CANCELLED = 'cancelled'
 
 
-class FileProcessingFields(BaseModel):
+class FileProcessingMixin(BaseModel):
     """
     Общие поля состояния файла для response-схем.
     """
@@ -32,7 +32,7 @@ class FileProcessingFields(BaseModel):
     status: FileStatus
 
 
-class FileNameFields(BaseModel):
+class FileNameMixin(BaseModel):
     """
     Общие поля имени файла для response-схем.
     """
@@ -41,7 +41,7 @@ class FileNameFields(BaseModel):
     original_filename: str
 
 
-class MetadataFields(BaseModel):
+class MetadataMixin(BaseModel):
     """
     Общие metadata-поля с sanitization для response и update-схем.
     """
@@ -69,8 +69,7 @@ class MetadataFields(BaseModel):
         return sanitize_keywords(value)
 
 
-
-class ProcessingJobFile(FileNameFields, MetadataFields):
+class ProcessingJobFile(FileNameMixin, MetadataMixin):
     file_id: UUID = Field(default_factory=uuid4)
     status: FileStatus = FileStatus.QUEUED
     error_message: str | None = None
@@ -93,7 +92,7 @@ class ProcessingJob(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
-class ProcessingJobFileStatus(FileProcessingFields, FileNameFields):
+class ProcessingJobFileStatus(FileProcessingMixin, FileNameMixin):
     """
     Краткий статус файла, который возвращает polling endpoint.
     """
@@ -113,9 +112,7 @@ class ProcessingJobStatus(BaseModel):
 
 
 class ProcessingJobMetadataResult(
-    FileProcessingFields,
-    FileNameFields,
-    MetadataFields,
+    FileProcessingMixin, FileNameMixin, MetadataMixin
 ):
     """
     Строка preview-метаданных для таблицы результатов на фронтенде.
@@ -135,7 +132,7 @@ class ProcessingJobMetadataResults(BaseModel):
     results: list[ProcessingJobMetadataResult] = Field(default_factory=list)
 
 
-class UpdateProcessingJobMetadataRequest(MetadataFields):
+class UpdateProcessingJobMetadataRequest(MetadataMixin):
     """
     Редактируемые поля метаданных, которые отправляет фронтенд.
     """
@@ -153,7 +150,7 @@ class CleanupJobResult(BaseModel):
     deleted_directories: int = 0
 
 
-class EmbeddedMetadataResult(FileNameFields):
+class EmbeddedMetadataResult(FileNameMixin):
     """
     Результат записи метаданных в JPG-файл.
     """
