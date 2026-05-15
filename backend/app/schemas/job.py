@@ -38,12 +38,14 @@ class CreateProcessingJobFile(BaseModel):
 
 class CreateProcessingJobRequest(BaseModel):
     files: list[CreateProcessingJobFile] = Field(default_factory=list)
+    shooting_context: str | None = None
 
 
 class ProcessingJob(BaseModel):
     job_id: UUID = Field(default_factory=uuid4)
     status: JobStatus = JobStatus.QUEUED
     files: list[ProcessingJobFile] = Field(default_factory=list)
+    shooting_context: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
