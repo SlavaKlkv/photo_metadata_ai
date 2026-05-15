@@ -6,22 +6,18 @@ import { devtools } from 'zustand/middleware';
 
 //TODO: добавить больше UI-состояний, например, для управления модальными окнами, спиннерами загрузки и т.д. Сейчас в UIStore только базовые состояния для демонстрации.
 
-//TODO: проверить, почемуу не работают в FileUpload.tsx:  
-  // const addJobs = useAppStore((state) => state.addJobs);
-  //const jobs = useAppStore((state) => state.jobs);
-  //const openProgressModal = useUIStore((state) => state.openProgressModal);
-  //const addToast = useUIStore((state) => state.addToast);
-
-
 export interface UIState {
   isSettingsOpen: boolean;
   isFileListOpen: boolean;
   isProcessing: boolean;
+  isProgressModalOpen: boolean;
 
   // Actions
   toggleSettings: () => void;
   toggleFileList: () => void;
   setIsProcessing: (isProcessing: boolean) => void;
+  openProgressModal: () => void;
+  closeProgressModal: () => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -30,6 +26,7 @@ export const useUIStore = create<UIState>()(
       isSettingsOpen: false,
       isFileListOpen: true,
       isProcessing: false,
+      isProgressModalOpen: false,
 
       toggleSettings: () =>
         set((state) => ({ isSettingsOpen: !state.isSettingsOpen })),
@@ -37,6 +34,10 @@ export const useUIStore = create<UIState>()(
         set((state) => ({ isFileListOpen: !state.isFileListOpen })),
       setIsProcessing: (isProcessing: boolean) =>
         set({ isProcessing }),
+      openProgressModal: () =>
+        set({ isProgressModalOpen: true }),
+      closeProgressModal: () =>
+        set({ isProgressModalOpen: false }),
     }),
     { name: 'UIStore' }
   )

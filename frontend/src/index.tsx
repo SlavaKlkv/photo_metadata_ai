@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { useAppStore } from './store/useAppStore';
+import App from './App';
 
 // от базового к специфичному
 import './styles/variables.module.scss';       // 1. Переменные
@@ -19,7 +20,7 @@ if (rootElement) {
 
   root.render(
     <React.StrictMode>
-      <div>Photo Metadata AI</div>
+      <App />
     </React.StrictMode>,
   );
 }
