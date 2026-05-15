@@ -2,7 +2,9 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.utils.sanitizers import sanitize_keywords, sanitize_metadata_text
 
 
 class FileStatus(StrEnum):
@@ -21,14 +23,56 @@ class JobStatus(StrEnum):
     CANCELLED = 'cancelled'
 
 
-class ProcessingJobFile(BaseModel):
-    file_id: UUID = Field(default_factory=uuid4)
+class FileProcessingFields(BaseModel):
+    """
+    Общие поля состояния файла для response-схем.
+    """
+
+    file_id: UUID
+    status: FileStatus
+
+
+class FileNameFields(BaseModel):
+    """
+    Общие поля имени файла для response-схем.
+    """
+
     filename: str
     original_filename: str
-    status: FileStatus = FileStatus.QUEUED
+
+
+class MetadataFields(BaseModel):
+    """
+    Общие metadata-поля с sanitization для response и update-схем.
+    """
+
+    model_config = ConfigDict(validate_assignment=True)
+
     title: str | None = None
     description: str | None = None
     keywords: list[str] = Field(default_factory=list)
+
+    @field_validator('title', 'description')
+    @classmethod
+    def sanitize_metadata_text(cls, value: str | None) -> str | None:
+        """
+        Валидирует и очищает текстовые metadata-поля.
+        """
+        return sanitize_metadata_text(value)
+
+    @field_validator('keywords')
+    @classmethod
+    def sanitize_keywords(cls, value: list[str] | None) -> list[str]:
+        """
+        Валидирует keywords перед сохранением.
+        """
+        return sanitize_keywords(value)
+
+
+
+class ProcessingJobFile(FileNameFields, MetadataFields):
+    file_id: UUID = Field(default_factory=uuid4)
+    status: FileStatus = FileStatus.QUEUED
     error_message: str | None = None
 
 
@@ -49,15 +93,11 @@ class ProcessingJob(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
-class ProcessingJobFileStatus(BaseModel):
+class ProcessingJobFileStatus(FileProcessingFields, FileNameFields):
     """
     Краткий статус файла, который возвращает polling endpoint.
     """
 
-    file_id: UUID
-    filename: str
-    original_filename: str
-    status: FileStatus
     error_message: str | None = None
 
 
@@ -72,18 +112,15 @@ class ProcessingJobStatus(BaseModel):
     files: list[ProcessingJobFileStatus] = Field(default_factory=list)
 
 
-class ProcessingJobMetadataResult(BaseModel):
+class ProcessingJobMetadataResult(
+    FileProcessingFields,
+    FileNameFields,
+    MetadataFields,
+):
     """
     Строка preview-метаданных для таблицы результатов на фронтенде.
     """
 
-    file_id: UUID
-    filename: str
-    original_filename: str
-    status: FileStatus
-    title: str | None = None
-    description: str | None = None
-    keywords: list[str] = Field(default_factory=list)
     error_message: str | None = None
 
 
@@ -98,13 +135,11 @@ class ProcessingJobMetadataResults(BaseModel):
     results: list[ProcessingJobMetadataResult] = Field(default_factory=list)
 
 
-class UpdateProcessingJobMetadataRequest(BaseModel):
+class UpdateProcessingJobMetadataRequest(MetadataFields):
     """
     Редактируемые поля метаданных, которые отправляет фронтенд.
     """
 
-    title: str | None = None
-    description: str | None = None
     keywords: list[str] | None = None
 
 
@@ -118,12 +153,10 @@ class CleanupJobResult(BaseModel):
     deleted_directories: int = 0
 
 
-class EmbeddedMetadataResult(BaseModel):
+class EmbeddedMetadataResult(FileNameFields):
     """
     Результат записи метаданных в JPG-файл.
     """
 
     file_id: UUID
-    filename: str
-    original_filename: str
     embedded: bool = True

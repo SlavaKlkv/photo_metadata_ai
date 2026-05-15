@@ -86,7 +86,7 @@ async def create_job(payload: CreateProcessingJobRequest):
     job = ProcessingJob(
         files=[
             ProcessingJobFile(
-                filename=file.filename,
+                filename=file.original_filename,
                 original_filename=file.original_filename,
             )
             for file in payload.files

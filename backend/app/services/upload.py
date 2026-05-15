@@ -1,4 +1,3 @@
-import re
 from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
@@ -14,18 +13,7 @@ from app.core.constants import (
     MAX_FILE_SIZE_BYTES,
     UPLOAD_DIR,
 )
-
-
-def _sanitize_filename(filename: str) -> str:
-    """
-    Приводит имя файла к безопасному формату для хранения на сервере.
-    """
-    stem = Path(filename).stem.lower()
-    stem = re.sub(r'\s+', '_', stem)
-    stem = re.sub(r'[^a-z0-9_-]', '', stem)
-    stem = re.sub(r'_+', '_', stem).strip('_-')
-
-    return stem or 'uploaded_file'
+from app.utils.sanitizers import sanitize_filename
 
 
 def verify_image(content: bytes) -> None:
@@ -74,7 +62,7 @@ async def save_upload_file(file: UploadFile) -> str:
     """
     original_filename = file.filename or 'uploaded_file'
     suffix = Path(original_filename).suffix.lower()
-    safe_filename_stem = _sanitize_filename(original_filename)
+    safe_filename_stem = sanitize_filename(original_filename)
 
     content = await file.read()
 
