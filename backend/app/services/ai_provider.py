@@ -1,5 +1,6 @@
 import base64
 import json
+import re
 from abc import ABC, abstractmethod
 from pathlib import Path
 
