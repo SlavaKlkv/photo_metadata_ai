@@ -75,7 +75,7 @@ async def create_job(payload: CreateProcessingJobRequest):
     job = ProcessingJob(
         files=[
             ProcessingJobFile(
-                filename=file.filename,
+                filename=file.original_filename,
                 original_filename=file.original_filename,
             )
             for file in payload.files
@@ -292,9 +292,7 @@ async def retry_failed_job_files(
         )
 
     failed_files = [
-        file
-        for file in job.files
-        if file.status == FileStatus.FAILED
+        file for file in job.files if file.status == FileStatus.FAILED
     ]
 
     if not failed_files:

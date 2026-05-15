@@ -71,10 +71,7 @@ async def process_job(job_id: UUID) -> None:
     ai_provider = get_ai_provider()
 
     await asyncio.gather(
-        *[
-            _process_file(file, ai_provider, job.job_id)
-            for file in job.files
-        ],
+        *[_process_file(file, ai_provider, job.job_id) for file in job.files],
     )
 
     if job.status == JobStatus.CANCELLED:
@@ -100,9 +97,7 @@ async def retry_failed_files(job_id: UUID) -> None:
         return
 
     failed_files = [
-        file
-        for file in job.files
-        if file.status == FileStatus.FAILED
+        file for file in job.files if file.status == FileStatus.FAILED
     ]
 
     if not failed_files:
