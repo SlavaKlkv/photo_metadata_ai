@@ -24,7 +24,11 @@ from app.services.csv_export import (
     get_csv_filename,
 )
 from app.services.metadata_embedding import embed_metadata_into_jpg
-from app.services.processing import process_job, retry_failed_files
+from app.services.processing import (
+    cancel_job_processing,
+    process_job,
+    retry_failed_files,
+)
 from app.services.storage import storage
 from app.services.upload import save_upload_file
 
@@ -302,6 +306,32 @@ async def retry_failed_job_files(
     background_tasks.add_task(retry_failed_files, job.job_id)
 
     return job
+
+
+@router.post('/{job_id}/cancel', response_model=ProcessingJob)
+async def cancel_job(job_id: UUID):
+    """
+    Останавливает дальнейшую обработку задачи.
+    """
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail='Job not found',
+        )
+
+    await cancel_job_processing(job.job_id)
+
+    cancelled_job = await storage.get_job(job.job_id)
+
+    if cancelled_job is None:
+        raise HTTPException(
+            status_code=404,
+            detail='Job not found',
+        )
+
+    return cancelled_job
 
 
 @router.post(

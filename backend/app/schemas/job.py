@@ -10,6 +10,7 @@ class FileStatus(StrEnum):
     PROCESSING = 'processing'
     COMPLETED = 'completed'
     FAILED = 'failed'
+    CANCELLED = 'cancelled'
 
 
 class JobStatus(StrEnum):
@@ -17,6 +18,7 @@ class JobStatus(StrEnum):
     PROCESSING = 'processing'
     COMPLETED = 'completed'
     FAILED = 'failed'
+    CANCELLED = 'cancelled'
 
 
 class ProcessingJobFile(BaseModel):
