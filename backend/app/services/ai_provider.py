@@ -123,8 +123,6 @@ class OllamaImageMetadataProvider(BaseAIProvider):
         if json_match is not None:
             raw_response = json_match.group(0).strip()
 
-        print(raw_response)
-
         try:
             metadata = json.loads(raw_response)
         except json.JSONDecodeError as error:
