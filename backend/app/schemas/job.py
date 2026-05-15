@@ -110,7 +110,11 @@ class ProcessingJobStatus(BaseModel):
     files: list[ProcessingJobFileStatus] = Field(default_factory=list)
 
 
-class ProcessingJobMetadataResult(FileProcessingFields, FileNameFields, MetadataFields):
+class ProcessingJobMetadataResult(
+    FileProcessingFields,
+    FileNameFields,
+    MetadataFields,
+):
     """
     Строка preview-метаданных для таблицы результатов на фронтенде.
     """
