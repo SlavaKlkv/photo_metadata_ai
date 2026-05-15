@@ -1,0 +1,81 @@
+/* Button atom styles */
+@import '../../../styles/variables.module.scss';
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: inherit;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  
+  // SIZES
+  &.sm {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+  
+  &.md {
+    padding: 10px 16px;
+    font-size: 14px;
+  }
+  
+  &.lg {
+    padding: 12px 24px;
+    font-size: 14px;
+  }
+  
+  // VARIANTS
+  &.primary {
+    background: var(--bt-default);
+    color: var(--bt-default-text);
+    
+    &:hover:not(:disabled) {
+      background: var(--bt-hover);
+      color: var(--bt-default-text);
+      transform: translateY(-1px);
+    }
+    
+    &:active:not(:disabled) {
+      background: var(--bt-active);
+      color: var(--bt-active-text);
+      transform: translateY(0);
+    }
+    
+    &:disabled {
+      background: var(--bt-disabled);
+      color: var(--bt-disabled-text);
+      cursor: not-allowed;
+    }
+  }
+  
+  &.secondary {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    
+    &:hover:not(:disabled) {
+      border-color: var(--accent-color);
+      background: rgba(74, 158, 255, 0.1);
+    }
+  }
+  
+  &.ghost {
+    background: transparent;
+    color: var(--text-primary);
+    
+    &:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.1);
+    }
+  }
+  
+  .icon {
+    display: inline-flex;
+    align-items: center;
+  }
+}

@@ -1278,7 +1278,7 @@ export const BottomStatusBar: React.FC = () => {
 ```
 
 ---
-
+//TODO
 ## 🦑 Организменные компоненты (Day 3+)
 
 ### 1. ProgressModal (НОВОЕ! Главная особенность)
