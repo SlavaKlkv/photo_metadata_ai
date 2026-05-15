@@ -92,3 +92,10 @@ Frontend
 ```bash
 docker compose run --rm --no-deps frontend npm install <new_lib_name>
 ```
+
+## Установка Ollama и модели llava
+```bash
+brew install ollama
+ollama serve
+ollama pull llava
+```

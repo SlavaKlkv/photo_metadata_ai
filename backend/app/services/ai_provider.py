@@ -1,16 +1,18 @@
 import base64
 import json
-import re
 from abc import ABC, abstractmethod
 from pathlib import Path
 
 import aiofiles
 import httpx
+import structlog
 from fastapi import HTTPException
 from openai import AsyncOpenAI
 
 from app.core.config import settings
 from app.core.constants import AI_PROVIDER_TIMEOUT
+
+logger = structlog.get_logger(__name__)
 
 
 class AIMetadataResponse:
@@ -34,6 +36,7 @@ class BaseAIProvider(ABC):
         self,
         image_path: Path,
         shooting_context: str | None = None,
+        file_number: int | None = None,
     ) -> AIMetadataResponse:
         """
         Генерирует метаданные для изображения.
@@ -49,6 +52,7 @@ class MockImageMetadataProvider(BaseAIProvider):
         self,
         image_path: Path,
         shooting_context: str | None = None,
+        file_number: int | None = None,
     ) -> AIMetadataResponse:
         """
         Возвращает тестовые метаданные для изображения.
@@ -75,10 +79,18 @@ class OllamaImageMetadataProvider(BaseAIProvider):
         self,
         image_path: Path,
         shooting_context: str | None = None,
+        file_number: int | None = None,
     ) -> AIMetadataResponse:
         """
         Отправляет изображение в локальную Ollama model и возвращает metadata.
         """
+        logger.info(
+            'started_ollama_metadata_generation',
+            file_number=file_number,
+            image_path=str(image_path),
+            model=settings.OLLAMA_MODEL,
+        )
+
         image_base64 = await _encode_image_to_base64(image_path)
 
         prompt = (
@@ -92,6 +104,13 @@ class OllamaImageMetadataProvider(BaseAIProvider):
             prompt = f'{prompt} Use this shooting context: {shooting_context}'
 
         async with httpx.AsyncClient(timeout=AI_PROVIDER_TIMEOUT) as client:
+            logger.info(
+                'sending_request_to_ollama',
+                file_number=file_number,
+                base_url=settings.OLLAMA_BASE_URL,
+                model=settings.OLLAMA_MODEL,
+            )
+
             response = await client.post(
                 f'{settings.OLLAMA_BASE_URL}/api/generate',
                 json={
@@ -99,39 +118,42 @@ class OllamaImageMetadataProvider(BaseAIProvider):
                     'prompt': prompt,
                     'images': [image_base64],
                     'stream': False,
+                    'format': 'json',
                 },
             )
 
         response.raise_for_status()
+
+        logger.info(
+            'received_response_from_ollama',
+            file_number=file_number,
+            status_code=response.status_code,
+        )
 
         payload = response.json()
         raw_response = payload.get('response', '')
 
         raw_response = raw_response.strip()
 
-        if raw_response.startswith('```json'):
-            raw_response = raw_response.removeprefix('```json').strip()
-
-        if raw_response.startswith('```'):
-            raw_response = raw_response.removeprefix('```').strip()
-
-        if raw_response.endswith('```'):
-            raw_response = raw_response.removesuffix('```').strip()
-
-        json_match = re.search(r'\{.*}', raw_response, re.DOTALL)
-
-        if json_match is not None:
-            raw_response = json_match.group(0).strip()
-
-        print(raw_response)
-
         try:
             metadata = json.loads(raw_response)
         except json.JSONDecodeError as error:
+            logger.exception(
+                'failed_to_parse_ollama_response',
+                file_number=file_number,
+                raw_response=raw_response,
+            )
             raise HTTPException(
                 status_code=502,
                 detail='Ollama provider returned invalid JSON',
             ) from error
+
+        logger.info(
+            'ollama_metadata_generated_successfully',
+            file_number=file_number,
+            title=metadata.get('title'),
+            keywords_count=len(metadata.get('keywords') or []),
+        )
 
         return AIMetadataResponse(
             title=metadata.get('title') or '',
@@ -158,6 +180,7 @@ class OpenAIImageMetadataProvider(BaseAIProvider):
         self,
         image_path: Path,
         shooting_context: str | None = None,
+        file_number: int | None = None,
     ) -> AIMetadataResponse:
         """
         Генерирует метаданные через OpenAI.

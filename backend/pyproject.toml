@@ -15,6 +15,7 @@ dependencies = [
     "pillow>=12.2.0",
     "aiofiles>=25.1.0",
     "openai>=2.36.0",
+    "structlog>=25.5.0",
 ]
 
 [dependency-groups]
