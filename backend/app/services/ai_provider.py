@@ -1,10 +1,16 @@
+import base64
+import json
+import re
 from abc import ABC, abstractmethod
 from pathlib import Path
 
+import aiofiles
+import httpx
 from fastapi import HTTPException
 from openai import AsyncOpenAI
 
 from app.core.config import settings
+from app.core.constants import AI_PROVIDER_TIMEOUT
 
 
 class AIMetadataResponse:
@@ -59,6 +65,81 @@ class MockImageMetadataProvider(BaseAIProvider):
         )
 
 
+class OllamaImageMetadataProvider(BaseAIProvider):
+    """
+    AI-провайдер на базе Ollama
+    для локальной генерации metadata по изображению.
+    """
+
+    async def generate_metadata(
+        self,
+        image_path: Path,
+        shooting_context: str | None = None,
+    ) -> AIMetadataResponse:
+        """
+        Отправляет изображение в локальную Ollama model и возвращает metadata.
+        """
+        image_base64 = await _encode_image_to_base64(image_path)
+
+        prompt = (
+            'Generate stock photo metadata for this image. '
+            'Return only valid JSON '
+            'with fields: title, description, keywords. '
+            'keywords must be an array of strings.'
+        )
+
+        if shooting_context:
+            prompt = f'{prompt} Use this shooting context: {shooting_context}'
+
+        async with httpx.AsyncClient(timeout=AI_PROVIDER_TIMEOUT) as client:
+            response = await client.post(
+                f'{settings.OLLAMA_BASE_URL}/api/generate',
+                json={
+                    'model': settings.OLLAMA_MODEL,
+                    'prompt': prompt,
+                    'images': [image_base64],
+                    'stream': False,
+                },
+            )
+
+        response.raise_for_status()
+
+        payload = response.json()
+        raw_response = payload.get('response', '')
+
+        raw_response = raw_response.strip()
+
+        if raw_response.startswith('```json'):
+            raw_response = raw_response.removeprefix('```json').strip()
+
+        if raw_response.startswith('```'):
+            raw_response = raw_response.removeprefix('```').strip()
+
+        if raw_response.endswith('```'):
+            raw_response = raw_response.removesuffix('```').strip()
+
+        json_match = re.search(r'\{.*}', raw_response, re.DOTALL)
+
+        if json_match is not None:
+            raw_response = json_match.group(0).strip()
+
+        print(raw_response)
+
+        try:
+            metadata = json.loads(raw_response)
+        except json.JSONDecodeError as error:
+            raise HTTPException(
+                status_code=502,
+                detail='Ollama provider returned invalid JSON',
+            ) from error
+
+        return AIMetadataResponse(
+            title=metadata.get('title') or '',
+            description=metadata.get('description') or '',
+            keywords=metadata.get('keywords') or [],
+        )
+
+
 class OpenAIImageMetadataProvider(BaseAIProvider):
     """
     AI-провайдер на базе OpenAI для генерации metadata по изображению.
@@ -94,6 +175,9 @@ def get_ai_provider() -> BaseAIProvider:
     if settings.DEFAULT_AI_PROVIDER == 'mock':
         return MockImageMetadataProvider()
 
+    if settings.DEFAULT_AI_PROVIDER == 'ollama':
+        return OllamaImageMetadataProvider()
+
     if settings.DEFAULT_AI_PROVIDER == 'openai':
         return OpenAIImageMetadataProvider()
 
@@ -101,3 +185,13 @@ def get_ai_provider() -> BaseAIProvider:
         status_code=500,
         detail=f'Unsupported AI provider: {settings.DEFAULT_AI_PROVIDER}',
     )
+
+
+async def _encode_image_to_base64(image_path: Path) -> str:
+    """
+    Кодирует изображение в base64 для отправки в AI-провайдер.
+    """
+    async with aiofiles.open(image_path, 'rb') as image_file:
+        image_bytes = await image_file.read()
+
+    return base64.b64encode(image_bytes).decode('utf-8')

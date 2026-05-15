@@ -135,7 +135,7 @@ async def get_job_status(job_id: UUID):
             # в UI и отображения ошибок отдельных файлов.
             ProcessingJobFileStatus(
                 file_id=file.file_id,
-                filename=file.filename,
+                filename=file.original_filename,
                 original_filename=file.original_filename,
                 status=file.status,
                 error_message=file.error_message,
