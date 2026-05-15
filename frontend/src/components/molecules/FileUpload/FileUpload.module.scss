@@ -1,0 +1,71 @@
+/* FileUpload molecule styles */
+@import '@/styles/variables.module.scss';
+
+.container {
+  width: 100%;
+}
+
+.dropZone {
+  border: 2px dashed var(--border-color);
+  border-radius: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all var(--transition-normal) ease;
+  background: var(--bg-secondary);
+  
+  &:hover:not(.disabled) {
+    border-color: var(--accent-color);
+  }
+  
+  &.active {
+    border-color: var(--accent-color);
+    background: var(--bg-tretiary);
+    transform: scale(1.02);
+  }
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.icon {
+  font-size: var(--font-size-3xl);
+  line-height: 1;
+}
+
+.dropZone h3 {
+  margin: 0;
+  font-size: var(--font-size-2xl);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.dropZone p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-base);
+}
+
+.format {
+  display: block;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  margin-top: 4px;
+}
+
+.input {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .dropZone {
+    padding: 32px 16px;
+  }
+  
+  .icon {
+    font-size: var(--font-size-2xl);
+  }
+}
