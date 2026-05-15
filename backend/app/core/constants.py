@@ -25,3 +25,4 @@ MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
 
 # Ограничения AI processing pipeline.
 MAX_CONCURRENT_AI_REQUESTS = 3
+AI_PROVIDER_TIMEOUT = 120
