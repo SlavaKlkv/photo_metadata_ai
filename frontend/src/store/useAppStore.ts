@@ -31,16 +31,16 @@ export interface AppSettings {
  */
 export interface AppState {
   // Data
-  files: ProcessingJob[];
+  jobs: ProcessingJob[];
   settings: AppSettings;
   isProcessing: boolean;
   diagnosticCount: number;
 
   // Actions - File Management
-  addFiles: (files: ProcessingJob[]) => void;
-  updateFileStatus: (fileId: string, status: ProcessingJob['status'], error?: string) => void;
-  updateMetadata: (fileId: string, metadata: ProcessingJob['metadata']) => void;
-  removeFile: (fileId: string) => void;
+  addJobs: (files: ProcessingJob[]) => void;
+  updateJobStatus: (jobId: string, status: ProcessingJob['status'], error?: string) => void;
+  updateMetadata: (jobId: string, metadata: ProcessingJob['metadata']) => void;
+  removeJob: (jobId: string) => void;
   
   // Actions - Settings
   updateSettings: (key: keyof AppSettings, value: any) => void;
@@ -68,7 +68,7 @@ export const useAppStore = create<AppState>()(
   devtools(
     (set, get) => ({
       // Initial State
-      files: [],
+      jobs: [],
       settings: {
         aiProvider: 'ollama',
         shootingContext: '',
@@ -82,19 +82,19 @@ export const useAppStore = create<AppState>()(
       /**
        * Добавить новые файлы в очередь обработки
        */
-      addFiles: (newFiles: ProcessingJob[]) => {
+      addJobs: (newJobs: ProcessingJob[]) => {
         set((state) => ({
-          files: [...state.files, ...newFiles],
+          jobs: [...state.jobs, ...newJobs],
         }));
       },
 
       /**
        * Обновить статус обработки файла
        */
-      updateFileStatus: (fileId: string, status: ProcessingJob['status'], error?: string) => {
+      updateJobStatus: (jobId: string, status: ProcessingJob['status'], error?: string) => {
         set((state) => ({
-          files: state.files.map((file) =>
-            file.id === fileId ? { ...file, status, error } : file
+          jobs: state.jobs.map((job) =>
+            job.id === jobId ? { ...job, status, error } : job
           ),
         }));
       },
@@ -102,10 +102,10 @@ export const useAppStore = create<AppState>()(
       /**
        * Обновить метаданные файла
        */
-      updateMetadata: (fileId: string, metadata: ProcessingJob['metadata']) => {
+      updateMetadata: (jobId: string, metadata: ProcessingJob['metadata']) => {
         set((state) => ({
-          files: state.files.map((file) =>
-            file.id === fileId ? { ...file, metadata } : file
+          jobs: state.jobs.map((job) =>
+            job.id === jobId ? { ...job, metadata } : job
           ),
         }));
       },
@@ -113,9 +113,9 @@ export const useAppStore = create<AppState>()(
       /**
        * Удалить файл из очереди
        */
-      removeFile: (fileId: string) => {
+      removeJob: (jobId: string) => {
         set((state) => ({
-          files: state.files.filter((file) => file.id !== fileId),
+          jobs: state.jobs.filter((job) => job.id !== jobId),
         }));
       },
 
@@ -152,30 +152,30 @@ export const useAppStore = create<AppState>()(
        * Получить общий прогресс обработки (0-100%)
        */
       getOverallProgress: () => {
-        const { files } = get();
-        if (files.length === 0) return 0;
+        const { jobs } = get();
+        if (jobs.length === 0) return 0;
 
-        const completedCount = files.filter(
-          (f) => f.status === 'done' || f.status === 'error'
+        const completedCount = jobs.filter(
+          (job) => job.status === 'done' || job.status === 'error'
         ).length;
 
-        return Math.round((completedCount / files.length) * 100);
+        return Math.round((completedCount / jobs.length) * 100);
       },
 
       /**
        * Получить файл по ID
        */
       getFileById: (fileId: string) => {
-        const { files } = get();
-        return files.find((f) => f.id === fileId);
+        const { jobs } = get();
+        return jobs.find((job) => job.id === fileId);
       },
 
       /**
        * Проверить, есть ли файлы с ошибками
        */
       hasErrors: () => {
-        const { files } = get();
-        return files.some((f) => f.status === 'error');
+        const { jobs } = get();
+        return jobs.some((job) => job.status === 'error');
       },
 
       /**
@@ -183,7 +183,7 @@ export const useAppStore = create<AppState>()(
        */
       clearAll: () => {
         set({
-          files: [],
+          jobs: [],
           isProcessing: false,
         });
       },

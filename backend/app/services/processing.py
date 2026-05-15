@@ -21,6 +21,7 @@ async def _process_file(
     file: ProcessingJobFile,
     ai_provider: BaseAIProvider,
     job_id: UUID,
+    shooting_context: str | None,
 ) -> None:
     """
     Обрабатывает один файл с ограничением числа одновременных AI-запросов.
@@ -35,6 +36,7 @@ async def _process_file(
 
             metadata = await ai_provider.generate_metadata(
                 get_upload_file_path(file.filename),
+                shooting_context=shooting_context,
             )
 
             if await _is_job_cancelled(job_id):
@@ -71,7 +73,15 @@ async def process_job(job_id: UUID) -> None:
     ai_provider = get_ai_provider()
 
     await asyncio.gather(
-        *[_process_file(file, ai_provider, job.job_id) for file in job.files],
+        *[
+            _process_file(
+                file,
+                ai_provider,
+                job.job_id,
+                job.shooting_context,
+            )
+            for file in job.files
+        ],
     )
 
     if job.status == JobStatus.CANCELLED:
@@ -115,7 +125,12 @@ async def retry_failed_files(job_id: UUID) -> None:
 
     await asyncio.gather(
         *[
-            _process_file(file, ai_provider, job.job_id)
+            _process_file(
+                file,
+                ai_provider,
+                job.job_id,
+                job.shooting_context,
+            )
             for file in failed_files
         ],
     )

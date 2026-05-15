@@ -1,6 +1,13 @@
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    File,
+    Form,
+    HTTPException,
+    UploadFile,
+)
 from fastapi.responses import Response
 from starlette.concurrency import run_in_threadpool
 
@@ -42,6 +49,7 @@ router = APIRouter(
 async def upload_photos(
     background_tasks: BackgroundTasks,
     files: list[UploadFile] = File(...),
+    shooting_context: str | None = Form(None),
 ):
     """
     Загружает несколько JPG/PNG файлов и создает задачу обработки.
@@ -59,7 +67,10 @@ async def upload_photos(
             )
         )
 
-    job = ProcessingJob(files=job_files)
+    job = ProcessingJob(
+        files=job_files,
+        shooting_context=shooting_context,
+    )
 
     created_job = await storage.create_job(job)
     background_tasks.add_task(process_job, created_job.job_id)
@@ -80,6 +91,7 @@ async def create_job(payload: CreateProcessingJobRequest):
             )
             for file in payload.files
         ],
+        shooting_context=payload.shooting_context,
     )
 
     return await storage.create_job(job)
