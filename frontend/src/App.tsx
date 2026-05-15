@@ -1,16 +1,14 @@
 import React from 'react';
 import { useAppStore } from './store/useAppStore';
 import styles from './App.module.scss';
-//import { FileUpload } from '@/components/molecules/FileUpload/FileUpload';
-//import { SettingsPanel } from '@/components/organisms/SettingsPanel/SettingsPanel';
-//import { FeatureCards } from '@/components/organisms/FeatureCards/FeatureCards';
-//import { ProgressModal } from '@/components/organisms/ProgressModal/ProgressModal';
-//import { BottomStatusBar } from '@/components/molecules/BottomStatusBar/BottomStatusBar';
-//import { BottomActionBar } from '@/components/organisms/
+import { FileUpload } from './components/molecules/FileUpload/FileUpload';
+import { SettingsPanel } from './components/organisms/SettingsPanel/SettingsPanel';
+import { FeatureCards } from './components/organisms/FeatureCards/FeatureCards';
+import { ProgressModal } from './components/organisms/ProgressModal/ProgressModal';
+import { BottomStatusBar } from './components/molecules/BottomStatusBar/BottomStatusBar';
+import { BottomActionBar } from './components/organisms/BottomActionBar/BottomActionBar';
 
 function App() {
-  const jobs = useAppStore((state) => state.jobs);
-  
   return (
     <div className={styles.app}>
       {/* HEADER */}

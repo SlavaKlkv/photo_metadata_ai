@@ -1,8 +1,9 @@
-// FileUpload (Drop zone) molecule component
+// FileUpload (drag-and-drop) molecule component
 
 import React, { useRef, useState } from 'react';
-import { useAppStore } from '@/store/useAppStore';
-import { useUIStore } from '@/store/useUIStore';
+import { useAppStore } from '../../../store/useAppStore';
+import { useUIStore } from '../../../store/useUIStore';
+import { useToastStore } from '../../../store/useToastStore';
 import styles from './FileUpload.module.scss';
 
 const ALLOWED_FORMATS = ['image/jpeg', 'image/png'];
@@ -13,9 +14,8 @@ export const FileUpload: React.FC = () => {
   const [dragActive, setDragActive] = useState(false);
   
   const addJobs = useAppStore((state) => state.addJobs);
-  const jobs = useAppStore((state) => state.jobs);
   const openProgressModal = useUIStore((state) => state.openProgressModal);
-  const addToast = useUIStore((state) => state.addToast);
+  const addToast = useToastStore((state) => state.addToast);
   
   const validateFile = (file: File): { valid: boolean; error?: string } => {
     if (!ALLOWED_FORMATS.includes(file.type)) {
