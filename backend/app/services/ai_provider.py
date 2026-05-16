@@ -132,9 +132,7 @@ class OllamaImageMetadataProvider(BaseAIProvider):
         )
 
         payload = response.json()
-        raw_response = payload.get('response', '')
-
-        raw_response = raw_response.strip()
+        raw_response = _extract_json_response(payload.get('response', ''))
 
         try:
             metadata = json.loads(raw_response)
@@ -142,7 +140,8 @@ class OllamaImageMetadataProvider(BaseAIProvider):
             logger.exception(
                 'failed_to_parse_ollama_response',
                 file_number=file_number,
-                raw_response=raw_response,
+                response_length=len(raw_response),
+                model=settings.OLLAMA_MODEL,
             )
             raise HTTPException(
                 status_code=502,
@@ -219,3 +218,25 @@ async def _encode_image_to_base64(image_path: Path) -> str:
         image_bytes = await image_file.read()
 
     return base64.b64encode(image_bytes).decode('utf-8')
+
+def _extract_json_response(raw_response: str) -> str:
+    """
+    Очищает ответ Ollama от возможной markdown-обёртки вокруг JSON.
+    """
+    raw_response = raw_response.strip()
+
+    if raw_response.startswith('```json'):
+        raw_response = raw_response.removeprefix('```json').strip()
+
+    if raw_response.startswith('```'):
+        raw_response = raw_response.removeprefix('```').strip()
+
+    if raw_response.endswith('```'):
+        raw_response = raw_response.removesuffix('```').strip()
+
+    json_match = re.search(r'\{.*}', raw_response, re.DOTALL)
+
+    if json_match is not None:
+        return json_match.group(0).strip()
+
+    return raw_response
