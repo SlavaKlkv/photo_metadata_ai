@@ -9,8 +9,8 @@
   align-items: center;
   justify-content: center;
   z-index: var(--z-modal-backdrop);
-  // плавное появление
-  animation: fadeIn var(--transition-fast) ease;
+  /* плавное появление */
+  animation: fadeIn var(--transition-fast);
 }
 
 .modal {
@@ -21,7 +21,7 @@
   width: 100%;
   max-width: 480px;
   z-index: var(--z-modal);
-  animation: slideUp var(--transition-normal) ease;
+  animation: slideUp var(--transition-normal);
 }
 
 @keyframes fadeIn {
