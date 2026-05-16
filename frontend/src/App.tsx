@@ -1,14 +1,22 @@
 import React from 'react';
 import { useAppStore } from './store/useAppStore';
+import { useUIStore } from './store/useUIStore';
 import styles from './App.module.scss';
-import { FileUpload } from './components/molecules/FileUpload/FileUpload';
+import { FileUploadSection } from './components/organisms/FileUploadSection/FileUploadSection';
 import { SettingsPanel } from './components/organisms/SettingsPanel/SettingsPanel';
-import { FeatureCards } from './components/organisms/FeatureCards/FeatureCards';
 import { ProgressModal } from './components/organisms/ProgressModal/ProgressModal';
 import { BottomStatusBar } from './components/molecules/BottomStatusBar/BottomStatusBar';
 import { BottomActionBar } from './components/organisms/BottomActionBar/BottomActionBar';
 
 function App() {
+  const jobs = useAppStore((state) => state.jobs);
+  const closeProgressModal = useUIStore((state) => state.closeProgressModal);
+
+  const totalJobs = jobs.length;
+  const currentProgress = jobs.filter(
+    (job) => job.status === 'processing' || job.status === 'done' || job.status === 'error'
+  ).length;
+
   return (
     <div className={styles.app}>
       {/* HEADER */}
@@ -36,10 +44,9 @@ function App() {
             <SettingsPanel />
           </aside>
           
-          {/* RIGHT: Upload & Features */}
+          {/* RIGHT: Upload & Info */}
           <div className={styles.content}>
-            <FileUpload />
-            <FeatureCards />
+            <FileUploadSection />
           </div>
         </div>
       </main>
@@ -51,7 +58,11 @@ function App() {
       <BottomActionBar />
       
       {/* MODAL: Progress (поверх всего) */}
-      <ProgressModal />
+      <ProgressModal
+        current={currentProgress}
+        total={totalJobs}
+        onCancel={closeProgressModal}
+      />
     </div>
   );
 }
