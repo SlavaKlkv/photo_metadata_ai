@@ -22,6 +22,7 @@ async def _process_file(
     ai_provider: BaseAIProvider,
     job_id: UUID,
     shooting_context: str | None,
+    file_number: int | None = None,
 ) -> None:
     """
     Обрабатывает один файл с ограничением числа одновременных AI-запросов.
@@ -37,6 +38,7 @@ async def _process_file(
             metadata = await ai_provider.generate_metadata(
                 get_upload_file_path(file.filename),
                 shooting_context=shooting_context,
+                file_number=file_number,
             )
 
             if await _is_job_cancelled(job_id):
@@ -70,7 +72,11 @@ async def process_job(job_id: UUID) -> None:
 
     await storage.update_job(job)
 
-    ai_provider = get_ai_provider()
+    try:
+        ai_provider = get_ai_provider()
+    except Exception as error:
+        await _mark_job_as_failed(job.job_id, error)
+        return
 
     await asyncio.gather(
         *[
@@ -79,8 +85,9 @@ async def process_job(job_id: UUID) -> None:
                 ai_provider,
                 job.job_id,
                 job.shooting_context,
+                file_number=index,
             )
-            for file in job.files
+            for index, file in enumerate(job.files, start=1)
         ],
     )
 
@@ -121,7 +128,11 @@ async def retry_failed_files(job_id: UUID) -> None:
 
     await storage.update_job(job)
 
-    ai_provider = get_ai_provider()
+    try:
+        ai_provider = get_ai_provider()
+    except Exception as error:
+        await _mark_job_as_failed(job.job_id, error)
+        return
 
     await asyncio.gather(
         *[
@@ -178,3 +189,24 @@ async def _is_job_cancelled(job_id: UUID) -> bool:
         return True
 
     return job.status == JobStatus.CANCELLED
+
+
+async def _mark_job_as_failed(job_id: UUID, error: Exception) -> None:
+    """
+    Переводит задачу и все незавершённые файлы в failed при ошибке пайплайна.
+    """
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        return
+
+    job.status = JobStatus.FAILED
+    error_message = str(error)
+
+    for file in job.files:
+        if file.status in {FileStatus.QUEUED, FileStatus.PROCESSING}:
+            file.status = FileStatus.FAILED
+            file.error_message = error_message
+
+    await storage.update_job(job)
+
