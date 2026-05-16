@@ -7,31 +7,51 @@
   --bg-tretiary: #24242E;       // Третичный фон (интерактивные элементы)
   --text-primary: #ffffff;       // Основной текст
   --text-secondary: #A9A9BC;    // Второстепенный текст
+  --text-placeholder: #8D8DA5;   // Цвет текста в плейсхолдерах
 
   //===== BORDERS =====
   --border-color: #262836;       // Цвет границ панелей
   --border-default: #5A5A72;     // Цвет границ для обычных элементов
   --border-hover: #8D8DA5;       // Цвет границ при наведении
   --border-active: #F4F4F6;      // Цвет границ при активном состоянии
-  --border-focus: #8D8DA5;    // Цвет границ для отключённых
+  --border-focus: #A9A9BC;    // Цвет границ для отключённых 
 
   // ===== BUTTONS =====
-  --bt-default: #5A5A72;       // Цвет фона для основных кнопок
-  --bt-hover: #8D8DA5;         // Цвет фона при наведении
-  --bt-active: #363645;        // Цвет фона при активном состоянии
-  --bt-disabled: #24242E;      // Цвет фона для отключённых кнопок
-  --bt-default-text: #F4F4F6;     // Цвет текста на кноп
-  --bt-active-text: #8D8DA5;      // Цвет текста на активных кнопках
+  --bt-default-primary: #5A5AED;       // Цвет фона для основных кнопок
+  --bt-hover-primary: #9191F3;         // Цвет фона при наведении
+  --bt-active-primary: #9191F3;        // Цвет фона при активном состоянии
+  --bt-disabled-primary: #24242E;      // Цвет фона для отключённых кнопок
+
+  --bt-default-secondary: #363645;       // Цвет фона для основных кнопок
+  --bt-hover-secondary: #5A5A72;         // Цвет фона при наведении
+  --bt-active-secondary: #24242E;        // Цвет фона при активном состоянии
+  --bt-disabled-secondary: #24242E;      // Цвет фона для отключённых кнопок
+
+  --bt-default-text: #F4F4F6;     // Цвет текста на кнопках
+  --bt-active-text: #A9A9BC;      // Цвет текста на активных кнопках
   --bt-disabled-text: #5A5A72;    // Цвет текста на отключённых кнопках
   
   // ===== ACCENTS =====
-  --accent-color: #9191F3;       // Основной цвет (синий)
-  --accent-light: #9191F3;       // Светлый вариант
-  --accent-dark: #484861;        // Тёмный вариант
+  --accent-main: #5A5AED;       // Основной цвет (синий)
+  --accent-light: #7171EE;       // Светлый вариант
+  --accent-dark: #3A3A5F;        // Тёмный вариант
   --success-color: #4caf50;      // Зелёный (успех)
   --error-color: #ff6b6b;        // Красный (ошибка)
   --warning-color: #ffa500;      // Оранжевый (предупреждение)
-  
+
+  // ===== preview row =====
+  --preview-bg: #303030;        // Цвет фона для превью строки
+  --preview-hover-bg: #1B1B22;  // Цвет фона при наведении
+  --preview-active-bg: #24242E; // Цвет фона при активном состоянии
+
+  // ===== LABELS =====
+  --label-default-primary: #474748;     // Цвет лейблов
+  --label-hover-primary: #5D5D5E;       // Цвет лейблов при наведении
+  --label-active-primary: #3C3C3C;      // Цвет лейблов при активном состоянии
+  --label-default-secondary: #3A3A3A;     // Цвет лейблов
+  --label-hover-secondary: #4E4E4E;       // Цвет лейблов при наведении
+  --label-active-secondary: #353535;     // Цвет лейблов при активном состоянии
+
   // ===== SPACING (8px grid system) =====
   --spacing-xs: 4px;             // Мини отступы
   --spacing-sm: 8px;             // Маленькие
