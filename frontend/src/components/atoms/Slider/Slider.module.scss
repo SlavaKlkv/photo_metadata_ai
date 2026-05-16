@@ -1,0 +1,54 @@
+/* Slider atom styles */
+@import '../../../styles/variables.module.scss';
+
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: var(--radius-full);
+  outline: none;
+  cursor: pointer;
+
+  // трек: левая часть (заполнена) через CSS custom property
+  background: linear-gradient(
+    to right,
+    var(--accent-main) 0%,
+    var(--accent-main) var(--fill),
+    var(--bg-tretiary) var(--fill),
+    var(--bg-tretiary) 100%
+  );
+
+  // ползунок — webkit
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: var(--radius-full);
+    background: var(--text-primary);
+    cursor: pointer;
+    transition: transform var(--transition-fast);
+
+    &:hover { transform: scale(1.2); }
+  }
+
+  // ползунок — firefox
+  &::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border: none;
+    border-radius: var(--radius-full);
+    background: var(--text-primary);
+    cursor: pointer;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 4px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+}

@@ -6,21 +6,19 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   variant?: 'primary' | 'secondary' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
   icon?: React.ReactNode;
-  iconPosition?: 'left' | 'right';
   children: React.ReactNode;
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = 'primary', size = 'md', icon, iconPosition = 'left', ...props }, ref) => {
+  ({ variant = 'primary', size = 'md', icon, ...props }, ref) => {
     return (
       <button
         ref={ref}
         className={`${styles.button} ${styles[variant]} ${styles[size]}`}
         {...props}
       >
-        {icon && iconPosition === 'left' && <span className={styles.icon}>{icon}</span>}
+        {icon && <span className={styles.icon}>{icon}</span>}
         {props.children}
-        {icon && iconPosition === 'right' && <span className={styles.icon}>{icon}</span>}
       </button>
     );
   }

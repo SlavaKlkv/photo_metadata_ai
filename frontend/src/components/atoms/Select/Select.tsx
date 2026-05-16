@@ -1,5 +1,6 @@
 // Select atom component
 import React from 'react';
+import { Icon } from '../Icon/Icon';
 import styles from './Select.module.scss';
 
 export interface SelectOption {
@@ -11,20 +12,25 @@ export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectE
   label?: string;
   options: SelectOption[];
   helper?: string;
+  icon?: React.ReactNode;
 }
 
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
-  ({ label, options, helper, ...props }, ref) => {
+  ({ label, options, helper, icon, ...props }, ref) => {
     return (
       <div className={styles.container}>
         {label && <label className={styles.label}>{label}</label>}
-        <select ref={ref} className={styles.select} {...props}>
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+        <div className={styles.selectWrapper}>
+          {icon && <span className={styles.leftIcon}>{icon}</span>}
+          <select ref={ref} className={styles.select} {...props}>
+            {options.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <Icon name="arrow-down" className={styles.rightIcon} />
+        </div>
         {helper && <small className={styles.helper}>{helper}</small>}
       </div>
     );
