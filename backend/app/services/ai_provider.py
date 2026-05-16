@@ -219,6 +219,7 @@ async def _encode_image_to_base64(image_path: Path) -> str:
 
     return base64.b64encode(image_bytes).decode('utf-8')
 
+
 def _extract_json_response(raw_response: str) -> str:
     """
     Очищает ответ Ollama от возможной markdown-обёртки вокруг JSON.
