@@ -17,6 +17,8 @@ export const BottomActionBar: React.FC = () => {
   const clearAll = useAppStore((state) => state.clearAll);
   const setIsUploaded = useUIStore((state) => state.setIsUploaded);
   const setIsExportReady = useUIStore((state) => state.setIsExportReady);
+  const setIsPollingActive = useUIStore((state) => state.setIsPollingActive);
+
 
   // текущий шаг степпера
   const currentStep = !isUploaded ? 0 : isProcessing ? 2 : isExportReady ? 4 : 1;
@@ -28,6 +30,7 @@ export const BottomActionBar: React.FC = () => {
   };
 
   const handleStartProcessing = () => {
+    setIsPollingActive(true);
     openProgressModal();
   };
 

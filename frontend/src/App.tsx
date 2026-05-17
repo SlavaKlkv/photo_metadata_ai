@@ -8,13 +8,14 @@ import { SettingsPanel } from './components/organisms/SettingsPanel/SettingsPane
 import { ProgressModal } from './components/organisms/ProgressModal/ProgressModal';
 import { BottomActionBar } from './components/organisms/BottomActionBar/BottomActionBar';
 import { ResultsTable } from './components/organisms/ResultsTable/ResultsTable';
-//import { MetadataPreview } from './components/organisms/MetadataPreview/MetadataPreview';
+import { MetadataPreview } from './components/organisms/MetadataPreview/MetadataPreview';
 
 function App() {
   const currentJobId = useUIStore((state) => state.currentJobId);
   const isExportReady = useUIStore((state) => state.isExportReady);
+  const isPollingActive = useUIStore((state) => state.isPollingActive);
 
-  usePolling(currentJobId);
+  usePolling(isPollingActive ? currentJobId : null);
 
   return (
     <div className={styles.app}>
@@ -42,7 +43,7 @@ function App() {
           <div className={styles.reviewGrid}>
             <SettingsPanel />
             <ResultsTable />
-            {/* <MetadataPreview /> */}
+            <MetadataPreview />
           </div>
         ) : (
           // upload экран — Settings + FileUpload
