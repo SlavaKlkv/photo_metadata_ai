@@ -1,0 +1,85 @@
+/* ResultsTable organism styles */
+@import '../../../styles/variables.module.scss';
+
+.panel {
+  height: 100%;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+
+  h2 {
+    margin: 0;
+    font-size: var(--font-size-2xl);
+    color: var(--text-primary);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  p {
+    margin: 4px 0 0;
+    font-size: var(--font-size-base);
+    color: var(--text-secondary);
+    line-height: var(--line-height-normal);
+  }
+}
+
+.headerIcon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  color: var(--accent-main);
+}
+
+.settingsIcon {
+  width: 24px;
+  height: 24px;
+}
+
+.tableHeader {
+  display: grid;
+  grid-template-columns: 32px 56px 1fr 1fr;
+  gap: var(--spacing-md);
+  padding: 0 var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.checkboxCell {
+  display: flex;
+  align-items: center;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  overflow-y: auto;
+  flex: 1;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--border-color);
+}
+
+.selectAll {
+  background: none;
+  border: none;
+  color: var(--accent-main);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  padding: 0;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}

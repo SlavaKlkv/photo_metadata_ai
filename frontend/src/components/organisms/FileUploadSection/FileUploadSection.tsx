@@ -22,6 +22,7 @@ export const FileUploadSection: React.FC = () => {
   const setCurrentJobId = useUIStore((state) => state.setCurrentJobId);
   const addToast = useToastStore((state) => state.addToast);
   const [isUploading, setIsUploading] = useState(false);
+  const addPreviews = useAppStore((state) => state.addPreviews);
 
   const validateFile = (file: File): { valid: boolean; error?: string } => {
     if (!ALLOWED_FORMATS.includes(file.type)) {
@@ -76,6 +77,13 @@ export const FileUploadSection: React.FC = () => {
       }>("/api/v1/jobs/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+
+      const previewMap: Record<string, string> = {};
+      response.data.files.forEach((f: { file_id: string }, index: number) => {
+        // порядок сохраняется — маппим по индексу
+        previewMap[f.file_id] = URL.createObjectURL(validFiles[index]);
+      });
+      addPreviews(previewMap);
 
       const fileIds = response.data.files.map((f) => f.file_id);
       const jobs = createJobs(validFiles, fileIds);

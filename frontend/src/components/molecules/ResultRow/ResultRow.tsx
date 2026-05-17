@@ -10,6 +10,7 @@ interface ResultRowProps {
   isChecked: boolean;
   onSelect: (id: string) => void;
   onCheck: (id: string, checked: boolean) => void;
+  previewUrl?: string;
 }
 
 export const ResultRow: React.FC<ResultRowProps> = ({
@@ -18,6 +19,7 @@ export const ResultRow: React.FC<ResultRowProps> = ({
   isChecked,
   onSelect,
   onCheck,
+  previewUrl,
 }) => {
   return (
     <div
@@ -31,9 +33,16 @@ export const ResultRow: React.FC<ResultRowProps> = ({
         />
       </div>
 
-      {/* превью — пока заглушка, реального URL нет в типах */}
       <div className={styles.preview}>
-        <div className={styles.previewPlaceholder} />
+        {previewUrl ? (
+          <img
+            src={previewUrl}
+            alt={job.originalFilename}
+            className={styles.previewImg}
+          />
+        ) : (
+          <div className={styles.previewPlaceholder} />
+        )}
       </div>
 
       <span className={styles.filename}>{job.originalFilename}</span>

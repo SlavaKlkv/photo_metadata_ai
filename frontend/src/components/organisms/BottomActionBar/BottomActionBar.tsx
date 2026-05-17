@@ -22,8 +22,10 @@ export const BottomActionBar: React.FC = () => {
 
   // текущий шаг степпера
   const currentStep = !isUploaded ? 0 : isProcessing ? 2 : isExportReady ? 4 : 1;
+  const previews = useAppStore((state) => state.previews);
 
   const handleRestart = () => {
+    Object.values(previews).forEach((url) => URL.revokeObjectURL(url));
     clearAll();
     setIsUploaded(false);
     setIsExportReady(false);

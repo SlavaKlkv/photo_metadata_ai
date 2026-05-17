@@ -30,7 +30,12 @@ export interface AppState {
   getFileById: (fileId: string) => ProcessingJob | undefined;
   hasErrors: () => boolean;
   clearAll: () => void;
-  
+
+  // Previews
+  previews: Record<string, string>; // fileId → objectURL
+  addPreviews: (previews: Record<string, string>) => void;
+  clearPreviews: () => void;
+
   // Persistence
   loadSettings: () => void;
   saveSettings: () => void;
@@ -41,159 +46,168 @@ export interface AppState {
  * Интегрирован с Redux DevTools для отладки
  */
 export const useAppStore = create<AppState>()(
-  devtools(
-    (set, get) => ({
-      // Initial State
-      jobs: [],
-      settings: {
-        aiProvider: 'ollama',
-        shootingContext: '',
-        exportFormat: 'getty',
-      },
-      isProcessing: false,
-      diagnosticCount: 0,
+  devtools((set, get) => ({
+    // Initial State
+    jobs: [],
+    settings: {
+      aiProvider: "ollama",
+      shootingContext: "",
+      exportFormat: "getty",
+    },
+    isProcessing: false,
+    diagnosticCount: 0,
 
-      // === File Management Actions ===
+    // === File Management Actions ===
 
-      /**
-       * Добавить новые файлы в очередь обработки
-       */
-      addJobs: (newJobs: ProcessingJob[]) => {
-        set((state) => ({
-          jobs: [...state.jobs, ...newJobs],
-        }));
-      },
+    /**
+     * Добавить новые файлы в очередь обработки
+     */
+    addJobs: (newJobs: ProcessingJob[]) => {
+      set((state) => ({
+        jobs: [...state.jobs, ...newJobs],
+      }));
+    },
 
-      /**
-       * Обновить статус обработки файла
-       */
-      updateJobStatus: (jobId: string, status: ProcessingJob['status'], error?: string) => {
-        set((state) => ({
-          jobs: state.jobs.map((job) =>
-            job.id === jobId ? { ...job, status, error } : job
-          ),
-        }));
-      },
+    /**
+     * Обновить статус обработки файла
+     */
+    updateJobStatus: (
+      jobId: string,
+      status: ProcessingJob["status"],
+      error?: string,
+    ) => {
+      set((state) => ({
+        jobs: state.jobs.map((job) =>
+          job.id === jobId ? { ...job, status, error } : job,
+        ),
+      }));
+    },
 
-      /**
-       * Обновить метаданные файла
-       */
-      updateMetadata: (jobId: string, metadata: ProcessingJob['metadata']) => {
-        set((state) => ({
-          jobs: state.jobs.map((job) =>
-            job.id === jobId ? { ...job, metadata } : job
-          ),
-        }));
-      },
+    /**
+     * Обновить метаданные файла
+     */
+    updateMetadata: (jobId: string, metadata: ProcessingJob["metadata"]) => {
+      set((state) => ({
+        jobs: state.jobs.map((job) =>
+          job.id === jobId ? { ...job, metadata } : job,
+        ),
+      }));
+    },
 
-      /**
-       * Удалить файл из очереди
-       */
-      removeJob: (jobId: string) => {
-        set((state) => ({
-          jobs: state.jobs.filter((job) => job.id !== jobId),
-        }));
-      },
+    /**
+     * Удалить файл из очереди
+     */
+    removeJob: (jobId: string) => {
+      set((state) => ({
+        jobs: state.jobs.filter((job) => job.id !== jobId),
+      }));
+    },
 
-      // === Settings Actions ===
+    // === Settings Actions ===
 
-      /**
-       * Обновить одну из настроек
-       */
-      updateSettings: (key: keyof AppSettings, value: any) => {
-        set((state) => ({
-          settings: { ...state.settings, [key]: value },
-        }));
-      },
+    /**
+     * Обновить одну из настроек
+     */
+    updateSettings: (key: keyof AppSettings, value: any) => {
+      set((state) => ({
+        settings: { ...state.settings, [key]: value },
+      }));
+    },
 
-      // === UI Actions ===
+    // === UI Actions ===
 
-      /**
-       * Установить флаг обработки
-       */
-      setIsProcessing: (isProcessing: boolean) => {
-        set({ isProcessing });
-      },
+    /**
+     * Установить флаг обработки
+     */
+    setIsProcessing: (isProcessing: boolean) => {
+      set({ isProcessing });
+    },
 
-      /**
-       * Диагностический инкремент для development-only проверки DevTools
-       */
-      inc: () => {
-        set((state) => ({ diagnosticCount: state.diagnosticCount + 1 }));
-      },
+    /**
+     * Диагностический инкремент для development-only проверки DevTools
+     */
+    inc: () => {
+      set((state) => ({ diagnosticCount: state.diagnosticCount + 1 }));
+    },
 
-      // === Computed / Utility Methods ===
+    // === Previews Management ===
+    previews: {},
+    addPreviews: (newPreviews) =>
+      set((state) => ({ previews: { ...state.previews, ...newPreviews } })),
+    clearPreviews: () => set({ previews: {} }),
 
-      /**
-       * Получить общий прогресс обработки (0-100%)
-       */
-      getOverallProgress: () => {
-        const { jobs } = get();
-        if (jobs.length === 0) return 0;
+    // === Computed / Utility Methods ===
 
-        const completedCount = jobs.filter(
-          (job) => job.status === 'done' || job.status === 'error'
-        ).length;
+    /**
+     * Получить общий прогресс обработки (0-100%)
+     */
+    getOverallProgress: () => {
+      const { jobs } = get();
+      if (jobs.length === 0) return 0;
 
-        return Math.round((completedCount / jobs.length) * 100);
-      },
+      const completedCount = jobs.filter(
+        (job) => job.status === "done" || job.status === "error",
+      ).length;
 
-      /**
-       * Получить файл по ID
-       */
-      getFileById: (fileId: string) => {
-        const { jobs } = get();
-        return jobs.find((job) => job.id === fileId);
-      },
+      return Math.round((completedCount / jobs.length) * 100);
+    },
 
-      /**
-       * Проверить, есть ли файлы с ошибками
-       */
-      hasErrors: () => {
-        const { jobs } = get();
-        return jobs.some((job) => job.status === 'error');
-      },
+    /**
+     * Получить файл по ID
+     */
+    getFileById: (fileId: string) => {
+      const { jobs } = get();
+      return jobs.find((job) => job.id === fileId);
+    },
 
-      /**
-       * Очистить все данные
-       */
-      clearAll: () => {
-        set({
-          jobs: [],
-          isProcessing: false,
-        });
-      },
+    /**
+     * Проверить, есть ли файлы с ошибками
+     */
+    hasErrors: () => {
+      const { jobs } = get();
+      return jobs.some((job) => job.status === "error");
+    },
 
-      // === Persistence ===
+    /**
+     * Очистить все данные
+     */
+    clearAll: () => {
+      set({
+        jobs: [],
+        isProcessing: false,
+        previews: {}
+      });
+    },
 
-      /**
-       * Загрузить настройки из localStorage
-       */
-      loadSettings: () => {
-        try {
-          const saved = localStorage.getItem('app_settings');
-          if (saved) {
-            const parsed = JSON.parse(saved);
-            set((state) => ({
-              settings: { ...state.settings, ...parsed },
-            }));
-          }
-        } catch (err) {
-          console.error('Failed to load settings from localStorage:', err);
+    // === Persistence ===
+
+    /**
+     * Загрузить настройки из localStorage
+     */
+    loadSettings: () => {
+      try {
+        const saved = localStorage.getItem("app_settings");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          set((state) => ({
+            settings: { ...state.settings, ...parsed },
+          }));
         }
-      },
+      } catch (err) {
+        console.error("Failed to load settings from localStorage:", err);
+      }
+    },
 
-      /**
-       * Сохранить настройки в localStorage
-       */
-      saveSettings: () => {
-        try {
-          const { settings } = get();
-          localStorage.setItem('app_settings', JSON.stringify(settings));
-        } catch (err) {
-          console.error('Failed to save settings to localStorage:', err);
-        }
-      },
-    }),
-)
+    /**
+     * Сохранить настройки в localStorage
+     */
+    saveSettings: () => {
+      try {
+        const { settings } = get();
+        localStorage.setItem("app_settings", JSON.stringify(settings));
+      } catch (err) {
+        console.error("Failed to save settings to localStorage:", err);
+      }
+    },
+  })),
 );

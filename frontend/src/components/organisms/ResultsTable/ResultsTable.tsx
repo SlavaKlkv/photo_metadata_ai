@@ -13,6 +13,7 @@ export const ResultsTable: React.FC = () => {
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const selectedJobId = useUIStore((state) => state.selectedJobId);
   const setSelectedJobId = useUIStore((state) => state.setSelectedJobId);
+  const previews = useAppStore((state) => state.previews);
 
   const doneJobs = jobs.filter((j) => j.status === 'done');
   const allChecked = checkedIds.size === doneJobs.length && doneJobs.length > 0;
@@ -30,10 +31,12 @@ export const ResultsTable: React.FC = () => {
   };
 
   return (
-    <Panel className={styles.panel} direction="column" gap="md">
+    <Panel className={styles.settingsPanel} direction="column" gap="md">
       {/* Заголовок */}
       <div className={styles.header}>
+        <div className={styles.headerIcon}>
         <Icon name="results-icon" className={styles.headerIcon} />
+        </div>
         <div>
           <h2>Results</h2>
           <p>{doneJobs.length} photos</p>
@@ -59,6 +62,7 @@ export const ResultsTable: React.FC = () => {
           <ResultRow
             key={job.id}
             job={job}
+            previewUrl={previews[job.id]}
             isSelected={selectedJobId === job.id}
             isChecked={checkedIds.has(job.id)}
             onSelect={setSelectedJobId}
