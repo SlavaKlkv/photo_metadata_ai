@@ -1,1 +1,102 @@
 /* SettingsPanel organism styles */
+@import '../../../styles/variables.module.scss';
+
+.settingsPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.headerIcon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  color: var(--accent-main);
+}
+
+.settingsIcon {
+  width: 24px;
+  height: 24px;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+}
+
+.header p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.charCounter {
+  align-self: flex-end;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.counterError {
+  color: var(--error-color);
+}
+
+.errorText {
+  color: var(--error-color);
+  font-size: var(--font-size-sm);
+}
+
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sliderRow {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sliderLabel {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.slider {
+  width: 100%;
+}
+
+@media (max-width: 760px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
