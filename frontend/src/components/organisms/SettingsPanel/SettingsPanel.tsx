@@ -47,6 +47,7 @@ export const SettingsPanel: React.FC = () => {
 
   return (
     <Panel className={styles.settingsPanel}>
+      {/* Заголовок */}
       <div className={styles.header}>
         <div className={styles.headerIcon}>
           <Icon name="settings-icon" className={styles.settingsIcon} />
