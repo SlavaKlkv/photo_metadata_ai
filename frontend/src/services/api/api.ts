@@ -1,3 +1,4 @@
+// frontend/src/services/api/api.ts
 import axios, { AxiosInstance } from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
@@ -8,5 +9,36 @@ const apiClient: AxiosInstance = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+export const jobsApi = {
+  // загрузка файлов
+  upload: (formData: FormData) =>
+    apiClient.post('/api/v1/jobs/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+
+  // статус джоба (для поллинга)
+  getStatus: (jobId: string) =>
+    apiClient.get(`/api/v1/jobs/${jobId}/status`),
+
+  // результаты после обработки
+  getResults: (jobId: string) =>
+    apiClient.get(`/api/v1/jobs/${jobId}/results`),
+
+  // экспорт CSV
+  exportCsv: (jobId: string, format?: string) =>
+    apiClient.get(`/api/v1/jobs/${jobId}/export/csv`, {
+      params: { format },
+      responseType: 'blob',
+    }),
+
+  // отмена
+  cancel: (jobId: string) =>
+    apiClient.post(`/api/v1/jobs/${jobId}/cancel`),
+
+  // обновление метаданных файла
+  updateMetadata: (jobId: string, fileId: string, metadata: object) =>
+    apiClient.patch(`/api/v1/jobs/${jobId}/files/${fileId}/metadata`, metadata),
+};
 
 export default apiClient;
