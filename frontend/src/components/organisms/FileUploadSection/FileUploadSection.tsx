@@ -3,6 +3,7 @@ import React, { useRef, useState } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { useToastStore } from '../../../store/useToastStore';
+import apiClient from '../../../services/api/api';
 import { Icon } from '../../atoms/Icon/Icon';
 import { InfoCard } from '../../molecules/InfoCard/InfoCard';
 import { Panel } from '../../atoms/Panel/Panel';
@@ -14,11 +15,13 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 export const FileUploadSection: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
-  const [uploadedCount, setUploadedCount] = useState(0);
 
   const addJobs = useAppStore((state) => state.addJobs);
+  const jobsCount = useAppStore((state) => state.jobs.length);
   const openProgressModal = useUIStore((state) => state.openProgressModal);
+  const setIsProcessing = useUIStore((state) => state.setIsProcessing);
   const addToast = useToastStore((state) => state.addToast);
+  const [isUploading, setIsUploading] = useState(false);
 
   const validateFile = (file: File): { valid: boolean; error?: string } => {
     if (!ALLOWED_FORMATS.includes(file.type)) {
@@ -32,11 +35,11 @@ export const FileUploadSection: React.FC = () => {
     return { valid: true };
   };
 
-  const filesToJobs = (files: File[]) => {
-    return files.map((file) => {
+  const createJobs = (files: File[], fileIds: string[]) => {
+    return files.map((file, index) => {
       const validation = validateFile(file);
       return {
-        id: `${Date.now()}-${Math.random()}`,
+        id: fileIds[index] ?? `${Date.now()}-${Math.random()}`,
         filename: file.name,
         originalFilename: file.name,
         status: validation.valid ? ('queued' as const) : ('error' as const),
@@ -46,20 +49,46 @@ export const FileUploadSection: React.FC = () => {
     });
   };
 
-  const processFiles = (files: File[]) => {
-    const jobs = filesToJobs(files);
-    const queuedJobs = jobs.filter((job) => job.status === 'queued');
+  const uploadFiles = async (files: File[]) => {
+    const validFiles = files.filter((file) => validateFile(file).valid);
+    const invalidFiles = files.filter((file) => !validateFile(file).valid);
 
-    if (jobs.length === 0) {
+    if (invalidFiles.length > 0) {
+      invalidFiles.forEach((file) => {
+        const error = validateFile(file).error ?? 'Invalid file';
+        addToast(`${file.name}: ${error}`, 'error');
+      });
+    }
+
+    if (validFiles.length === 0) {
       return;
     }
 
-    addJobs(jobs);
-    openProgressModal();
+    const formData = new FormData();
+    validFiles.forEach((file) => formData.append('files', file));
 
-    if (queuedJobs.length > 0) {
-      setUploadedCount((count) => count + queuedJobs.length);
-      addToast(`Загружено ${queuedJobs.length} файлов`, 'info');
+    try {
+      setIsUploading(true);
+      setIsProcessing(true);
+      const response = await apiClient.post<{
+        job_id: string;
+        files: Array<{ file_id: string }>;
+      }>('/api/v1/jobs/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      // Extract file IDs from the ProcessingJob response
+      const fileIds = response.data.files.map((f) => f.file_id);
+      const jobs = createJobs(validFiles, fileIds);
+      console.log('jobs to add:', jobs);
+      addJobs(jobs);
+      openProgressModal();
+      addToast(`Uploaded ${jobs.length} files`, 'success');
+    } catch (error) {
+      addToast('Upload failed. Please try again.', 'error', undefined);
+    } finally {
+      setIsUploading(false);
+      setIsProcessing(false);
     }
   };
 
@@ -75,18 +104,26 @@ export const FileUploadSection: React.FC = () => {
     setDragActive(false);
 
     const files = Array.from(e.dataTransfer.files);
-    processFiles(files);
+    uploadFiles(files);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.currentTarget.files || []);
-    processFiles(files);
+    uploadFiles(files);
   };
 
-  const hasUploads = uploadedCount > 0;
-  const headline = hasUploads ? `${uploadedCount} photos uploaded successfully!` : 'Drag & drop photos here';
-  const description = hasUploads ? 'Ready for AI processing' : 'or click to browse';
-  const metadataHint = hasUploads ? 'You can add more photos' : 'Upload 50+ JPG, PNG or RAW photos to begin';
+  const hasUploads = jobsCount > 0;
+  const headline = hasUploads
+  ? `${jobsCount} photos uploaded successfully!`
+  : 'Drag & drop photos here';
+  const description = hasUploads
+  ? 'Ready for AI processing'
+  : 'or click to browse';
+  const metadataHint = isUploading
+    ? 'This may take a moment.'
+    : hasUploads
+    ? 'You can add more photos'
+    : 'Upload JPG, PNG or RAW photos to begin';
   const iconName = hasUploads ? 'img-modal-icon' : 'img-icon';
 
   const cards = [
