@@ -1,9 +1,6 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 
-
-//TODO: возможно, стоит объединить UIStore и AppStore в один глобальный Store, так как они тесно связаны. Но для чистоты архитектуры пока оставим их раздельными.
-
 //TODO: добавить больше UI-состояний, например, для управления модальными окнами, спиннерами загрузки и т.д. Сейчас в UIStore только базовые состояния для демонстрации.
 
 export interface UIState {
@@ -11,6 +8,10 @@ export interface UIState {
   isFileListOpen: boolean;
   isProcessing: boolean;
   isProgressModalOpen: boolean;
+  isUploaded: boolean;
+  isExportReady: boolean;
+  setIsUploaded: (val: boolean) => void;
+  setIsExportReady: (val: boolean) => void;
 
   // Actions
   toggleSettings: () => void;
@@ -27,6 +28,8 @@ export const useUIStore = create<UIState>()(
       isFileListOpen: true,
       isProcessing: false,
       isProgressModalOpen: false,
+      isUploaded: false,
+      isExportReady: false,
 
       toggleSettings: () =>
         set((state) => ({ isSettingsOpen: !state.isSettingsOpen })),
@@ -34,6 +37,10 @@ export const useUIStore = create<UIState>()(
         set((state) => ({ isFileListOpen: !state.isFileListOpen })),
       setIsProcessing: (isProcessing: boolean) =>
         set({ isProcessing }),
+      setIsUploaded: (val: boolean) =>
+        set({ isUploaded: val }),
+      setIsExportReady: (val: boolean) =>
+        set({ isExportReady: val }),
       openProgressModal: () =>
         set({ isProgressModalOpen: true }),
       closeProgressModal: () =>
