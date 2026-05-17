@@ -1,10 +1,12 @@
 import React from 'react';
+import { useAppStore } from '../../../store/useAppStore';
 import { Panel } from '../../atoms/Panel/Panel';
 import { Icon } from '../../atoms/Icon/Icon';
 import { Input } from '../../atoms/Input/Input';
 import { Select } from '../../atoms/Select/Select';
 import { Checkbox } from '../../atoms/Checkbox/Checkbox';
 import { Slider } from '../../atoms/Slider/Slider';
+import { Button } from '../../atoms/Button/Button';
 import styles from './SettingsPanel.module.scss';
 
 const platformOptions = [
@@ -20,16 +22,18 @@ const providerOptions = [
 ];
 
 export const SettingsPanel: React.FC = () => {
+  const settings = useAppStore((state) => state.settings);
+  const updateSettings = useAppStore((state) => state.updateSettings);
+  const saveSettings = useAppStore((state) => state.saveSettings);
   const [formats, setFormats] = React.useState({
     csv: true,
     iptc: true,
     json: false,
   });
   const [quality, setQuality] = React.useState(72);
-  const [shootNotes, setShootNotes] = React.useState('');
 
   const CHAR_LIMIT = 600;
-  const charCount = shootNotes.length;
+  const charCount = settings.shootingContext.length;
   const isOverLimit = charCount > CHAR_LIMIT;
 
   const handleFormatChange = (key: keyof typeof formats) => (
@@ -57,8 +61,8 @@ export const SettingsPanel: React.FC = () => {
         <div className={styles.inputGroup}>
           <label className={styles.label}>Shoot Notes / Event Name</label>
           <Input
-            value={shootNotes}
-            onChange={(e) => setShootNotes(e.target.value)}
+            value={settings.shootingContext}
+            onChange={(e) => updateSettings('shootingContext', e.target.value)}
             placeholder={
               'Describe the context of the shooting, and the following questions will help you — Where? What? When? E.g., “New York, Central Park, Sunset, two people on a bench 10 May 2026”'
             }
@@ -74,7 +78,12 @@ export const SettingsPanel: React.FC = () => {
           )}
         </div>
 
-        <Select label="Stock Platform" options={platformOptions} />
+        <Select
+          label="Stock Platform"
+          options={platformOptions}
+          value={settings.exportFormat}
+          onChange={(e) => updateSettings('exportFormat', e.target.value)}
+        />
 
         <div className={styles.checkboxRow}>
           <Checkbox
@@ -97,7 +106,12 @@ export const SettingsPanel: React.FC = () => {
           />
         </div>
 
-        <Select label="AI Provider" options={providerOptions} />
+        <Select
+          label="AI Provider"
+          options={providerOptions}
+          value={settings.aiProvider}
+          onChange={(e) => updateSettings('aiProvider', e.target.value)}
+        />
 
         <div className={styles.sliderRow}>
           <label htmlFor="quality" className={styles.sliderLabel}>
@@ -111,6 +125,10 @@ export const SettingsPanel: React.FC = () => {
             onChange={(e) => setQuality(Number(e.target.value))}
           />
         </div>
+
+        <Button variant="primary" size="md" onClick={saveSettings}>
+          Save Settings
+        </Button>
       </div>
     </Panel>
   );
