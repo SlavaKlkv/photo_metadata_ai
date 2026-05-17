@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAppStore } from './store/useAppStore';
 import { useUIStore } from './store/useUIStore';
+import { usePolling } from './hooks/usePolling';
 import styles from './App.module.scss';
 import { Icon } from './components/atoms/Icon/Icon';
 import { FileUploadSection } from './components/organisms/FileUploadSection/FileUploadSection';
@@ -9,13 +10,10 @@ import { ProgressModal } from './components/organisms/ProgressModal/ProgressModa
 import { BottomActionBar } from './components/organisms/BottomActionBar/BottomActionBar';
 
 function App() {
-  const jobs = useAppStore((state) => state.jobs);
-  const closeProgressModal = useUIStore((state) => state.closeProgressModal);
+  const currentJobId = useUIStore((state) => state.currentJobId);
 
-  const totalJobs = jobs.length;
-  const currentProgress = jobs.filter(
-    (job) => job.status === 'processing' || job.status === 'done' || job.status === 'error'
-  ).length;
+  // поллинг стартует автоматически когда currentJobId появляется
+  usePolling(currentJobId);
 
   return (
     <div className={styles.app}>
@@ -35,31 +33,24 @@ function App() {
           </div>
         </div>
       </header>
-      
+
       {/* MAIN CONTENT */}
       <main className={styles.container}>
         <div className={styles.grid}>
-          {/* LEFT: Settings */}
           <aside className={styles.sidebar}>
             <SettingsPanel />
           </aside>
-          
-          {/* RIGHT: Upload & Info */}
           <div className={styles.content}>
             <FileUploadSection />
           </div>
         </div>
       </main>
-      
-      {/* BOTTOM: Action bar */}
+
+      {/* BOTTOM */}
       <BottomActionBar />
-      
-      {/* MODAL: Progress (поверх всего) */}
-      <ProgressModal
-        current={currentProgress}
-        total={totalJobs}
-        onCancel={closeProgressModal}
-      />
+
+      {/* MODAL */}
+      <ProgressModal />
     </div>
   );
 }

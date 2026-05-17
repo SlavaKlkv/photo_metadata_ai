@@ -4,12 +4,12 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background-color: var(--bg-secondary);
+  background-color: rgba(0, 0, 0, 0.75); /* было var(--bg-secondary) — перекрывало всё непрозрачным */
+  backdrop-filter: blur(1px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: var(--z-modal-backdrop);
-  /* плавное появление */
   animation: fadeIn var(--transition-fast);
 }
 

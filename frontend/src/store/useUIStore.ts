@@ -1,8 +1,6 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 
-//TODO: добавить больше UI-состояний, например, для управления модальными окнами, спиннерами загрузки и т.д. Сейчас в UIStore только базовые состояния для демонстрации.
-
 export interface UIState {
   isSettingsOpen: boolean;
   isFileListOpen: boolean;
@@ -10,8 +8,7 @@ export interface UIState {
   isProgressModalOpen: boolean;
   isUploaded: boolean;
   isExportReady: boolean;
-  setIsUploaded: (val: boolean) => void;
-  setIsExportReady: (val: boolean) => void;
+  currentJobId: string | null;
 
   // Actions
   toggleSettings: () => void;
@@ -19,32 +16,40 @@ export interface UIState {
   setIsProcessing: (isProcessing: boolean) => void;
   openProgressModal: () => void;
   closeProgressModal: () => void;
+  setIsUploaded: (val: boolean) => void;
+  setIsExportReady: (val: boolean) => void;
+  setCurrentJobId: (id: string | null) => void;
 }
 
 export const useUIStore = create<UIState>()(
   devtools(
     (set) => ({
+      // initial state
       isSettingsOpen: false,
       isFileListOpen: true,
       isProcessing: false,
       isProgressModalOpen: false,
       isUploaded: false,
       isExportReady: false,
+      currentJobId: null, // <- это и было пропущено
 
+      // actions
       toggleSettings: () =>
         set((state) => ({ isSettingsOpen: !state.isSettingsOpen })),
       toggleFileList: () =>
         set((state) => ({ isFileListOpen: !state.isFileListOpen })),
-      setIsProcessing: (isProcessing: boolean) =>
+      setIsProcessing: (isProcessing) =>
         set({ isProcessing }),
-      setIsUploaded: (val: boolean) =>
-        set({ isUploaded: val }),
-      setIsExportReady: (val: boolean) =>
-        set({ isExportReady: val }),
       openProgressModal: () =>
         set({ isProgressModalOpen: true }),
       closeProgressModal: () =>
         set({ isProgressModalOpen: false }),
+      setIsUploaded: (val) =>
+        set({ isUploaded: val }),
+      setIsExportReady: (val) =>
+        set({ isExportReady: val }),
+      setCurrentJobId: (id) =>
+        set({ currentJobId: id }),
     }),
     { name: 'UIStore' }
   )

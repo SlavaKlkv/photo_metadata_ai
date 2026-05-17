@@ -1,5 +1,4 @@
 /* ProgressModal organism styles */
-/* ProgressModal organism styles */
 @import '../../../styles/variables.module.scss';
 
 .content {
@@ -8,12 +7,17 @@
   gap: var(--spacing-md);
 }
 
+.row {
+  // текст и кнопка Cancel в одну строку
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
 .label {
   margin: 0;
   font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
   color: var(--text-primary);
-}
-
-.cancel {
-  align-self: flex-end;
 }
