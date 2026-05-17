@@ -1,3 +1,174 @@
-/* MetadataPreview molecule styles */
+/* MetadataPreview organism styles */
+@import '../../../styles/variables.module.scss';
 
-//TODO: После согласования дизайна, добавить превью метаданных в виде карточки, которая будет отображать основные метаданные изображения (например, разрешение, размер файла, дату создания и т.д.). Это поможет пользователю быстро оценить информацию о загруженном файле.
+.panel {
+  height: 100%;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+
+  h2 {
+    margin: 0;
+    font-size: var(--font-size-lg);
+    color: var(--text-primary);
+  }
+}
+
+.headerIcon {
+  width: 18px;
+  height: 18px;
+  color: var(--text-secondary);
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+}
+
+.navBtn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: var(--font-size-xl);
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+
+  &:hover { color: var(--text-primary); }
+}
+
+.navCount {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+
+  &:hover { color: var(--text-primary); }
+}
+
+.indexInput {
+  width: 60px;
+  text-align: center;
+  background: var(--bg-tretiary);
+  border: 1px solid var(--accent-main);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  padding: 2px 4px;
+  outline: none;
+}
+
+.imagePlaceholder {
+  width: 100%;
+  aspect-ratio: 16/9;
+  background: var(--bg-tretiary);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.imagePlaceholderIcon {
+  width: 48px;
+  height: 48px;
+  color: var(--text-placeholder);
+}
+
+.filename {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  flex: 1;
+}
+
+.field {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  align-items: start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.fieldLabel {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  padding-top: 2px;
+}
+
+.fieldValue {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+  min-height: 20px;
+
+  &:hover .editIcon {
+    opacity: 1;
+  }
+}
+
+.editIcon {
+  width: 14px;
+  height: 14px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.fieldInput {
+  width: 100%;
+  background: var(--bg-tretiary);
+  border: 1px solid var(--accent-main);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  padding: 4px 8px;
+  outline: none;
+  font-family: inherit;
+}
+
+.fieldTextarea {
+  width: 100%;
+  min-height: 80px;
+  background: var(--bg-tretiary);
+  border: 1px solid var(--accent-main);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  padding: 4px 8px;
+  outline: none;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.regenerateBtn {
+  margin-top: auto;
+  align-self: flex-start;
+}
+
+.btnIcon {
+  width: 14px;
+  height: 14px;
+}
+
+.empty {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  text-align: center;
+  margin: auto;
+}

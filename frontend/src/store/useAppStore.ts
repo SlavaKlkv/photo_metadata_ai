@@ -1,30 +1,6 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-
-/**
- * Processing Job - представляет загруженный файл в обработке
- */
-export interface ProcessingJob {
-  id: string;
-  filename: string;
-  originalFilename: string;
-  status: 'queued' | 'processing' | 'done' | 'error';
-  error?: string;
-  metadata?: {
-    title: string;
-    description: string;
-    keywords: string[];
-  };
-}
-
-/**
- * App Settings - глобальные настройки приложения
- */
-export interface AppSettings {
-  aiProvider: 'ollama' | 'claude' | 'openai';
-  shootingContext: string;
-  exportFormat: 'getty' | 'shutterstock' | 'adobe';
-}
+import { ProcessingJob, AppSettings } from '../types';
 
 /**
  * App State - полное состояние приложения
