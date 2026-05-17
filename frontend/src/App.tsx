@@ -2,10 +2,10 @@ import React from 'react';
 import { useAppStore } from './store/useAppStore';
 import { useUIStore } from './store/useUIStore';
 import styles from './App.module.scss';
+import { Icon } from './components/atoms/Icon/Icon';
 import { FileUploadSection } from './components/organisms/FileUploadSection/FileUploadSection';
 import { SettingsPanel } from './components/organisms/SettingsPanel/SettingsPanel';
 import { ProgressModal } from './components/organisms/ProgressModal/ProgressModal';
-import { BottomStatusBar } from './components/molecules/BottomStatusBar/BottomStatusBar';
 import { BottomActionBar } from './components/organisms/BottomActionBar/BottomActionBar';
 
 function App() {
@@ -23,7 +23,7 @@ function App() {
       <header className={styles.header}>
         <div className={styles.headerContent}>
           <div className={styles.title}>
-            <span className={styles.logo}>✨</span>
+            <Icon name="logo" className={styles.logo} />
             <div>
               <h1>Photo Metadata AI</h1>
               <p>Prepare your photos for stock platforms in minutes</p>
@@ -50,9 +50,6 @@ function App() {
           </div>
         </div>
       </main>
-      
-      {/* BOTTOM: Status bar */}
-      <BottomStatusBar />
       
       {/* BOTTOM: Action bar */}
       <BottomActionBar />

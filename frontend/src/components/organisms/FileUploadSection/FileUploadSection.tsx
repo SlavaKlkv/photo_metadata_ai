@@ -20,6 +20,7 @@ export const FileUploadSection: React.FC = () => {
   const jobsCount = useAppStore((state) => state.jobs.length);
   const openProgressModal = useUIStore((state) => state.openProgressModal);
   const setIsProcessing = useUIStore((state) => state.setIsProcessing);
+  const setIsUploaded = useUIStore((state) => state.setIsUploaded);
   const addToast = useToastStore((state) => state.addToast);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -82,6 +83,7 @@ export const FileUploadSection: React.FC = () => {
       const jobs = createJobs(validFiles, fileIds);
       console.log('jobs to add:', jobs);
       addJobs(jobs);
+      setIsUploaded(true);
       openProgressModal();
       addToast(`Uploaded ${jobs.length} files`, 'success');
     } catch (error) {
