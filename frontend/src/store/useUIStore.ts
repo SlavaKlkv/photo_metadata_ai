@@ -9,6 +9,8 @@ export interface UIState {
   isUploaded: boolean;
   isExportReady: boolean;
   currentJobId: string | null;
+  selectedJobId: string | null;
+  setSelectedJobId: (id: string | null) => void;
 
   // Actions
   toggleSettings: () => void;
@@ -31,8 +33,9 @@ export const useUIStore = create<UIState>()(
       isProgressModalOpen: false,
       isUploaded: false,
       isExportReady: false,
-      currentJobId: null, // <- это и было пропущено
-
+      currentJobId: null, 
+      selectedJobId: null,
+      
       // actions
       toggleSettings: () =>
         set((state) => ({ isSettingsOpen: !state.isSettingsOpen })),
@@ -50,6 +53,7 @@ export const useUIStore = create<UIState>()(
         set({ isExportReady: val }),
       setCurrentJobId: (id) =>
         set({ currentJobId: id }),
+      setSelectedJobId: (id) => set({ selectedJobId: id }),
     }),
     { name: 'UIStore' }
   )

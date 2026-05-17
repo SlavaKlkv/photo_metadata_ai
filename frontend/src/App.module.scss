@@ -99,6 +99,13 @@
   flex-direction: column;
 }
 
+.reviewGrid {
+  display: grid;
+  grid-template-columns: 260px 1fr 360px;
+  gap: var(--spacing-lg);
+  height: 100%;
+}
+
 // ===== RESPONSIVE =====
 @media (max-width: 1024px) {
   .grid {

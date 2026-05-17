@@ -1,5 +1,4 @@
 import React from 'react';
-import { useAppStore } from './store/useAppStore';
 import { useUIStore } from './store/useUIStore';
 import { usePolling } from './hooks/usePolling';
 import styles from './App.module.scss';
@@ -8,11 +7,13 @@ import { FileUploadSection } from './components/organisms/FileUploadSection/File
 import { SettingsPanel } from './components/organisms/SettingsPanel/SettingsPanel';
 import { ProgressModal } from './components/organisms/ProgressModal/ProgressModal';
 import { BottomActionBar } from './components/organisms/BottomActionBar/BottomActionBar';
+import { ResultsTable } from './components/organisms/ResultsTable/ResultsTable';
+//import { MetadataPreview } from './components/organisms/MetadataPreview/MetadataPreview';
 
 function App() {
   const currentJobId = useUIStore((state) => state.currentJobId);
+  const isExportReady = useUIStore((state) => state.isExportReady);
 
-  // поллинг стартует автоматически когда currentJobId появляется
   usePolling(currentJobId);
 
   return (
@@ -36,14 +37,24 @@ function App() {
 
       {/* MAIN CONTENT */}
       <main className={styles.container}>
-        <div className={styles.grid}>
-          <aside className={styles.sidebar}>
+        {isExportReady ? (
+          // review экран — Results + MetadataPreview
+          <div className={styles.reviewGrid}>
             <SettingsPanel />
-          </aside>
-          <div className={styles.content}>
-            <FileUploadSection />
+            <ResultsTable />
+            {/* <MetadataPreview /> */}
           </div>
-        </div>
+        ) : (
+          // upload экран — Settings + FileUpload
+          <div className={styles.grid}>
+            <aside className={styles.sidebar}>
+              <SettingsPanel />
+            </aside>
+            <div className={styles.content}>
+              <FileUploadSection />
+            </div>
+          </div>
+        )}
       </main>
 
       {/* BOTTOM */}
