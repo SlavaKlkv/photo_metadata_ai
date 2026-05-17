@@ -11,14 +11,8 @@ export const usePolling = (jobId: string | null) => {
   const updateMetadata = useAppStore((state) => state.updateMetadata);
   const closeProgressModal = useUIStore((state) => state.closeProgressModal);
   const setIsExportReady = useUIStore((state) => state.setIsExportReady);
-  const isProgressModalOpen = useUIStore((state) => state.isProgressModalOpen);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  // ref чтобы poll() всегда видел актуальное значение, не замыкание
-  const isModalOpenRef = useRef(isProgressModalOpen);
-  useEffect(() => {
-    isModalOpenRef.current = isProgressModalOpen;
-  }, [isProgressModalOpen]);
 
   const stopPolling = () => {
     if (intervalRef.current) {
@@ -49,11 +43,8 @@ export const usePolling = (jobId: string | null) => {
         const isDone = statusData.status === 'completed' || statusData.status === 'error';
         if (isDone) {
           stopPolling();
-          // читаем ref — всегда актуальное значение
-          if (isModalOpenRef.current) {
-            closeProgressModal();
-            setIsExportReady(true);
-          }
+          closeProgressModal();
+          setIsExportReady(true);
         }
       } catch (error) {
         console.error('[Polling error]:', error);

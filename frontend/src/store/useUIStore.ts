@@ -10,8 +10,8 @@ export interface UIState {
   isExportReady: boolean;
   currentJobId: string | null;
   selectedJobId: string | null;
-  setSelectedJobId: (id: string | null) => void;
-
+  isPollingActive: boolean;
+  
   // Actions
   toggleSettings: () => void;
   toggleFileList: () => void;
@@ -21,6 +21,8 @@ export interface UIState {
   setIsUploaded: (val: boolean) => void;
   setIsExportReady: (val: boolean) => void;
   setCurrentJobId: (id: string | null) => void;
+  setSelectedJobId: (id: string | null) => void;
+  setIsPollingActive: (val: boolean) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -35,6 +37,7 @@ export const useUIStore = create<UIState>()(
       isExportReady: false,
       currentJobId: null, 
       selectedJobId: null,
+      isPollingActive: false,
       
       // actions
       toggleSettings: () =>
@@ -54,6 +57,7 @@ export const useUIStore = create<UIState>()(
       setCurrentJobId: (id) =>
         set({ currentJobId: id }),
       setSelectedJobId: (id) => set({ selectedJobId: id }),
+      setIsPollingActive: (val) => set({ isPollingActive: val }),
     }),
     { name: 'UIStore' }
   )
