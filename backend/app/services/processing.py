@@ -1,6 +1,8 @@
 import asyncio
 from uuid import UUID
 
+import structlog
+
 from app.core.constants import MAX_CONCURRENT_AI_REQUESTS
 from app.schemas.job import (
     FileStatus,
@@ -15,6 +17,7 @@ from app.services.metadata_embedding import get_upload_file_path
 from app.services.storage import storage
 
 ai_requests_semaphore = asyncio.Semaphore(MAX_CONCURRENT_AI_REQUESTS)
+logger = structlog.get_logger(__name__)
 
 
 async def _process_file(
@@ -28,9 +31,23 @@ async def _process_file(
     Обрабатывает один файл с ограничением числа одновременных AI-запросов.
     """
     async with ai_requests_semaphore:
+        logger.info(
+            'file_processing_started',
+            job_id=str(job_id),
+            file_id=str(file.file_id),
+            file_number=file_number,
+            filename=file.original_filename,
+        )
         try:
             if await _is_job_cancelled(job_id):
                 file.status = FileStatus.CANCELLED
+                logger.info(
+                    'file_processing_cancelled',
+                    job_id=str(job_id),
+                    file_id=str(file.file_id),
+                    file_number=file_number,
+                    filename=file.original_filename,
+                )
                 return
 
             file.status = FileStatus.PROCESSING
@@ -43,6 +60,13 @@ async def _process_file(
 
             if await _is_job_cancelled(job_id):
                 file.status = FileStatus.CANCELLED
+                logger.info(
+                    'file_processing_cancelled',
+                    job_id=str(job_id),
+                    file_id=str(file.file_id),
+                    file_number=file_number,
+                    filename=file.original_filename,
+                )
                 return
 
             file.title = metadata.title
@@ -50,10 +74,25 @@ async def _process_file(
             file.keywords = metadata.keywords
 
             file.status = FileStatus.COMPLETED
+            logger.info(
+                'file_processing_completed',
+                job_id=str(job_id),
+                file_id=str(file.file_id),
+                file_number=file_number,
+                filename=file.original_filename,
+            )
 
         except Exception as error:
             file.status = FileStatus.FAILED
             file.error_message = str(error)
+            logger.exception(
+                'file_processing_failed',
+                job_id=str(job_id),
+                file_id=str(file.file_id),
+                file_number=file_number,
+                filename=file.original_filename,
+                error=str(error),
+            )
 
 
 async def process_job(job_id: UUID) -> None:
@@ -64,6 +103,11 @@ async def process_job(job_id: UUID) -> None:
 
     if job is None:
         return
+    logger.info(
+        'job_processing_started',
+        job_id=str(job.job_id),
+        files_count=len(job.files),
+    )
 
     job.status = JobStatus.PROCESSING
 
@@ -75,6 +119,11 @@ async def process_job(job_id: UUID) -> None:
     try:
         ai_provider = get_ai_provider()
     except Exception as error:
+        logger.exception(
+            'ai_provider_initialization_failed',
+            job_id=str(job.job_id),
+            error=str(error),
+        )
         await _mark_job_as_failed(job.job_id, error)
         return
 
@@ -101,6 +150,11 @@ async def process_job(job_id: UUID) -> None:
     else:
         job.status = JobStatus.COMPLETED
 
+    logger.info(
+        'job_processing_finished',
+        job_id=str(job.job_id),
+        status=job.status,
+    )
     await storage.update_job(job)
 
 
@@ -113,16 +167,23 @@ async def retry_failed_files(job_id: UUID) -> None:
     if job is None:
         return
 
-    failed_files = [
-        file for file in job.files if file.status == FileStatus.FAILED
+    failed_indexed_files = [
+        (file_number, file)
+        for file_number, file in enumerate(job.files, start=1)
+        if file.status == FileStatus.FAILED
     ]
 
-    if not failed_files:
+    if not failed_indexed_files:
         return
+    logger.info(
+        'retry_failed_files_started',
+        job_id=str(job.job_id),
+        failed_files_count=len(failed_indexed_files),
+    )
 
     job.status = JobStatus.PROCESSING
 
-    for file in failed_files:
+    for _, file in failed_indexed_files:
         file.status = FileStatus.QUEUED
         file.error_message = None
 
@@ -131,6 +192,11 @@ async def retry_failed_files(job_id: UUID) -> None:
     try:
         ai_provider = get_ai_provider()
     except Exception as error:
+        logger.exception(
+            'ai_provider_initialization_failed_on_retry',
+            job_id=str(job.job_id),
+            error=str(error),
+        )
         await _mark_job_as_failed(job.job_id, error)
         return
 
@@ -141,8 +207,9 @@ async def retry_failed_files(job_id: UUID) -> None:
                 ai_provider,
                 job.job_id,
                 job.shooting_context,
+                file_number=file_number,
             )
-            for file in failed_files
+            for file_number, file in failed_indexed_files
         ],
     )
 
@@ -158,6 +225,11 @@ async def retry_failed_files(job_id: UUID) -> None:
     else:
         job.status = JobStatus.COMPLETED
 
+    logger.info(
+        'retry_failed_files_finished',
+        job_id=str(job.job_id),
+        status=job.status,
+    )
     await storage.update_job(job)
 
 
@@ -169,6 +241,10 @@ async def cancel_job_processing(job_id: UUID) -> None:
 
     if job is None:
         return
+    logger.info(
+        'job_processing_cancel_requested',
+        job_id=str(job.job_id),
+    )
 
     job.status = JobStatus.CANCELLED
 
@@ -207,6 +283,9 @@ async def _mark_job_as_failed(job_id: UUID, error: Exception) -> None:
         if file.status in {FileStatus.QUEUED, FileStatus.PROCESSING}:
             file.status = FileStatus.FAILED
             file.error_message = error_message
-
+    logger.exception(
+        'job_marked_as_failed',
+        job_id=str(job.job_id),
+        error=str(error),
+    )
     await storage.update_job(job)
-

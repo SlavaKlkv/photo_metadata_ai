@@ -2,9 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import router_v1
-from app.core import logging_setup  # noqa: F401
+from app.core.logging_setup import configure_logging
 
-# Импорт logging_setup выше инициализирует structlog при старте приложения.
+configure_logging()
+
 app = FastAPI()
 
 app.include_router(router_v1)
