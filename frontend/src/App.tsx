@@ -9,6 +9,8 @@ import { ProgressModal } from './components/organisms/ProgressModal/ProgressModa
 import { BottomActionBar } from './components/organisms/BottomActionBar/BottomActionBar';
 import { ResultsTable } from './components/organisms/ResultsTable/ResultsTable';
 import { MetadataPreview } from './components/organisms/MetadataPreview/MetadataPreview';
+import { ExportModal } from './components/organisms/ExportModal/ExportModal';
+import { SuccessModal } from './components/organisms/SuccessModal/SuccessModal';
 
 function App() {
   const currentJobId = useUIStore((state) => state.currentJobId);
@@ -63,6 +65,8 @@ function App() {
 
       {/* MODAL */}
       <ProgressModal />
+      <ExportModal />
+      <SuccessModal />
     </div>
   );
 }

@@ -136,7 +136,7 @@ export const FileUploadSection: React.FC = () => {
     ? "This may take a moment."
     : hasUploads
       ? "You can add more photos"
-      : "Upload JPG, PNG or RAW photos to begin";
+      : "Upload JPG or PNG photos to begin";
   const iconName = hasUploads ? "img-modal-icon" : "img-icon";
 
   const cards = [

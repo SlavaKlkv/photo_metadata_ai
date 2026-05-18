@@ -21,6 +21,7 @@ export const BottomActionBar: React.FC = () => {
   const settings = useAppStore((state) => state.settings);
   const isExporting = useUIStore((state) => state.isExporting);
   const setIsExporting = useUIStore((state) => state.setIsExporting);
+  const openExportModal = useUIStore((state) => state.openExportModal);
 
 
   // текущий шаг степпера
@@ -45,12 +46,16 @@ export const BottomActionBar: React.FC = () => {
       <nav className={styles.stepper}>
         {STEPS.map((step, index) => (
           <React.Fragment key={step}>
-            <div className={`${styles.step} ${index <= currentStep ? styles.active : ''}`}>
+            <div
+              className={`${styles.step} ${index <= currentStep ? styles.active : ""}`}
+            >
               <span className={styles.stepNumber}>{index + 1}</span>
               <span className={styles.stepLabel}>{step}</span>
             </div>
             {index < STEPS.length - 1 && (
-              <div className={`${styles.line} ${index < currentStep ? styles.activeLine : ''}`} />
+              <div
+                className={`${styles.line} ${index < currentStep ? styles.activeLine : ""}`}
+              />
             )}
           </React.Fragment>
         ))}
@@ -75,8 +80,14 @@ export const BottomActionBar: React.FC = () => {
           variant="primary"
           size="md"
           icon={<Icon name="start-icon" className={styles.btnIcon} />}
-          disabled={!isUploaded || isProcessing || !settings.shootingContext.trim()}
-          title={!settings.shootingContext.trim() ? 'Add shoot notes to start processing' : undefined}
+          disabled={
+            !isUploaded || isProcessing || !settings.shootingContext.trim() || isExportReady
+          }
+          title={
+            !settings.shootingContext.trim()
+              ? "Add shoot notes to start processing"
+              : undefined
+          }
           onClick={handleStartProcessing}
         >
           Start processing
@@ -88,7 +99,10 @@ export const BottomActionBar: React.FC = () => {
           size="md"
           icon={<Icon name="download-icon" className={styles.btnIcon} />}
           disabled={!isExportReady}
-          onClick={() => setIsExporting(true)}
+          onClick={() => {
+            setIsExporting(true);
+            openExportModal();
+          }}
         >
           Export results
         </Button>
