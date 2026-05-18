@@ -149,7 +149,6 @@ class OllamaImageMetadataProvider(BaseAIProvider):
             'ollama_raw_response_received',
             file_number=file_number,
             response_length=len(raw_response),
-            raw_response=raw_response,
         )
 
         try:
