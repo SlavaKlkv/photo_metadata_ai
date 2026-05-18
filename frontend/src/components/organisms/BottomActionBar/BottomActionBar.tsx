@@ -18,6 +18,7 @@ export const BottomActionBar: React.FC = () => {
   const setIsUploaded = useUIStore((state) => state.setIsUploaded);
   const setIsExportReady = useUIStore((state) => state.setIsExportReady);
   const setIsPollingActive = useUIStore((state) => state.setIsPollingActive);
+  const settings = useAppStore((state) => state.settings);
 
 
   // текущий шаг степпера
@@ -72,7 +73,8 @@ export const BottomActionBar: React.FC = () => {
           variant="primary"
           size="md"
           icon={<Icon name="start-icon" className={styles.btnIcon} />}
-          disabled={!isUploaded || isProcessing}
+          disabled={!isUploaded || isProcessing || !settings.shootingContext.trim()}
+          title={!settings.shootingContext.trim() ? 'Add shoot notes to start processing' : undefined}
           onClick={handleStartProcessing}
         >
           Start processing
