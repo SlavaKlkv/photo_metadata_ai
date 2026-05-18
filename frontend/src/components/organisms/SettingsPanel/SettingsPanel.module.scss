@@ -7,39 +7,6 @@
   gap: 20px;
 }
 
-.header {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-md);
-}
-
-.headerIcon {
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  color: var(--accent-main);
-}
-
-.settingsIcon {
-  width: 24px;
-  height: 24px;
-}
-
-.header h2 {
-  margin: 0;
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-semibold);
-}
-
-.header p {
-  margin: 4px 0 0;
-  color: var(--text-secondary);
-  font-size: var(--font-size-base);
-  line-height: var(--line-height-normal);
-}
-
 .controls {
   display: flex;
   flex-direction: column;

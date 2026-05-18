@@ -5,8 +5,8 @@ import { useUIStore } from '../../../store/useUIStore';
 import { ResultRow } from '../../molecules/ResultRow/ResultRow';
 import { Checkbox } from '../../atoms/Checkbox/Checkbox';
 import { Panel } from '../../atoms/Panel/Panel';
-import { Icon } from '../../atoms/Icon/Icon';
 import styles from './ResultsTable.module.scss';
+import { SectionHeader } from '../../molecules/SectionHeader/SectionHeader';
 
 export const ResultsTable: React.FC = () => {
   const jobs = useAppStore((state) => state.jobs);
@@ -15,11 +15,12 @@ export const ResultsTable: React.FC = () => {
   const setSelectedJobId = useUIStore((state) => state.setSelectedJobId);
   const previews = useAppStore((state) => state.previews);
 
-  const doneJobs = jobs.filter((j) => j.status === 'done');
-  const allChecked = checkedIds.size === doneJobs.length && doneJobs.length > 0;
+  //const doneJobs = jobs.filter((j) => j.status === 'done');
+  const visibleJobs = jobs; // отображаем все, даже с ошибкой, чтобы можно было выбрать и посмотреть превью и ошибку
+  const allChecked = checkedIds.size === visibleJobs.length && visibleJobs.length > 0;
 
   const handleCheckAll = (checked: boolean) => {
-    setCheckedIds(checked ? new Set(doneJobs.map((j) => j.id)) : new Set());
+    setCheckedIds(checked ? new Set(visibleJobs.map((j) => j.id)) : new Set());
   };
 
   const handleCheck = (id: string, checked: boolean) => {
@@ -32,16 +33,12 @@ export const ResultsTable: React.FC = () => {
 
   return (
     <Panel className={styles.settingsPanel} direction="column" gap="md">
-      {/* Заголовок */}
-      <div className={styles.header}>
-        <div className={styles.headerIcon}>
-        <Icon name="results-icon" className={styles.headerIcon} />
-        </div>
-        <div>
-          <h2>Results</h2>
-          <p>{doneJobs.length} photos</p>
-        </div>
-      </div>
+            {/* Заголовок */}
+            <SectionHeader
+              icon="results-icon"
+              title="Results"
+              subtitle={`${visibleJobs.length} photos`}
+            />
 
       {/* Шапка таблицы */}
       <div className={styles.tableHeader}>
@@ -58,7 +55,7 @@ export const ResultsTable: React.FC = () => {
 
       {/* Строки */}
       <div className={styles.rows}>
-        {doneJobs.map((job) => (
+        {visibleJobs.map((job) => (
           <ResultRow
             key={job.id}
             job={job}
@@ -74,12 +71,12 @@ export const ResultsTable: React.FC = () => {
       {/* Футер */}
       <div className={styles.footer}>
         <span>{checkedIds.size} selected</span>
-        {checkedIds.size < doneJobs.length && (
+        {checkedIds.size < visibleJobs.length && (
           <button
             className={styles.selectAll}
             onClick={() => handleCheckAll(true)}
           >
-            Select all {doneJobs.length}
+            Select all {visibleJobs.length}
           </button>
         )}
       </div>

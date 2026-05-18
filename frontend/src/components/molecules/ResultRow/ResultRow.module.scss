@@ -7,18 +7,17 @@
   align-items: center;
   gap: var(--spacing-md);
   padding: 10px var(--spacing-md);
-  background: var(--bg-secondary);
-  border-radius: var(--radius-md);
+  //background: var(--bg-secondary);
+  //border-radius: var(--radius-md);
   cursor: pointer;
   transition: background var(--transition-fast);
 
   &:hover {
-    background: var(--preview-hover-bg);
+    background: var(--row-hover-bg);
   }
 
   &.selected {
-    background: var(--preview-active-bg);
-    outline: 1px solid var(--accent-main);
+    background: var(--row-active-bg);
   }
 }
 

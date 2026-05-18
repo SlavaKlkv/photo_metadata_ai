@@ -31,25 +31,50 @@ export const usePolling = (jobId: string | null) => {
 
         if (statusData.files) {
           statusData.files.forEach((file: any) => {
-            const status = file.status === 'completed' ? 'done' : file.status;
+            const status = file.status === "completed" ? "done" : file.status;
             updateJobStatus(file.file_id, status, file.error_message);
 
-            if (file.status === 'completed' && file.metadata) {
+            /*if (file.status === 'completed' && file.metadata) {
               updateMetadata(file.file_id, file.metadata);
-            }
+            }*/
           });
         }
 
-        const isDone = statusData.status === 'completed' || statusData.status === 'error';
+        const isDone =
+          statusData.status === "completed" ||
+          statusData.status === "error" ||
+          statusData.status === "cancelled";
         if (isDone) {
           stopPolling();
+          // забираем результаты с метаданными
+          try {
+            const resultsResponse = await jobsApi.getResults(jobId);
+            const results = resultsResponse.data;
+            // results — массив файлов с metadata
+            if (results.files) {
+              results.files.forEach((file: any) => {
+                updateMetadata(file.file_id, {
+                  title: file.title ?? "",
+                  description: file.description ?? "",
+                  keywords: file.keywords ?? [],
+                });
+              });
+            }
+          } catch (error) {
+            console.error("[Results fetch error]:", error);
+          }
           closeProgressModal();
           setIsExportReady(true);
         }
-      } catch (error) {
-        console.error('[Polling error]:', error);
       }
-    };
+
+      catch (error) {
+        console.error('[Polling error]:', error);
+        // при ошибке останавливаем опрос и закрываем модалку
+        stopPolling();
+        closeProgressModal();
+      }
+    }
 
     poll();
     intervalRef.current = setInterval(poll, POLLING_INTERVAL);

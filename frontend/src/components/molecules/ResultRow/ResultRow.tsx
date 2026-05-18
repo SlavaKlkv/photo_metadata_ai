@@ -1,4 +1,4 @@
-// ResultRow
+// frontend/src/components/molecules/ResultRow/ResultRow.tsx
 import React from 'react';
 import { ProcessingJob } from '../../../types';
 import { Checkbox } from '../../atoms/Checkbox/Checkbox';
@@ -25,6 +25,14 @@ export const ResultRow: React.FC<ResultRowProps> = ({
     <div
       className={`${styles.row} ${isSelected ? styles.selected : ''}`}
       onClick={() => onSelect(job.id)}
+      tabIndex={0}
+      role="button"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect(job.id);
+        }
+      }}
     >
       <div className={styles.checkboxCell} onClick={(e) => e.stopPropagation()}>
         <Checkbox

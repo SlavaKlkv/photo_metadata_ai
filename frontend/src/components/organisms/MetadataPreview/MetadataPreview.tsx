@@ -1,4 +1,4 @@
-// MetadataPreview
+// frontend/src/components/organisms/MetadataPreview/MetadataPreview.tsx
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
 import { useUIStore } from '../../../store/useUIStore';
@@ -8,6 +8,7 @@ import { Button } from '../../atoms/Button/Button';
 import { Icon } from '../../atoms/Icon/Icon';
 import { Panel } from '../../atoms/Panel/Panel';
 import styles from './MetadataPreview.module.scss';
+import { SectionHeader } from '../../molecules/SectionHeader/SectionHeader';
 
 export const MetadataPreview: React.FC = () => {
   const jobs = useAppStore((state) => state.jobs);
@@ -16,17 +17,19 @@ export const MetadataPreview: React.FC = () => {
   const setSelectedJobId = useUIStore((state) => state.setSelectedJobId);
   const currentJobId = useUIStore((state) => state.currentJobId);
   const addToast = useToastStore((state) => state.addToast);
+  const previews = useAppStore((state) => state.previews);
 
-  const doneJobs = jobs.filter((j) => j.status === 'done');
+  const doneJobs = jobs.filter((j) => j.status === "done");
   const currentIndex = doneJobs.findIndex((j) => j.id === selectedJobId);
-  const job = currentIndex >= 0 ? doneJobs[currentIndex] : doneJobs[0];
+  //const job = currentIndex >= 0 ? doneJobs[currentIndex] : doneJobs[0];
+  const job = doneJobs.find((j) => j.id === selectedJobId); // может быть undefined, если выбран job с ошибкой или еще не выбран
 
   // локальный стейт для редактирования
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValues, setEditValues] = useState({
-    title: '',
-    description: '',
-    keywords: '',
+    title: "",
+    description: "",
+    keywords: "",
   });
 
   // навигация — ввод номера вручную
@@ -36,49 +39,61 @@ export const MetadataPreview: React.FC = () => {
   useEffect(() => {
     if (job?.metadata) {
       setEditValues({
-        title: job.metadata.title ?? '',
-        description: job.metadata.description ?? '',
-        keywords: job.metadata.keywords?.join(', ') ?? '',
+        title: job.metadata.title ?? "",
+        description: job.metadata.description ?? "",
+        keywords: job.metadata.keywords?.join(", ") ?? "",
       });
     }
     setEditingField(null);
   }, [job?.id]);
 
-  const handleNavigate = (direction: 'prev' | 'next') => {
+  // выбираем первый completed job автоматически
+  useEffect(() => {
+    if (!selectedJobId && doneJobs.length > 0) {
+      setSelectedJobId(doneJobs[0].id);
+    }
+  }, [doneJobs, selectedJobId]);
+
+  const handleNavigate = (direction: "prev" | "next") => {
     if (doneJobs.length === 0) return;
-    const newIndex = direction === 'prev'
-      ? Math.max(0, currentIndex - 1)
-      : Math.min(doneJobs.length - 1, currentIndex + 1);
+    const newIndex =
+      direction === "prev"
+        ? Math.max(0, currentIndex - 1)
+        : Math.min(doneJobs.length - 1, currentIndex + 1);
     setSelectedJobId(doneJobs[newIndex].id);
   };
 
   const handleIndexSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && indexInput !== null) {
+    if (e.key === "Enter" && indexInput !== null) {
       const num = parseInt(indexInput, 10);
       if (!isNaN(num) && num >= 1 && num <= doneJobs.length) {
         setSelectedJobId(doneJobs[num - 1].id);
       }
       setIndexInput(null);
     }
-    if (e.key === 'Escape') setIndexInput(null);
+    if (e.key === "Escape") setIndexInput(null);
   };
 
-  const handleSave = async (field: 'title' | 'description' | 'keywords') => {
+  const handleSave = async (field: "title" | "description" | "keywords") => {
     if (!job || !currentJobId) return;
 
     const updatedMetadata = {
       ...job.metadata,
-      [field]: field === 'keywords'
-        ? editValues.keywords.split(',').map((k) => k.trim()).filter(Boolean)
-        : editValues[field],
+      [field]:
+        field === "keywords"
+          ? editValues.keywords
+              .split(",")
+              .map((k) => k.trim())
+              .filter(Boolean)
+          : editValues[field],
     };
 
     try {
       await jobsApi.updateMetadata(currentJobId, job.id, updatedMetadata);
       updateMetadata(job.id, updatedMetadata as any);
-      addToast('Saved', 'success');
+      addToast("Saved", "success");
     } catch {
-      addToast('Failed to save', 'error');
+      addToast("Failed to save", "error");
     }
 
     setEditingField(null);
@@ -86,10 +101,10 @@ export const MetadataPreview: React.FC = () => {
 
   const handleKeyDown = (
     e: React.KeyboardEvent,
-    field: 'title' | 'description' | 'keywords'
+    field: "title" | "description" | "keywords",
   ) => {
-    if (e.key === 'Enter' && !e.shiftKey) handleSave(field);
-    if (e.key === 'Escape') setEditingField(null);
+    if (e.key === "Enter" && !e.shiftKey) handleSave(field);
+    if (e.key === "Escape") setEditingField(null);
   };
 
   if (!job) {
@@ -105,14 +120,20 @@ export const MetadataPreview: React.FC = () => {
   return (
     <Panel className={styles.panel} direction="column" gap="md">
       {/* Заголовок */}
-      <div className={styles.header}>
-        <Icon name="info-icon" className={styles.headerIcon} />
-        <h2>Metadata Preview</h2>
-      </div>
+      <SectionHeader
+        icon="info-icon"
+        title="Metadata Preview"
+        subtitle="Upload photos and set context to see AI-generated metadata."
+      />
 
       {/* Навигация */}
       <div className={styles.nav}>
-        <button className={styles.navBtn} onClick={() => handleNavigate('prev')}>‹</button>
+        <button
+          className={styles.navBtn}
+          onClick={() => handleNavigate("prev")}
+        >
+          ‹
+        </button>
         {indexInput !== null ? (
           <input
             autoFocus
@@ -131,12 +152,25 @@ export const MetadataPreview: React.FC = () => {
             {displayIndex} of {doneJobs.length}
           </span>
         )}
-        <button className={styles.navBtn} onClick={() => handleNavigate('next')}>›</button>
+        <button
+          className={styles.navBtn}
+          onClick={() => handleNavigate("next")}
+        >
+          ›
+        </button>
       </div>
 
       {/* Превью фото */}
       <div className={styles.imagePlaceholder}>
-        <Icon name="img-icon" className={styles.imagePlaceholderIcon} />
+        {previews[job.id] ? (
+          <img
+            src={previews[job.id]}
+            alt={job.originalFilename}
+            className={styles.previewImage}
+          />
+        ) : (
+          <Icon name="img-icon" className={styles.imagePlaceholderIcon} />
+        )}
       </div>
 
       {/* Filename */}
@@ -144,16 +178,20 @@ export const MetadataPreview: React.FC = () => {
 
       {/* Поля метаданных */}
       <div className={styles.fields}>
-        {(['title', 'description', 'keywords'] as const).map((field) => (
+        {(["title", "description", "keywords"] as const).map((field) => (
           <div key={field} className={styles.field}>
-            <span className={styles.fieldLabel}>{field.charAt(0).toUpperCase() + field.slice(1)}</span>
+            <span className={styles.fieldLabel}>
+              {field.charAt(0).toUpperCase() + field.slice(1)}
+            </span>
             {editingField === field ? (
-              field === 'description' ? (
+              field === "description" ? (
                 <textarea
                   autoFocus
                   className={styles.fieldTextarea}
                   value={editValues[field]}
-                  onChange={(e) => setEditValues((v) => ({ ...v, [field]: e.target.value }))}
+                  onChange={(e) =>
+                    setEditValues((v) => ({ ...v, [field]: e.target.value }))
+                  }
                   onKeyDown={(e) => handleKeyDown(e, field)}
                   onBlur={() => handleSave(field)}
                 />
@@ -162,7 +200,9 @@ export const MetadataPreview: React.FC = () => {
                   autoFocus
                   className={styles.fieldInput}
                   value={editValues[field]}
-                  onChange={(e) => setEditValues((v) => ({ ...v, [field]: e.target.value }))}
+                  onChange={(e) =>
+                    setEditValues((v) => ({ ...v, [field]: e.target.value }))
+                  }
                   onKeyDown={(e) => handleKeyDown(e, field)}
                   onBlur={() => handleSave(field)}
                 />
@@ -173,9 +213,9 @@ export const MetadataPreview: React.FC = () => {
                 onDoubleClick={() => setEditingField(field)}
                 title="Double-click to edit"
               >
-                {field === 'keywords'
-                  ? job.metadata?.keywords?.join(', ') || '—'
-                  : job.metadata?.[field] || '—'}
+                {field === "keywords"
+                  ? job.metadata?.keywords?.join(", ") || "—"
+                  : job.metadata?.[field] || "—"}
                 <Icon name="edit-icon" className={styles.editIcon} />
               </div>
             )}
@@ -183,12 +223,12 @@ export const MetadataPreview: React.FC = () => {
         ))}
       </div>
 
-      {/* Regenerate — внизу */}
+      {/* Regenerate — внизу (перенесли) */}
       <Button
         variant="secondary"
         size="sm"
         icon={<Icon name="restart-icon" className={styles.btnIcon} />}
-        onClick={() => addToast('Regenerate coming soon', 'info')}
+        onClick={() => addToast("Regenerate coming soon", "info")}
         className={styles.regenerateBtn}
       >
         Regenerate
