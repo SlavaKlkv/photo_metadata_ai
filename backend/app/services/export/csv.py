@@ -1,9 +1,10 @@
 import csv
 from io import StringIO
 
-from app.schemas.job import ProcessingJob, ProcessingJobFile, StockPlatform
-
 import structlog
+
+from app.core.enums import StockPlatform
+from app.schemas.job import ProcessingJob, ProcessingJobFile
 
 logger = structlog.get_logger(__name__)
 
@@ -55,7 +56,7 @@ def generate_metadata_csv(
     logger.info(
         'csv_generation_completed',
         job_id=str(job.job_id),
-        export_format=export_format,
+        export_platform=export_platform,
         files_count=len(job.files),
         csv_size=len(csv_content),
     )

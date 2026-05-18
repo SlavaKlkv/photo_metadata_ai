@@ -67,7 +67,7 @@ class MockImageMetadataProvider(BaseAIProvider):
         if shooting_context:
             description = f'{description} Context: {shooting_context}'
 
-        return AIMetadataResponse(
+        metadata = AIMetadataResponse(
             title=f'Test metadata for {image_path.name}',
             description=description,
             keywords=['test', 'image', 'metadata'],
