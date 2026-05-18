@@ -11,25 +11,24 @@ from fastapi import (
 from fastapi.responses import Response
 from starlette.concurrency import run_in_threadpool
 
+from app.core.enums import ExportFormat, ExportStatus, JobStatus
 from app.schemas.job import (
     CleanupJobResult,
     CreateProcessingJobRequest,
     EmbeddedMetadataResult,
     FileStatus,
     ProcessingJob,
+    ProcessingJobExportStatus,
     ProcessingJobFile,
     ProcessingJobFileStatus,
     ProcessingJobMetadataResult,
     ProcessingJobMetadataResults,
     ProcessingJobStatus,
     UpdateProcessingJobMetadataRequest,
+    UpdateProcessingJobSettingsRequest,
 )
 from app.services.cleanup import cleanup_job_temp_files
-from app.services.csv_export import (
-    CsvExportFormat,
-    generate_metadata_csv,
-    get_csv_filename,
-)
+from app.services.export.export import generate_job_export, run_job_export
 from app.services.metadata_embedding import embed_metadata_into_jpg
 from app.services.processing import (
     cancel_job_processing,
@@ -47,7 +46,6 @@ router = APIRouter(
 
 @router.post('/upload', response_model=ProcessingJob)
 async def upload_photos(
-    background_tasks: BackgroundTasks,
     files: list[UploadFile] = File(...),
     shooting_context: str | None = Form(None),
 ):
@@ -73,9 +71,60 @@ async def upload_photos(
     )
 
     created_job = await storage.create_job(job)
-    background_tasks.add_task(process_job, created_job.job_id)
 
     return created_job
+
+
+@router.patch('/{job_id}/settings', response_model=ProcessingJob)
+async def update_job_settings(
+    job_id: UUID,
+    payload: UpdateProcessingJobSettingsRequest,
+):
+    """
+    Обновляет настройки задачи перед запуском обработки.
+    """
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail='Job not found',
+        )
+
+    for field_name in payload.model_fields_set:
+        setattr(job, field_name, getattr(payload, field_name))
+
+    return await storage.update_job(job)
+
+
+@router.post('/{job_id}/process', response_model=ProcessingJob)
+async def start_job_processing(
+    job_id: UUID,
+    background_tasks: BackgroundTasks,
+):
+    """
+    Запускает обработку задачи после загрузки файлов и настройки параметров.
+    """
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail='Job not found',
+        )
+
+    if job.status != JobStatus.QUEUED:
+        raise HTTPException(
+            status_code=400,
+            detail='Job processing has already been started or finished',
+        )
+
+    job.status = JobStatus.PROCESSING
+    await storage.update_job(job)
+
+    background_tasks.add_task(process_job, job.job_id)
+
+    return job
 
 
 @router.post('/', response_model=ProcessingJob)
@@ -179,13 +228,75 @@ async def get_job_results(job_id: UUID):
     )
 
 
-@router.get('/{job_id}/export/csv')
-async def export_job_csv(
+@router.post(
+    '/{job_id}/export/{export_format}',
+    response_model=ProcessingJobExportStatus,
+)
+async def start_job_export(
     job_id: UUID,
-    format: CsvExportFormat,
+    export_format: ExportFormat,
+    background_tasks: BackgroundTasks,
 ):
     """
-    Возвращает CSV с метаданными задачи для выбранной стоковой платформы.
+    Запускает подготовку экспорта задачи в выбранном формате.
+    """
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail='Job not found',
+        )
+
+    job.export_status = ExportStatus.QUEUED
+    job.export_progress = 0
+    job.export_format = export_format
+    job.export_error_message = None
+    await storage.update_job(job)
+
+    background_tasks.add_task(run_job_export, job.job_id, export_format)
+
+    return ProcessingJobExportStatus(
+        job_id=job.job_id,
+        status=job.export_status,
+        progress=job.export_progress,
+        export_format=job.export_format,
+        error_message=job.export_error_message,
+    )
+
+
+@router.get(
+    '/{job_id}/export/status',
+    response_model=ProcessingJobExportStatus,
+)
+async def get_job_export_status(job_id: UUID):
+    """
+    Возвращает текущий статус подготовки экспорта задачи.
+    """
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail='Job not found',
+        )
+
+    return ProcessingJobExportStatus(
+        job_id=job.job_id,
+        status=job.export_status,
+        progress=job.export_progress,
+        export_format=job.export_format,
+        error_message=job.export_error_message,
+    )
+
+
+@router.get('/{job_id}/export/{export_format}')
+async def export_job(
+    job_id: UUID,
+    export_format: ExportFormat,
+):
+    """
+    Возвращает экспорт задачи в выбранном формате.
     """
 
     job = await storage.get_job(job_id)
@@ -196,12 +307,17 @@ async def export_job_csv(
             detail='Job not found',
         )
 
-    csv_content = generate_metadata_csv(job, format)
-    filename = get_csv_filename(job, format)
+    try:
+        content, filename, media_type = generate_job_export(job, export_format)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        ) from error
 
     return Response(
-        content=csv_content,
-        media_type='text/csv; charset=utf-8',
+        content=content,
+        media_type=media_type,
         headers={
             'Content-Disposition': f'attachment; filename="{filename}"',
         },

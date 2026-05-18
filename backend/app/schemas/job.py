@@ -1,26 +1,17 @@
 from datetime import UTC, datetime
-from enum import StrEnum
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.core.enums import (
+    AIProvider,
+    ExportFormat,
+    ExportStatus,
+    FileStatus,
+    JobStatus,
+    StockPlatform,
+)
 from app.utils.sanitizers import sanitize_keywords, sanitize_metadata_text
-
-
-class FileStatus(StrEnum):
-    QUEUED = 'queued'
-    PROCESSING = 'processing'
-    COMPLETED = 'completed'
-    FAILED = 'failed'
-    CANCELLED = 'cancelled'
-
-
-class JobStatus(StrEnum):
-    QUEUED = 'queued'
-    PROCESSING = 'processing'
-    COMPLETED = 'completed'
-    FAILED = 'failed'
-    CANCELLED = 'cancelled'
 
 
 class FileProcessingMixin(BaseModel):
@@ -69,6 +60,33 @@ class MetadataMixin(BaseModel):
         return sanitize_keywords(value)
 
 
+class JobSettingsMixin(BaseModel):
+    """
+    Общие поля настроек задачи для request и job-схем.
+    """
+
+    shooting_context: str | None = None
+    stock_platform: StockPlatform | None = None
+    export_formats: list[ExportFormat] = Field(default_factory=list)
+    ai_provider: AIProvider | None = None
+    export_quality: int | None = Field(
+        default=None,
+        ge=0,
+        le=100,
+    )
+
+
+class ExportStatusMixin(BaseModel):
+    """
+    Общие поля статуса экспорта для response-схем.
+    """
+
+    export_status: ExportStatus | None = None
+    export_progress: int = 0
+    export_format: ExportFormat | None = None
+    export_error_message: str | None = None
+
+
 class ProcessingJobFile(FileNameMixin, MetadataMixin):
     file_id: UUID = Field(default_factory=uuid4)
     status: FileStatus = FileStatus.QUEUED
@@ -84,11 +102,16 @@ class CreateProcessingJobRequest(BaseModel):
     shooting_context: str | None = None
 
 
-class ProcessingJob(BaseModel):
+class UpdateProcessingJobSettingsRequest(JobSettingsMixin):
+    """
+    Данные для обновления настроек задачи перед запуском обработки.
+    """
+
+
+class ProcessingJob(JobSettingsMixin, ExportStatusMixin):
     job_id: UUID = Field(default_factory=uuid4)
     status: JobStatus = JobStatus.QUEUED
     files: list[ProcessingJobFile] = Field(default_factory=list)
-    shooting_context: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
@@ -109,6 +132,14 @@ class ProcessingJobStatus(BaseModel):
     status: JobStatus
     # Оставляем в ответе только данные прогресса вместо полных метаданных.
     files: list[ProcessingJobFileStatus] = Field(default_factory=list)
+
+
+class ProcessingJobExportStatus(ExportStatusMixin):
+    """
+    Текущий статус экспорта задачи для polling на фронтенде.
+    """
+
+    job_id: UUID
 
 
 class ProcessingJobMetadataResult(

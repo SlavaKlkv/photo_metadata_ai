@@ -215,11 +215,11 @@ class OpenAIImageMetadataProvider(BaseAIProvider):
         )
 
 
-def get_ai_provider() -> BaseAIProvider:
-    """
-    Возвращает AI-провайдер по настройке DEFAULT_AI_PROVIDER.
-    """
-    provider_name = settings.DEFAULT_AI_PROVIDER
+def get_ai_provider(provider_name: str | None = None) -> BaseAIProvider:
+    """Возвращает AI-провайдер по имени или настройке DEFAULT_AI_PROVIDER."""
+
+    provider_name = provider_name or settings.DEFAULT_AI_PROVIDER
+
     provider_classes: dict[str, type[BaseAIProvider]] = {
         'mock': MockImageMetadataProvider,
         'ollama': OllamaImageMetadataProvider,
@@ -227,11 +227,13 @@ def get_ai_provider() -> BaseAIProvider:
     }
 
     provider_class = provider_classes.get(provider_name)
+
     if provider_class is None:
         logger.error(
             'unsupported_ai_provider_configured',
             provider=provider_name,
         )
+
         raise HTTPException(
             status_code=500,
             detail=f'Unsupported AI provider: {provider_name}',

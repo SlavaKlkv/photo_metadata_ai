@@ -1,26 +1,16 @@
 import csv
-from enum import StrEnum
 from io import StringIO
 
 import structlog
 
+from app.core.enums import StockPlatform
 from app.schemas.job import ProcessingJob, ProcessingJobFile
 
 logger = structlog.get_logger(__name__)
 
 
-class CsvExportFormat(StrEnum):
-    """
-    Поддерживаемые форматы CSV для стоковых платформ.
-    """
-
-    SHUTTERSTOCK = 'shutterstock'
-    GETTY = 'getty'
-    ADOBE = 'adobe'
-
-
-CSV_HEADERS: dict[CsvExportFormat, list[str]] = {
-    CsvExportFormat.SHUTTERSTOCK: [
+CSV_HEADERS: dict[StockPlatform, list[str]] = {
+    StockPlatform.SHUTTERSTOCK: [
         'Filename',
         'Description',
         'Keywords',
@@ -29,13 +19,13 @@ CSV_HEADERS: dict[CsvExportFormat, list[str]] = {
         'Mature Content',
         'Editorial',
     ],
-    CsvExportFormat.GETTY: [
+    StockPlatform.GETTY_IMAGES: [
         'Filename',
         'Title',
         'Description',
         'Keywords',
     ],
-    CsvExportFormat.ADOBE: [
+    StockPlatform.ADOBE_STOCK: [
         'Filename',
         'Title',
         'Keywords',
@@ -47,32 +37,26 @@ CSV_HEADERS: dict[CsvExportFormat, list[str]] = {
 
 def generate_metadata_csv(
     job: ProcessingJob,
-    export_format: CsvExportFormat,
+    export_platform: StockPlatform | None = None,
 ) -> str:
     """
     Генерирует CSV с метаданными файлов в формате выбранной платформы.
     """
-
-    logger.info(
-        'csv_generation_started',
-        job_id=str(job.job_id),
-        export_format=export_format,
-        files_count=len(job.files),
-    )
-
+    if export_platform is None:
+        export_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
     output = StringIO()
     writer = csv.writer(output)
-    writer.writerow(CSV_HEADERS[export_format])
+    writer.writerow(CSV_HEADERS[export_platform])
 
     for file in job.files:
-        writer.writerow(_build_csv_row(file, export_format))
+        writer.writerow(_build_csv_row(file, export_platform))
 
     csv_content = output.getvalue()
 
     logger.info(
         'csv_generation_completed',
         job_id=str(job.job_id),
-        export_format=export_format,
+        export_platform=export_platform,
         files_count=len(job.files),
         csv_size=len(csv_content),
     )
@@ -82,7 +66,7 @@ def generate_metadata_csv(
 
 def get_csv_filename(
     job: ProcessingJob,
-    export_format: CsvExportFormat,
+    export_format: StockPlatform,
 ) -> str:
     """
     Формирует безопасное имя CSV-файла для скачивания.
@@ -100,9 +84,22 @@ def get_csv_filename(
     return filename
 
 
+def _resolve_export_format(job: ProcessingJob) -> StockPlatform:
+    """
+    Определяет формат CSV на основе настроек задачи.
+    """
+
+    stock_platform = (job.stock_platform or '').lower()
+
+    try:
+        return StockPlatform(stock_platform)
+    except ValueError:
+        return StockPlatform.SHUTTERSTOCK
+
+
 def _build_csv_row(
     file: ProcessingJobFile,
-    export_format: CsvExportFormat,
+    export_platform: StockPlatform,
 ) -> list[str]:
     """
     Преобразует файл задачи в строку CSV нужного формата.
@@ -112,7 +109,7 @@ def _build_csv_row(
     title = file.title or ''  # защита от None
     description = file.description or title
 
-    if export_format == CsvExportFormat.SHUTTERSTOCK:
+    if export_platform == StockPlatform.SHUTTERSTOCK:
         return [
             file.filename,
             description,
@@ -123,7 +120,7 @@ def _build_csv_row(
             '',
         ]
 
-    if export_format == CsvExportFormat.GETTY:
+    if export_platform == StockPlatform.GETTY_IMAGES:
         return [
             file.filename,
             title,

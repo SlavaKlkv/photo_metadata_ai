@@ -117,7 +117,7 @@ async def process_job(job_id: UUID) -> None:
     await storage.update_job(job)
 
     try:
-        ai_provider = get_ai_provider()
+        ai_provider = get_ai_provider(job.ai_provider)
     except Exception as error:
         logger.exception(
             'ai_provider_initialization_failed',
@@ -190,7 +190,7 @@ async def retry_failed_files(job_id: UUID) -> None:
     await storage.update_job(job)
 
     try:
-        ai_provider = get_ai_provider()
+        ai_provider = get_ai_provider(job.ai_provider)
     except Exception as error:
         logger.exception(
             'ai_provider_initialization_failed_on_retry',
