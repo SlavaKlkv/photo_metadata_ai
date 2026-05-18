@@ -191,10 +191,13 @@ class OpenAIImageMetadataProvider(BaseAIProvider):
         )
 
 
-def get_ai_provider() -> BaseAIProvider:
+def get_ai_provider(provider_name: str | None = None) -> BaseAIProvider:
     """
     Возвращает AI-провайдер по настройке DEFAULT_AI_PROVIDER.
     """
+
+    provider_name = provider_name or settings.DEFAULT_AI_PROVIDER
+
     if settings.DEFAULT_AI_PROVIDER == 'mock':
         return MockImageMetadataProvider()
 

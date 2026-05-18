@@ -1,22 +1,10 @@
 import csv
-from enum import StrEnum
 from io import StringIO
 
-from app.schemas.job import ProcessingJob, ProcessingJobFile
+from app.schemas.job import ProcessingJob, ProcessingJobFile, StockPlatform
 
-
-class CsvExportFormat(StrEnum):
-    """
-    Поддерживаемые форматы CSV для стоковых платформ.
-    """
-
-    SHUTTERSTOCK = 'shutterstock'
-    GETTY = 'getty'
-    ADOBE = 'adobe'
-
-
-CSV_HEADERS: dict[CsvExportFormat, list[str]] = {
-    CsvExportFormat.SHUTTERSTOCK: [
+CSV_HEADERS: dict[StockPlatform, list[str]] = {
+    StockPlatform.SHUTTERSTOCK: [
         'Filename',
         'Description',
         'Keywords',
@@ -25,13 +13,13 @@ CSV_HEADERS: dict[CsvExportFormat, list[str]] = {
         'Mature Content',
         'Editorial',
     ],
-    CsvExportFormat.GETTY: [
+    StockPlatform.GETTY_IMAGES: [
         'Filename',
         'Title',
         'Description',
         'Keywords',
     ],
-    CsvExportFormat.ADOBE: [
+    StockPlatform.ADOBE_STOCK: [
         'Filename',
         'Title',
         'Keywords',
@@ -43,12 +31,13 @@ CSV_HEADERS: dict[CsvExportFormat, list[str]] = {
 
 def generate_metadata_csv(
     job: ProcessingJob,
-    export_format: CsvExportFormat,
+    export_format: StockPlatform | None = None,
 ) -> str:
     """
     Генерирует CSV с метаданными файлов в формате выбранной платформы.
     """
-
+    if export_format is None:
+        export_format = _resolve_export_format(job)
     output = StringIO()
     writer = csv.writer(output)
     writer.writerow(CSV_HEADERS[export_format])
@@ -61,7 +50,7 @@ def generate_metadata_csv(
 
 def get_csv_filename(
     job: ProcessingJob,
-    export_format: CsvExportFormat,
+    export_format: StockPlatform,
 ) -> str:
     """
     Формирует безопасное имя CSV-файла для скачивания.
@@ -70,9 +59,22 @@ def get_csv_filename(
     return f'{job.job_id}_{export_format}.csv'
 
 
+def _resolve_export_format(job: ProcessingJob) -> StockPlatform:
+    """
+    Определяет формат CSV на основе настроек задачи.
+    """
+
+    stock_platform = (job.stock_platform or '').lower()
+
+    try:
+        return StockPlatform(stock_platform)
+    except ValueError:
+        return StockPlatform.SHUTTERSTOCK
+
+
 def _build_csv_row(
     file: ProcessingJobFile,
-    export_format: CsvExportFormat,
+    export_format: StockPlatform,
 ) -> list[str]:
     """
     Преобразует файл задачи в строку CSV нужного формата.
@@ -82,7 +84,7 @@ def _build_csv_row(
     title = file.title or ''  # защита от None
     description = file.description or title
 
-    if export_format == CsvExportFormat.SHUTTERSTOCK:
+    if export_format == StockPlatform.SHUTTERSTOCK:
         return [
             file.filename,
             description,
@@ -93,7 +95,7 @@ def _build_csv_row(
             '',
         ]
 
-    if export_format == CsvExportFormat.GETTY:
+    if export_format == StockPlatform.GETTY_IMAGES:
         return [
             file.filename,
             title,

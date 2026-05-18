@@ -73,7 +73,7 @@ async def process_job(job_id: UUID) -> None:
     await storage.update_job(job)
 
     try:
-        ai_provider = get_ai_provider()
+        ai_provider = get_ai_provider(job.ai_provider)
     except Exception as error:
         await _mark_job_as_failed(job.job_id, error)
         return
@@ -129,7 +129,7 @@ async def retry_failed_files(job_id: UUID) -> None:
     await storage.update_job(job)
 
     try:
-        ai_provider = get_ai_provider()
+        ai_provider = get_ai_provider(job.ai_provider)
     except Exception as error:
         await _mark_job_as_failed(job.job_id, error)
         return
@@ -209,4 +209,3 @@ async def _mark_job_as_failed(job_id: UUID, error: Exception) -> None:
             file.error_message = error_message
 
     await storage.update_job(job)
-

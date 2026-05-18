@@ -11,6 +11,7 @@ from fastapi import (
 from fastapi.responses import Response
 from starlette.concurrency import run_in_threadpool
 
+from app.core.enums import StockPlatform
 from app.schemas.job import (
     CleanupJobResult,
     CreateProcessingJobRequest,
@@ -23,10 +24,10 @@ from app.schemas.job import (
     ProcessingJobMetadataResults,
     ProcessingJobStatus,
     UpdateProcessingJobMetadataRequest,
+    UpdateProcessingJobSettingsRequest,
 )
 from app.services.cleanup import cleanup_job_temp_files
 from app.services.csv_export import (
-    CsvExportFormat,
     generate_metadata_csv,
     get_csv_filename,
 )
@@ -47,7 +48,6 @@ router = APIRouter(
 
 @router.post('/upload', response_model=ProcessingJob)
 async def upload_photos(
-    background_tasks: BackgroundTasks,
     files: list[UploadFile] = File(...),
     shooting_context: str | None = Form(None),
 ):
@@ -73,9 +73,51 @@ async def upload_photos(
     )
 
     created_job = await storage.create_job(job)
-    background_tasks.add_task(process_job, created_job.job_id)
 
     return created_job
+
+
+@router.patch('/{job_id}/settings', response_model=ProcessingJob)
+async def update_job_settings(
+    job_id: UUID,
+    payload: UpdateProcessingJobSettingsRequest,
+):
+    """
+    Обновляет настройки задачи перед запуском обработки.
+    """
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail='Job not found',
+        )
+
+    for field_name in payload.model_fields_set:
+        setattr(job, field_name, getattr(payload, field_name))
+
+    return await storage.update_job(job)
+
+
+@router.post('/{job_id}/process', response_model=ProcessingJob)
+async def start_job_processing(
+    job_id: UUID,
+    background_tasks: BackgroundTasks,
+):
+    """
+    Запускает обработку задачи после загрузки файлов и настройки параметров.
+    """
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail='Job not found',
+        )
+
+    background_tasks.add_task(process_job, job.job_id)
+
+    return job
 
 
 @router.post('/', response_model=ProcessingJob)
@@ -182,7 +224,7 @@ async def get_job_results(job_id: UUID):
 @router.get('/{job_id}/export/csv')
 async def export_job_csv(
     job_id: UUID,
-    format: CsvExportFormat,
+    format: StockPlatform,
 ):
     """
     Возвращает CSV с метаданными задачи для выбранной стоковой платформы.

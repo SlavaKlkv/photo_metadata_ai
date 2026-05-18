@@ -1,26 +1,10 @@
 from datetime import UTC, datetime
-from enum import StrEnum
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.core.enums import ExportFormat, FileStatus, JobStatus, StockPlatform, AIProvider
 from app.utils.sanitizers import sanitize_keywords, sanitize_metadata_text
-
-
-class FileStatus(StrEnum):
-    QUEUED = 'queued'
-    PROCESSING = 'processing'
-    COMPLETED = 'completed'
-    FAILED = 'failed'
-    CANCELLED = 'cancelled'
-
-
-class JobStatus(StrEnum):
-    QUEUED = 'queued'
-    PROCESSING = 'processing'
-    COMPLETED = 'completed'
-    FAILED = 'failed'
-    CANCELLED = 'cancelled'
 
 
 class FileProcessingMixin(BaseModel):
@@ -69,6 +53,18 @@ class MetadataMixin(BaseModel):
         return sanitize_keywords(value)
 
 
+class JobSettingsMixin(BaseModel):
+    """
+    Общие поля настроек задачи для request и job-схем.
+    """
+
+    shooting_context: str | None = None
+    stock_platform: StockPlatform | None = None
+    export_formats: list[ExportFormat] = Field(default_factory=list)
+    ai_provider: AIProvider | None = None
+    export_quality: int | None = None
+
+
 class ProcessingJobFile(FileNameMixin, MetadataMixin):
     file_id: UUID = Field(default_factory=uuid4)
     status: FileStatus = FileStatus.QUEUED
@@ -84,11 +80,16 @@ class CreateProcessingJobRequest(BaseModel):
     shooting_context: str | None = None
 
 
-class ProcessingJob(BaseModel):
+class UpdateProcessingJobSettingsRequest(JobSettingsMixin):
+    """
+    Данные для обновления настроек задачи перед запуском обработки.
+    """
+
+
+class ProcessingJob(JobSettingsMixin):
     job_id: UUID = Field(default_factory=uuid4)
     status: JobStatus = JobStatus.QUEUED
     files: list[ProcessingJobFile] = Field(default_factory=list)
-    shooting_context: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
