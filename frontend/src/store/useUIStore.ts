@@ -1,3 +1,4 @@
+//frontend/src/store/useUIStore.ts
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 
