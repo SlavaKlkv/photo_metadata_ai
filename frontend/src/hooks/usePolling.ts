@@ -1,4 +1,4 @@
-// usePolling.ts
+// frontend/src/hooks/usePolling.ts
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { useUIStore } from '../store/useUIStore';
@@ -51,8 +51,8 @@ export const usePolling = (jobId: string | null) => {
             const resultsResponse = await jobsApi.getResults(jobId);
             const results = resultsResponse.data;
             // results — массив файлов с metadata
-            if (results.files) {
-              results.files.forEach((file: any) => {
+            if (results.results) {
+              results.results.forEach((file: any) => {
                 updateMetadata(file.file_id, {
                   title: file.title ?? "",
                   description: file.description ?? "",

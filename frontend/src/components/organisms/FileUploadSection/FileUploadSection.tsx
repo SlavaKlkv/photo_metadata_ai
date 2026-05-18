@@ -24,6 +24,7 @@ export const FileUploadSection: React.FC = () => {
   const addToast = useToastStore((state) => state.addToast);
   const [isUploading, setIsUploading] = useState(false);
   const addPreviews = useAppStore((state) => state.addPreviews);
+  const settings = useAppStore((state) => state.settings);
 
   const validateFile = (file: File): { valid: boolean; error?: string } => {
     if (!ALLOWED_FORMATS.includes(file.type)) {
@@ -69,6 +70,10 @@ export const FileUploadSection: React.FC = () => {
 
     const formData = new FormData();
     validFiles.forEach((file) => formData.append("files", file));
+    // только shooting_context — остальное бэкенд не ожидает
+    if (settings.shootingContext) {
+      formData.append("shooting_context", settings.shootingContext);
+    }
 
     try {
       setIsUploading(true);
@@ -131,7 +136,7 @@ export const FileUploadSection: React.FC = () => {
     ? "This may take a moment."
     : hasUploads
       ? "You can add more photos"
-      : "Upload JPG, PNG or RAW photos to begin";
+      : "Upload JPG or PNG photos to begin";
   const iconName = hasUploads ? "img-modal-icon" : "img-icon";
 
   const cards = [

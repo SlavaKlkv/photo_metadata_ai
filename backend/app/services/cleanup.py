@@ -1,8 +1,12 @@
 import shutil
 from pathlib import Path
 
+import structlog
+
 from app.core.constants import JOB_TEMP_DIRS, UPLOAD_DIR
 from app.schemas.job import ProcessingJob
+
+logger = structlog.get_logger(__name__)
 
 
 def cleanup_job_temp_files(job: ProcessingJob) -> tuple[int, int]:
@@ -10,10 +14,24 @@ def cleanup_job_temp_files(job: ProcessingJob) -> tuple[int, int]:
     Удаляет временные файлы, связанные с конкретной задачей обработки.
     """
 
+    logger.info(
+        'cleanup_job_started',
+        job_id=str(job.job_id),
+    )
+
     deleted_files = _cleanup_uploaded_files(job)
     temp_files, temp_directories = _cleanup_job_temp_directories(job)
 
-    return deleted_files + temp_files, temp_directories
+    total_deleted_files = deleted_files + temp_files
+
+    logger.info(
+        'cleanup_job_completed',
+        job_id=str(job.job_id),
+        deleted_files=total_deleted_files,
+        deleted_directories=temp_directories,
+    )
+
+    return total_deleted_files, temp_directories
 
 
 def _cleanup_uploaded_files(job: ProcessingJob) -> int:
@@ -31,6 +49,12 @@ def _cleanup_uploaded_files(job: ProcessingJob) -> int:
 
         file_path.unlink()
         deleted_files += 1
+
+        logger.debug(
+            'uploaded_file_deleted',
+            job_id=str(job.job_id),
+            file_path=str(file_path),
+        )
 
     return deleted_files
 
@@ -52,6 +76,12 @@ def _cleanup_job_temp_directories(job: ProcessingJob) -> tuple[int, int]:
         deleted_files += _count_files(job_temp_dir)
         shutil.rmtree(job_temp_dir)
         deleted_directories += 1
+
+        logger.debug(
+            'job_temp_directory_deleted',
+            job_id=str(job.job_id),
+            directory_path=str(job_temp_dir),
+        )
 
     return deleted_files, deleted_directories
 

@@ -1,3 +1,4 @@
+//frontend/src/store/useUIStore.ts
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 
@@ -11,6 +12,9 @@ export interface UIState {
   currentJobId: string | null;
   selectedJobId: string | null;
   isPollingActive: boolean;
+  isExporting: boolean;
+  isExportModalOpen: boolean;
+  isSuccessModalOpen: boolean;
   
   // Actions
   toggleSettings: () => void;
@@ -23,6 +27,11 @@ export interface UIState {
   setCurrentJobId: (id: string | null) => void;
   setSelectedJobId: (id: string | null) => void;
   setIsPollingActive: (val: boolean) => void;
+  setIsExporting: (val: boolean) => void;
+  openExportModal: () => void;
+  closeExportModal: () => void;
+  openSuccessModal: () => void;
+  closeSuccessModal: () => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -38,6 +47,9 @@ export const useUIStore = create<UIState>()(
       currentJobId: null, 
       selectedJobId: null,
       isPollingActive: false,
+      isExporting: false,
+      isExportModalOpen: false,
+      isSuccessModalOpen: false,
       
       // actions
       toggleSettings: () =>
@@ -58,6 +70,11 @@ export const useUIStore = create<UIState>()(
         set({ currentJobId: id }),
       setSelectedJobId: (id) => set({ selectedJobId: id }),
       setIsPollingActive: (val) => set({ isPollingActive: val }),
+      setIsExporting: (val) => set({ isExporting: val }),
+      openExportModal: () => set({ isExportModalOpen: true }),
+      closeExportModal: () => set({ isExportModalOpen: false }),
+      openSuccessModal: () => set({ isSuccessModalOpen: true }),
+      closeSuccessModal: () => set({ isSuccessModalOpen: false }),
     }),
     { name: 'UIStore' }
   )

@@ -1,4 +1,4 @@
-// BottomActionBar
+// frontend/src/components/organisms/BottomActionBar/BottomActionBar.tsx
 import React from 'react';
 import { useAppStore } from '../../../store/useAppStore';
 import { useUIStore } from '../../../store/useUIStore';
@@ -18,10 +18,14 @@ export const BottomActionBar: React.FC = () => {
   const setIsUploaded = useUIStore((state) => state.setIsUploaded);
   const setIsExportReady = useUIStore((state) => state.setIsExportReady);
   const setIsPollingActive = useUIStore((state) => state.setIsPollingActive);
+  const settings = useAppStore((state) => state.settings);
+  const isExporting = useUIStore((state) => state.isExporting);
+  const setIsExporting = useUIStore((state) => state.setIsExporting);
+  const openExportModal = useUIStore((state) => state.openExportModal);
 
 
   // текущий шаг степпера
-  const currentStep = !isUploaded ? 0 : isProcessing ? 2 : isExportReady ? 4 : 1;
+  const currentStep = !isUploaded ? 0 : isProcessing ? 2 : isExporting ? 4 : isExportReady ? 3 : 1;
   const previews = useAppStore((state) => state.previews);
 
   const handleRestart = () => {
@@ -42,12 +46,16 @@ export const BottomActionBar: React.FC = () => {
       <nav className={styles.stepper}>
         {STEPS.map((step, index) => (
           <React.Fragment key={step}>
-            <div className={`${styles.step} ${index <= currentStep ? styles.active : ''}`}>
+            <div
+              className={`${styles.step} ${index <= currentStep ? styles.active : ""}`}
+            >
               <span className={styles.stepNumber}>{index + 1}</span>
               <span className={styles.stepLabel}>{step}</span>
             </div>
             {index < STEPS.length - 1 && (
-              <div className={`${styles.line} ${index < currentStep ? styles.activeLine : ''}`} />
+              <div
+                className={`${styles.line} ${index < currentStep ? styles.activeLine : ""}`}
+              />
             )}
           </React.Fragment>
         ))}
@@ -72,7 +80,14 @@ export const BottomActionBar: React.FC = () => {
           variant="primary"
           size="md"
           icon={<Icon name="start-icon" className={styles.btnIcon} />}
-          disabled={!isUploaded || isProcessing}
+          disabled={
+            !isUploaded || isProcessing || !settings.shootingContext.trim() || isExportReady
+          }
+          title={
+            !settings.shootingContext.trim()
+              ? "Add shoot notes to start processing"
+              : undefined
+          }
           onClick={handleStartProcessing}
         >
           Start processing
@@ -84,6 +99,10 @@ export const BottomActionBar: React.FC = () => {
           size="md"
           icon={<Icon name="download-icon" className={styles.btnIcon} />}
           disabled={!isExportReady}
+          onClick={() => {
+            setIsExporting(true);
+            openExportModal();
+          }}
         >
           Export results
         </Button>

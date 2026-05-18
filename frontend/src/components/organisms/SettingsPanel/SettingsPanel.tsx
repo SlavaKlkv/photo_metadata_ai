@@ -1,3 +1,4 @@
+//frontend/src/components/organisms/SettingsPanel/SettingsPanel.tsx
 import React from 'react';
 import { useAppStore } from '../../../store/useAppStore';
 import { Panel } from '../../atoms/Panel/Panel';
@@ -5,7 +6,6 @@ import { Input } from '../../atoms/Input/Input';
 import { Select } from '../../atoms/Select/Select';
 import { Checkbox } from '../../atoms/Checkbox/Checkbox';
 import { Slider } from '../../atoms/Slider/Slider';
-import { Button } from '../../atoms/Button/Button';
 import styles from './SettingsPanel.module.scss';
 import { SectionHeader } from '../../molecules/SectionHeader/SectionHeader';
 
@@ -90,7 +90,7 @@ export const SettingsPanel: React.FC = () => {
             checked={formats.csv}
             onChange={handleFormatChange("csv")}
           />
-          <Checkbox
+          {/*<Checkbox
             id="iptc"
             label="IPTC"
             checked={formats.iptc}
@@ -101,7 +101,7 @@ export const SettingsPanel: React.FC = () => {
             label="JSON"
             checked={formats.json}
             onChange={handleFormatChange("json")}
-          />
+          />*/}
         </div>
 
         <Select
@@ -124,9 +124,9 @@ export const SettingsPanel: React.FC = () => {
           />
         </div>
 
-        <Button variant="primary" size="md" onClick={saveSettings}>
+        {/*<Button variant="primary" size="md" onClick={saveSettings}>
           Save Settings
-        </Button>
+        </Button>*/}
       </div>
     </Panel>
   );
