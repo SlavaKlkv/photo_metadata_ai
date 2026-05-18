@@ -2,7 +2,11 @@ import csv
 from enum import StrEnum
 from io import StringIO
 
+import structlog
+
 from app.schemas.job import ProcessingJob, ProcessingJobFile
+
+logger = structlog.get_logger(__name__)
 
 
 class CsvExportFormat(StrEnum):
@@ -49,6 +53,13 @@ def generate_metadata_csv(
     Генерирует CSV с метаданными файлов в формате выбранной платформы.
     """
 
+    logger.info(
+        'csv_generation_started',
+        job_id=str(job.job_id),
+        export_format=export_format,
+        files_count=len(job.files),
+    )
+
     output = StringIO()
     writer = csv.writer(output)
     writer.writerow(CSV_HEADERS[export_format])
@@ -56,7 +67,17 @@ def generate_metadata_csv(
     for file in job.files:
         writer.writerow(_build_csv_row(file, export_format))
 
-    return output.getvalue()
+    csv_content = output.getvalue()
+
+    logger.info(
+        'csv_generation_completed',
+        job_id=str(job.job_id),
+        export_format=export_format,
+        files_count=len(job.files),
+        csv_size=len(csv_content),
+    )
+
+    return csv_content
 
 
 def get_csv_filename(
@@ -67,7 +88,16 @@ def get_csv_filename(
     Формирует безопасное имя CSV-файла для скачивания.
     """
 
-    return f'{job.job_id}_{export_format}.csv'
+    filename = f'{job.job_id}_{export_format}.csv'
+
+    logger.debug(
+        'csv_filename_generated',
+        job_id=str(job.job_id),
+        export_format=export_format,
+        filename=filename,
+    )
+
+    return filename
 
 
 def _build_csv_row(

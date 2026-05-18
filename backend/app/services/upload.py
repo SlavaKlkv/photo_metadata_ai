@@ -3,6 +3,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import aiofiles
+import structlog
 from fastapi import HTTPException, UploadFile
 from PIL import Image, UnidentifiedImageError
 from starlette.concurrency import run_in_threadpool
@@ -14,6 +15,8 @@ from app.core.constants import (
     UPLOAD_DIR,
 )
 from app.utils.sanitizers import sanitize_filename
+
+logger = structlog.get_logger(__name__)
 
 
 def verify_image(content: bytes) -> None:
@@ -28,6 +31,12 @@ async def validate_upload_file(file: UploadFile, content: bytes) -> None:
     Выполняет валидацию загружаемого файла.
     """
     if file.content_type not in ALLOWED_IMAGE_TYPES:
+        logger.warning(
+            'upload_validation_failed',
+            filename=file.filename,
+            content_type=file.content_type,
+            reason='invalid_content_type',
+        )
         raise HTTPException(
             status_code=400,
             detail='Only JPG and PNG files are allowed',
@@ -36,12 +45,25 @@ async def validate_upload_file(file: UploadFile, content: bytes) -> None:
     suffix = Path(file.filename or '').suffix.lower()
 
     if suffix not in ALLOWED_IMAGE_SUFFIXES:
+        logger.warning(
+            'upload_validation_failed',
+            filename=file.filename,
+            suffix=suffix,
+            reason='invalid_file_suffix',
+        )
         raise HTTPException(
             status_code=400,
             detail='Only JPG and PNG files are allowed',
         )
 
     if len(content) > MAX_FILE_SIZE_BYTES:
+        logger.warning(
+            'upload_validation_failed',
+            filename=file.filename,
+            file_size=len(content),
+            max_file_size=MAX_FILE_SIZE_BYTES,
+            reason='file_too_large',
+        )
         raise HTTPException(
             status_code=400,
             detail='File size exceeds 10 MB',
@@ -50,6 +72,11 @@ async def validate_upload_file(file: UploadFile, content: bytes) -> None:
     try:
         await run_in_threadpool(verify_image, content)
     except (UnidentifiedImageError, OSError, SyntaxError):
+        logger.warning(
+            'upload_validation_failed',
+            filename=file.filename,
+            reason='invalid_or_corrupted_image',
+        )
         raise HTTPException(
             status_code=400,
             detail='Invalid or corrupted image file',
@@ -65,6 +92,11 @@ async def save_upload_file(file: UploadFile) -> str:
     safe_filename_stem = sanitize_filename(original_filename)
 
     content = await file.read()
+    logger.info(
+        'file_upload_started',
+        filename=original_filename,
+        file_size=len(content),
+    )
 
     await validate_upload_file(file, content)
 
@@ -75,5 +107,11 @@ async def save_upload_file(file: UploadFile) -> str:
 
     async with aiofiles.open(saved_file_path, 'wb') as output_file:
         await output_file.write(content)
+    logger.info(
+        'file_upload_completed',
+        filename=original_filename,
+        saved_filename=saved_filename,
+        saved_file_path=str(saved_file_path),
+    )
 
     return saved_filename
