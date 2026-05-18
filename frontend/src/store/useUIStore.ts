@@ -13,6 +13,8 @@ export interface UIState {
   selectedJobId: string | null;
   isPollingActive: boolean;
   isExporting: boolean;
+  isExportModalOpen: boolean;
+  isSuccessModalOpen: boolean;
   
   // Actions
   toggleSettings: () => void;
@@ -26,6 +28,10 @@ export interface UIState {
   setSelectedJobId: (id: string | null) => void;
   setIsPollingActive: (val: boolean) => void;
   setIsExporting: (val: boolean) => void;
+  openExportModal: () => void;
+  closeExportModal: () => void;
+  openSuccessModal: () => void;
+  closeSuccessModal: () => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -42,6 +48,8 @@ export const useUIStore = create<UIState>()(
       selectedJobId: null,
       isPollingActive: false,
       isExporting: false,
+      isExportModalOpen: false,
+      isSuccessModalOpen: false,
       
       // actions
       toggleSettings: () =>
@@ -63,6 +71,10 @@ export const useUIStore = create<UIState>()(
       setSelectedJobId: (id) => set({ selectedJobId: id }),
       setIsPollingActive: (val) => set({ isPollingActive: val }),
       setIsExporting: (val) => set({ isExporting: val }),
+      openExportModal: () => set({ isExportModalOpen: true }),
+      closeExportModal: () => set({ isExportModalOpen: false }),
+      openSuccessModal: () => set({ isSuccessModalOpen: true }),
+      closeSuccessModal: () => set({ isSuccessModalOpen: false }),
     }),
     { name: 'UIStore' }
   )
