@@ -8,6 +8,7 @@ import { Icon } from "../../atoms/Icon/Icon";
 import { InfoCard } from "../../molecules/InfoCard/InfoCard";
 import { Panel } from "../../atoms/Panel/Panel";
 import styles from "./FileUploadSection.module.scss";
+import { SectionHeader } from "../../molecules/SectionHeader/SectionHeader";
 
 const ALLOWED_FORMATS = ["image/jpeg", "image/png"];
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
@@ -163,15 +164,11 @@ export const FileUploadSection: React.FC = () => {
   return (
     <Panel className={styles.panel}>
       <section className={styles.container}>
-        <div className={styles.header}>
-          <div className={styles.headerIcon}>
-            <Icon name="folder-icon" className={styles.folderIcon} />
-          </div>
-          <div>
-            <h2>Upload Photos</h2>
-            <p>Start by adding your photos. We’ll take care of the rest.</p>
-          </div>
-        </div>
+        <SectionHeader
+          icon="folder-icon"
+          title="Upload Photos"
+          subtitle="Start by adding your photos. We'll take care of the rest."
+        />
 
         <div
           className={`${styles.uploadArea} ${dragActive ? styles.active : ""}`}

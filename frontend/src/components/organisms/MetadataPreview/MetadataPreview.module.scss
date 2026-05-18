@@ -5,24 +5,6 @@
   height: 100%;
 }
 
-.header {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-
-  h2 {
-    margin: 0;
-    font-size: var(--font-size-lg);
-    color: var(--text-primary);
-  }
-}
-
-.headerIcon {
-  width: 18px;
-  height: 18px;
-  color: var(--text-secondary);
-}
-
 .nav {
   display: flex;
   align-items: center;
@@ -76,6 +58,14 @@
   width: 48px;
   height: 48px;
   color: var(--text-placeholder);
+}
+
+.previewImage {
+  width: 100%;
+  height: 100%;
+  background: var(--bg-secondary);
+  object-fit: contain;
+  display: block;
 }
 
 .filename {

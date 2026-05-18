@@ -14,7 +14,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <button
         ref={ref}
-        className={`${styles.button} ${styles[variant]} ${styles[size]}`}
+        className={`${styles.button} ${styles[variant]} ${styles[size]} ${props.className ?? ''}`}
         {...props}
       >
         {icon && <span className={styles.icon}>{icon}</span>}
