@@ -1,4 +1,4 @@
-// BottomActionBar
+// frontend/src/components/organisms/BottomActionBar/BottomActionBar.tsx
 import React from 'react';
 import { useAppStore } from '../../../store/useAppStore';
 import { useUIStore } from '../../../store/useUIStore';
@@ -19,10 +19,12 @@ export const BottomActionBar: React.FC = () => {
   const setIsExportReady = useUIStore((state) => state.setIsExportReady);
   const setIsPollingActive = useUIStore((state) => state.setIsPollingActive);
   const settings = useAppStore((state) => state.settings);
+  const isExporting = useUIStore((state) => state.isExporting);
+  const setIsExporting = useUIStore((state) => state.setIsExporting);
 
 
   // текущий шаг степпера
-  const currentStep = !isUploaded ? 0 : isProcessing ? 2 : isExportReady ? 4 : 1;
+  const currentStep = !isUploaded ? 0 : isProcessing ? 2 : isExporting ? 4 : isExportReady ? 3 : 1;
   const previews = useAppStore((state) => state.previews);
 
   const handleRestart = () => {
@@ -86,6 +88,7 @@ export const BottomActionBar: React.FC = () => {
           size="md"
           icon={<Icon name="download-icon" className={styles.btnIcon} />}
           disabled={!isExportReady}
+          onClick={() => setIsExporting(true)}
         >
           Export results
         </Button>
