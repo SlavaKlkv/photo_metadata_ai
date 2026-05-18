@@ -3,7 +3,14 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.core.enums import ExportFormat, FileStatus, JobStatus, StockPlatform, AIProvider
+from app.core.enums import (
+    AIProvider,
+    ExportFormat,
+    ExportStatus,
+    FileStatus,
+    JobStatus,
+    StockPlatform,
+)
 from app.utils.sanitizers import sanitize_keywords, sanitize_metadata_text
 
 
@@ -62,7 +69,22 @@ class JobSettingsMixin(BaseModel):
     stock_platform: StockPlatform | None = None
     export_formats: list[ExportFormat] = Field(default_factory=list)
     ai_provider: AIProvider | None = None
-    export_quality: int | None = None
+    export_quality: int | None = Field(
+        default=None,
+        ge=0,
+        le=100,
+    )
+
+
+class ExportStatusMixin(BaseModel):
+    """
+    Общие поля статуса экспорта для response-схем.
+    """
+
+    export_status: ExportStatus | None = None
+    export_progress: int = 0
+    export_format: ExportFormat | None = None
+    export_error_message: str | None = None
 
 
 class ProcessingJobFile(FileNameMixin, MetadataMixin):
@@ -86,7 +108,7 @@ class UpdateProcessingJobSettingsRequest(JobSettingsMixin):
     """
 
 
-class ProcessingJob(JobSettingsMixin):
+class ProcessingJob(JobSettingsMixin, ExportStatusMixin):
     job_id: UUID = Field(default_factory=uuid4)
     status: JobStatus = JobStatus.QUEUED
     files: list[ProcessingJobFile] = Field(default_factory=list)
@@ -110,6 +132,14 @@ class ProcessingJobStatus(BaseModel):
     status: JobStatus
     # Оставляем в ответе только данные прогресса вместо полных метаданных.
     files: list[ProcessingJobFileStatus] = Field(default_factory=list)
+
+
+class ProcessingJobExportStatus(ExportStatusMixin):
+    """
+    Текущий статус экспорта задачи для polling на фронтенде.
+    """
+
+    job_id: UUID
 
 
 class ProcessingJobMetadataResult(

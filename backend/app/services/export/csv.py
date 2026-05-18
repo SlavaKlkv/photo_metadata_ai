@@ -8,8 +8,8 @@ import structlog
 logger = structlog.get_logger(__name__)
 
 
-CSV_HEADERS: dict[CsvExportFormat, list[str]] = {
-    CsvExportFormat.SHUTTERSTOCK: [
+CSV_HEADERS: dict[StockPlatform, list[str]] = {
+    StockPlatform.SHUTTERSTOCK: [
         'Filename',
         'Description',
         'Keywords',
@@ -36,27 +36,19 @@ CSV_HEADERS: dict[CsvExportFormat, list[str]] = {
 
 def generate_metadata_csv(
     job: ProcessingJob,
-    export_format: StockPlatform | None = None,
+    export_platform: StockPlatform | None = None,
 ) -> str:
     """
     Генерирует CSV с метаданными файлов в формате выбранной платформы.
     """
-    if export_format is None:
-        export_format = _resolve_export_format(job)
-
-    logger.info(
-        'csv_generation_started',
-        job_id=str(job.job_id),
-        export_format=export_format,
-        files_count=len(job.files),
-    )
-
+    if export_platform is None:
+        export_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
     output = StringIO()
     writer = csv.writer(output)
-    writer.writerow(CSV_HEADERS[export_format])
+    writer.writerow(CSV_HEADERS[export_platform])
 
     for file in job.files:
-        writer.writerow(_build_csv_row(file, export_format))
+        writer.writerow(_build_csv_row(file, export_platform))
 
     csv_content = output.getvalue()
 
@@ -106,7 +98,7 @@ def _resolve_export_format(job: ProcessingJob) -> StockPlatform:
 
 def _build_csv_row(
     file: ProcessingJobFile,
-    export_format: StockPlatform,
+    export_platform: StockPlatform,
 ) -> list[str]:
     """
     Преобразует файл задачи в строку CSV нужного формата.
@@ -116,7 +108,7 @@ def _build_csv_row(
     title = file.title or ''  # защита от None
     description = file.description or title
 
-    if export_format == StockPlatform.SHUTTERSTOCK:
+    if export_platform == StockPlatform.SHUTTERSTOCK:
         return [
             file.filename,
             description,
@@ -127,7 +119,7 @@ def _build_csv_row(
             '',
         ]
 
-    if export_format == StockPlatform.GETTY_IMAGES:
+    if export_platform == StockPlatform.GETTY_IMAGES:
         return [
             file.filename,
             title,

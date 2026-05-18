@@ -17,8 +17,15 @@ class JobStatus(StrEnum):
     CANCELLED = 'cancelled'
 
 
-class AIProvider(StrEnum):
+class ExportStatus(StrEnum):
+    QUEUED = 'queued'
+    PROCESSING = 'processing'
+    COMPLETED = 'completed'
+    FAILED = 'failed'
+    CANCELLED = 'cancelled'
 
+
+class AIProvider(StrEnum):
     MOCK = 'mock'
     OLLAMA = 'ollama'
     CLAUDE = 'claude'
