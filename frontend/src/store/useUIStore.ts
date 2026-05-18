@@ -11,6 +11,7 @@ export interface UIState {
   currentJobId: string | null;
   selectedJobId: string | null;
   isPollingActive: boolean;
+  isExporting: boolean;
   
   // Actions
   toggleSettings: () => void;
@@ -23,6 +24,7 @@ export interface UIState {
   setCurrentJobId: (id: string | null) => void;
   setSelectedJobId: (id: string | null) => void;
   setIsPollingActive: (val: boolean) => void;
+  setIsExporting: (val: boolean) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -38,6 +40,7 @@ export const useUIStore = create<UIState>()(
       currentJobId: null, 
       selectedJobId: null,
       isPollingActive: false,
+      isExporting: false,
       
       // actions
       toggleSettings: () =>
@@ -58,6 +61,7 @@ export const useUIStore = create<UIState>()(
         set({ currentJobId: id }),
       setSelectedJobId: (id) => set({ selectedJobId: id }),
       setIsPollingActive: (val) => set({ isPollingActive: val }),
+      setIsExporting: (val) => set({ isExporting: val }),
     }),
     { name: 'UIStore' }
   )
