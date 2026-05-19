@@ -258,10 +258,10 @@ async def start_job_export(
 
     return ProcessingJobExportStatus(
         job_id=job.job_id,
-        status=job.export_status,
-        progress=job.export_progress,
+        export_status=job.export_status,
+        export_progress=job.export_progress,
         export_format=job.export_format,
-        error_message=job.export_error_message,
+        export_error_message=job.export_error_message,
     )
 
 
@@ -283,10 +283,10 @@ async def get_job_export_status(job_id: UUID):
 
     return ProcessingJobExportStatus(
         job_id=job.job_id,
-        status=job.export_status,
-        progress=job.export_progress,
+        export_status=job.export_status,
+        export_progress=job.export_progress,
         export_format=job.export_format,
-        error_message=job.export_error_message,
+        export_error_message=job.export_error_message,
     )
 
 
