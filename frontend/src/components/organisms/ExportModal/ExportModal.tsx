@@ -37,14 +37,17 @@ export const ExportModal: React.FC = () => {
 
     const doExport = async () => {
       try {
-        const response = await jobsApi.exportCsv(currentJobId);
+        // 1. запускаем экспорт
+        await jobsApi.startExport(currentJobId, "csv");
+
+        // 2. скачиваем файл
+        const response = await jobsApi.downloadExport(currentJobId, "csv");
 
         if (isCancelled) return;
 
-        // скачиваем файл
-        const blob = new Blob([response.data], { type: 'text/csv' });
+        const blob = new Blob([response.data], { type: "text/csv" });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        const a = document.createElement("a");
         a.href = url;
         a.download = `metadata_export_${currentJobId}.csv`;
         a.click();

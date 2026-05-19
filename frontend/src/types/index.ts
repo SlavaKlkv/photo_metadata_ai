@@ -18,7 +18,7 @@ export interface ProcessingJob {
 export interface AppSettings {
   aiProvider: 'ollama' | 'claude' | 'openai';
   shootingContext: string;
-  exportFormat: 'getty' | 'shutterstock' | 'adobe';
+  exportFormat: 'getty_images' | 'shutterstock' | 'adobe_stock';
 }
 
 export interface ApiUploadResponse {

@@ -52,7 +52,7 @@ export const useAppStore = create<AppState>()(
     settings: {
       aiProvider: "ollama",
       shootingContext: "",
-      exportFormat: "getty",
+      exportFormat: "getty_images",
     },
     isProcessing: false,
     diagnosticCount: 0,

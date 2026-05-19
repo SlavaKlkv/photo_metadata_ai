@@ -5,6 +5,8 @@ import { useUIStore } from '../../../store/useUIStore';
 import { Button } from '../../atoms/Button/Button';
 import { Icon } from '../../atoms/Icon/Icon';
 import styles from './BottomActionBar.module.scss';
+import { jobsApi } from '../../../services/api/api';
+import { useToastStore } from '../../../store/useToastStore';
 
 const STEPS = ['Upload', 'Context', 'Process', 'Review', 'Export'] as const;
 
@@ -22,6 +24,8 @@ export const BottomActionBar: React.FC = () => {
   const isExporting = useUIStore((state) => state.isExporting);
   const setIsExporting = useUIStore((state) => state.setIsExporting);
   const openExportModal = useUIStore((state) => state.openExportModal);
+  const addToast = useToastStore((state) => state.addToast);
+  const currentJobId = useUIStore((state) => state.currentJobId);
 
 
   // текущий шаг степпера
@@ -35,10 +39,31 @@ export const BottomActionBar: React.FC = () => {
     setIsExportReady(false);
   };
 
-  const handleStartProcessing = () => {
+  const handleStartProcessing = async () => {
+  if (!currentJobId) return;
+
+  try {
+    await jobsApi.updateSettings(currentJobId, {
+      shooting_context: settings.shootingContext,
+      stock_platform: settings.exportFormat,
+      ai_provider: settings.aiProvider,
+    });
+
+    try {
+      await jobsApi.startProcessing(currentJobId);
+    } catch (processError: any) {
+      // игнорируем если уже запущен
+      if (!processError?.response?.data?.detail?.includes('already been started')) {
+        throw processError;
+      }
+    }
+
     setIsPollingActive(true);
     openProgressModal();
-  };
+  } catch (error) {
+    addToast('Failed to start processing', 'error');
+  }
+};
 
   return (
     <footer className={styles.bar}>
