@@ -43,9 +43,15 @@ export const usePolling = (jobId: string | null) => {
         const isDone =
           statusData.status === "completed" ||
           statusData.status === "error" ||
-          statusData.status === "cancelled";
+          statusData.status === "cancelled" ||
+          statusData.status === "failed";
         if (isDone) {
           stopPolling();
+          if (statusData.status === "failed") {
+            closeProgressModal();
+            // не ставим isExportReady — показываем ошибку
+            return;
+          }
           // забираем результаты с метаданными
           try {
             const resultsResponse = await jobsApi.getResults(jobId);

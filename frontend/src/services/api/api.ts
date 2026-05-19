@@ -17,6 +17,20 @@ export const jobsApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
 
+  // обновление настроек джоба перед запуском
+  updateSettings: (jobId: string, settings: {
+    shooting_context?: string;
+    stock_platform?: string;
+    export_formats?: string[];
+    ai_provider?: string;
+    export_quality?: number;
+  }) =>
+    apiClient.patch(`/api/v1/jobs/${jobId}/settings`, settings),
+
+  // запуск обработки
+  startProcessing: (jobId: string) =>
+    apiClient.post(`/api/v1/jobs/${jobId}/process`),
+
   // статус джоба (для поллинга)
   getStatus: (jobId: string) =>
     apiClient.get(`/api/v1/jobs/${jobId}/status`),
@@ -25,12 +39,19 @@ export const jobsApi = {
   getResults: (jobId: string) =>
     apiClient.get(`/api/v1/jobs/${jobId}/results`),
 
-  // экспорт CSV
-  exportCsv: (jobId: string, format?: string) =>
-    apiClient.get(`/api/v1/jobs/${jobId}/export/csv`, {
-      params: { format },
+  // старт экспорта — новый endpoint
+  startExport: (jobId: string, exportFormat: string) =>
+    apiClient.post(`/api/v1/jobs/${jobId}/export/${exportFormat}`),
+
+  // скачать экспорт
+  downloadExport: (jobId: string, exportFormat: string) =>
+    apiClient.get(`/api/v1/jobs/${jobId}/export/${exportFormat}`, {
       responseType: 'blob',
     }),
+
+  // статус экспорта
+  getExportStatus: (jobId: string) =>
+    apiClient.get(`/api/v1/jobs/${jobId}/export/status`),
 
   // отмена
   cancel: (jobId: string) =>
