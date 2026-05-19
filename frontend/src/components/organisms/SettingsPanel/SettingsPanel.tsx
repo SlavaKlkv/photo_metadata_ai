@@ -10,9 +10,9 @@ import styles from './SettingsPanel.module.scss';
 import { SectionHeader } from '../../molecules/SectionHeader/SectionHeader';
 
 const platformOptions = [
-  { value: 'getty', label: 'Getty Images' },
+  { value: 'getty_images', label: 'Getty Images' },
   { value: 'shutterstock', label: 'Shutterstock' },
-  { value: 'adobe', label: 'Adobe Stock' },
+  { value: 'adobe_stock', label: 'Adobe Stock' },
 ];
 
 const providerOptions = [
