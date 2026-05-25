@@ -16,11 +16,15 @@ class Settings(BaseSettings):
     DEFAULT_AI_PROVIDER: str = 'ollama'
 
     CLAUDE_API_KEY: str | None = None
+    GEMINI_API_KEY: str | None = None
+    OPENROUTER_API_KEY: str | None = None
+    OPENROUTER_MODEL: str = 'openrouter/auto'
 
     OPENAI_API_KEY: str | None = None
 
     OLLAMA_BASE_URL: str = 'http://localhost:11434'
     OLLAMA_MODEL: str = 'llava'
+    OLLAMA_REQUIRED_MODEL: str = 'qwen2.5vl'
 
     BACKEND_RUNTIME_PROFILE: RuntimeProfile = 'desktop'
     WORKSPACE_DIR: Path = Path.cwd()
