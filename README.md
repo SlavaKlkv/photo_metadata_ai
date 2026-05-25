@@ -81,6 +81,12 @@ docker compose build --no-cache
 docker compose up -d
 ```
 
+## Запуск тестов
+```bash
+docker compose run --rm backend uv run pytest
+```
+
+
 ## Установка новых зависимостей
 
 Backend
@@ -93,9 +99,10 @@ Frontend
 docker compose run --rm --no-deps frontend npm install <new_lib_name>
 ```
 
-## Установка Ollama и модели llava
+## Установка Ollama и модели Qwen2.5-VL
+
 ```bash
 brew install ollama
 ollama serve
-ollama pull llava
+ollama pull qwen2.5vl
 ```

@@ -14,6 +14,7 @@ from app.core.constants import (
     MAX_FILE_SIZE_BYTES,
     UPLOAD_DIR,
 )
+from app.core.runtime import resolve_path_in_base
 from app.utils.sanitizers import sanitize_filename
 
 logger = structlog.get_logger(__name__)
@@ -103,7 +104,19 @@ async def save_upload_file(file: UploadFile) -> str:
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
     saved_filename = f'{uuid4()}_{safe_filename_stem}{suffix}'
-    saved_file_path = UPLOAD_DIR / saved_filename
+    try:
+        saved_file_path = resolve_path_in_base(UPLOAD_DIR, saved_filename)
+    except ValueError as error:
+        logger.warning(
+            'upload_validation_failed',
+            filename=original_filename,
+            reason='unsafe_file_path',
+            error=str(error),
+        )
+        raise HTTPException(
+            status_code=400,
+            detail='Unsafe file path',
+        ) from error
 
     async with aiofiles.open(saved_file_path, 'wb') as output_file:
         await output_file.write(content)

@@ -38,3 +38,6 @@ indent-style = "space"
 
 [tool.mypy]
 python_version = "3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
