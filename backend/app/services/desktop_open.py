@@ -4,8 +4,12 @@ import subprocess
 from pathlib import Path
 from uuid import UUID
 
+import structlog
+
 from app.core.constants import RESULTS_DIR
 from app.core.runtime import resolve_path_in_base
+
+logger = structlog.get_logger(__name__)
 
 ALLOWED_DESKTOP_OPEN_FILE_SUFFIXES = {
     '.csv',
@@ -48,11 +52,19 @@ def open_path_in_default_app(path: Path) -> None:
     current_os = platform.system()
 
     if current_os == 'Darwin':
-        subprocess.run(['open', str(path)], check=True)
+        subprocess.Popen(
+            ['open', str(path)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
         return
 
     if current_os == 'Windows':
         os.startfile(str(path))  # type: ignore[attr-defined]
         return
 
-    subprocess.run(['xdg-open', str(path)], check=True)
+    subprocess.Popen(
+        ['xdg-open', str(path)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
