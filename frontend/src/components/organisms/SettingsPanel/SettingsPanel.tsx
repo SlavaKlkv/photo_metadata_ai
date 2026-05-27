@@ -111,9 +111,9 @@ export const SettingsPanel: React.FC = () => {
           onChange={(e) => updateSettings("aiProvider", e.target.value)}
         />
 
-        <div className={styles.sliderRow}>
+        {/*<div className={styles.sliderRow}>
           <label htmlFor="quality" className={styles.sliderLabel}>
-            Export Quality
+            AI Image Quality
           </label>
           <Slider
             id="quality"
@@ -122,7 +122,7 @@ export const SettingsPanel: React.FC = () => {
             value={quality}
             onChange={(e) => setQuality(Number(e.target.value))}
           />
-        </div>
+        </div>*/}
 
         {/*<Button variant="primary" size="md" onClick={saveSettings}>
           Save Settings

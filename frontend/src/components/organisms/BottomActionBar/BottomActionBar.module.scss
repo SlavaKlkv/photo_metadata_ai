@@ -5,21 +5,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px var(--spacing-lg);
-  background: var(--bg-secondary);
-  border-top: 1px solid var(--border-color);
   gap: var(--spacing-lg);
-
-  // на мобильном — степпер сверху, кнопки снизу
-  @media (max-width: 768px) {
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--spacing-md);
-    padding: var(--spacing-md);
-  }
 }
 
-// СТЕППЕР
 .stepper {
   display: flex;
   align-items: center;
@@ -47,7 +35,6 @@
     }
   }
 
-  // на очень маленьких экранах скрываем текст шагов
   @media (max-width: 480px) {
     .stepLabel {
       display: none;
@@ -88,7 +75,6 @@
   }
 }
 
-// КНОПКИ
 .actions {
   display: flex;
   align-items: center;
@@ -103,7 +89,6 @@
     flex-wrap: wrap;
     justify-content: stretch;
 
-    // кнопки на всю ширину на маленьких экранах
     > * {
       flex: 1;
     }
@@ -113,4 +98,12 @@
 .btnIcon {
   width: 16px;
   height: 16px;
+}
+
+@media (max-width: 768px) {
+  .bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-md);
+  }
 }

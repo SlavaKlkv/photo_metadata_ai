@@ -21,49 +21,43 @@ function App() {
 
   return (
     <div className={styles.app}>
-      {/* HEADER */}
-      <header className={styles.header}>
-        <div className={styles.headerContent}>
-          <div className={styles.title}>
-            <Icon name="logo" className={styles.logo} />
-            <div>
-              <h1>Photo Metadata AI</h1>
-              <p>Prepare your photos for stock platforms in minutes</p>
-            </div>
-          </div>
-          <div className={styles.icons}>
-            <button className={styles.iconBtn} title="Help">ℹ️</button>
-            <button className={styles.iconBtn} title="Settings">⚙️</button>
-          </div>
-        </div>
-      </header>
-
-      {/* MAIN CONTENT */}
       <main className={styles.container}>
-        {isExportReady ? (
-          // review экран — Results + MetadataPreview
-          <div className={styles.reviewGrid}>
-            <SettingsPanel />
-            <ResultsTable />
-            <MetadataPreview />
-          </div>
-        ) : (
-          // upload экран — Settings + FileUpload
-          <div className={styles.grid}>
-            <aside className={styles.sidebar}>
-              <SettingsPanel />
-            </aside>
-            <div className={styles.content}>
-              <FileUploadSection />
+        <section className={styles.bodyShell}>
+          <div className={styles.bodyHeader}>
+            <div className={styles.titleBlock}>
+              <Icon name="logo" className={styles.logo} />
+              <div className={styles.titleText}>
+                <h1>Photo Metadata AI</h1>
+                <p>Prepare your photos for stock platforms in minutes</p>
+              </div>
             </div>
           </div>
-        )}
+
+          <div className={styles.bodyContent}>
+            {isExportReady ? (
+              <div className={styles.reviewGrid}>
+                <SettingsPanel />
+                <ResultsTable />
+                <MetadataPreview />
+              </div>
+            ) : (
+              <div className={styles.grid}>
+                <aside className={styles.sidebar}>
+                  <SettingsPanel />
+                </aside>
+                <div className={styles.content}>
+                  <FileUploadSection />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className={styles.bodyFooter}>
+            <BottomActionBar />
+          </div>
+        </section>
       </main>
 
-      {/* BOTTOM */}
-      <BottomActionBar />
-
-      {/* MODAL */}
       <ProgressModal />
       <ExportModal />
       <SuccessModal />

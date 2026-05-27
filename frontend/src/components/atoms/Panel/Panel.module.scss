@@ -8,6 +8,7 @@
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   box-sizing: border-box;
+  height: 100%;
 
   // DIRECTION
   &.column { flex-direction: column; }
