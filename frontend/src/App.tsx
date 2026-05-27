@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useUIStore } from './store/useUIStore';
 import { usePolling } from './hooks/usePolling';
 import styles from './App.module.scss';
@@ -11,11 +11,17 @@ import { ResultsTable } from './components/organisms/ResultsTable/ResultsTable';
 import { MetadataPreview } from './components/organisms/MetadataPreview/MetadataPreview';
 import { ExportModal } from './components/organisms/ExportModal/ExportModal';
 import { SuccessModal } from './components/organisms/SuccessModal/SuccessModal';
+import { useAppStore } from './store/useAppStore';
 
 function App() {
   const currentJobId = useUIStore((state) => state.currentJobId);
   const isExportReady = useUIStore((state) => state.isExportReady);
   const isPollingActive = useUIStore((state) => state.isPollingActive);
+  const loadSessionSettings = useAppStore((state) => state.loadSessionSettings);
+
+  useEffect(() => {
+    loadSessionSettings();
+  }, [loadSessionSettings]);
 
   usePolling(isPollingActive ? currentJobId : null);
 

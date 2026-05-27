@@ -131,6 +131,10 @@ async def start_job_processing(
         raise HTTPException(
             status_code=400,
             detail='No valid JPEG files to process',
+    if job.ai_provider is None:
+        raise HTTPException(
+            status_code=400,
+            detail='AI provider must be selected before processing',
         )
 
     if job.status != JobStatus.QUEUED:
