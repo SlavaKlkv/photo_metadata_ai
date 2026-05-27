@@ -11,6 +11,7 @@ from openai import AsyncOpenAI
 
 from app.core.config import settings
 from app.core.constants import AI_PROVIDER_TIMEOUT
+from app.core.enums import AIProvider
 
 logger = structlog.get_logger(__name__)
 
@@ -215,10 +216,9 @@ class OpenAIImageMetadataProvider(BaseAIProvider):
         )
 
 
-def get_ai_provider(provider_name: str | None = None) -> BaseAIProvider:
-    """Возвращает AI-провайдер по имени или настройке DEFAULT_AI_PROVIDER."""
-
-    provider_name = provider_name or settings.DEFAULT_AI_PROVIDER
+def get_ai_provider(provider_name: str | AIProvider) -> BaseAIProvider:
+    """Возвращает AI-провайдер по имени."""
+    provider_key = str(provider_name)
 
     provider_classes: dict[str, type[BaseAIProvider]] = {
         'mock': MockImageMetadataProvider,
@@ -226,22 +226,22 @@ def get_ai_provider(provider_name: str | None = None) -> BaseAIProvider:
         'openai': OpenAIImageMetadataProvider,
     }
 
-    provider_class = provider_classes.get(provider_name)
+    provider_class = provider_classes.get(provider_key)
 
     if provider_class is None:
         logger.error(
             'unsupported_ai_provider_configured',
-            provider=provider_name,
+            provider=provider_key,
         )
 
         raise HTTPException(
             status_code=500,
-            detail=f'Unsupported AI provider: {provider_name}',
+            detail=f'Unsupported AI provider: {provider_key}',
         )
 
     logger.info(
         'ai_provider_selected',
-        provider=provider_name,
+        provider=provider_key,
     )
     return provider_class()
 

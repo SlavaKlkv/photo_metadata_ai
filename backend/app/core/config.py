@@ -13,8 +13,6 @@ class Settings(BaseSettings):
 
     # AI Providers Settings
 
-    DEFAULT_AI_PROVIDER: str = 'mock'
-
     CLAUDE_API_KEY: str | None = None
     GEMINI_API_KEY: str | None = None
     OPENROUTER_API_KEY: str | None = None
