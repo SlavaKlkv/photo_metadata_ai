@@ -1,5 +1,7 @@
 // /Slider
-import React from 'react';
+// TODO: удалить, если не понадобится слайдер
+
+/*import React from 'react';
 import styles from './Slider.module.scss';
 
 export interface SliderProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -34,4 +36,4 @@ export const Slider: React.FC<SliderProps> = ({
       {...props}
     />
   );
-};
+};*/

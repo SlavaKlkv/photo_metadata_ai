@@ -5,6 +5,8 @@ from app.core.runtime import (
     ensure_runtime_directories,
     get_runtime_directories,
 )
+from app.schemas.provider_discovery import ProvidersDiscoveryResponse
+from app.services.provider_discovery import discover_ai_providers
 
 router = APIRouter(
     prefix='/desktop',
@@ -62,3 +64,11 @@ async def desktop_health_check():
 async def get_desktop_runtime_info():
     ensure_runtime_directories()
     return _build_runtime_info()
+
+
+@router.get(
+    '/providers/discovery',
+    response_model=ProvidersDiscoveryResponse,
+)
+async def discover_desktop_ai_providers():
+    return await discover_ai_providers()
