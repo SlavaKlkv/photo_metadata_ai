@@ -4,6 +4,7 @@ from pathlib import Path
 import structlog
 
 from app.core.constants import JOB_TEMP_DIRS, UPLOAD_DIR
+from app.core.runtime import resolve_path_in_base
 from app.schemas.job import ProcessingJob
 
 logger = structlog.get_logger(__name__)
@@ -42,7 +43,19 @@ def _cleanup_uploaded_files(job: ProcessingJob) -> int:
     deleted_files = 0
 
     for file in job.files:
-        file_path = UPLOAD_DIR / Path(file.filename).name
+        try:
+            file_path = resolve_path_in_base(
+                UPLOAD_DIR,
+                Path(file.filename).name,
+            )
+        except ValueError as error:
+            logger.warning(
+                'cleanup_skipped_unsafe_upload_path',
+                job_id=str(job.job_id),
+                filename=file.filename,
+                error=str(error),
+            )
+            continue
 
         if not file_path.is_file():
             continue
@@ -68,7 +81,16 @@ def _cleanup_job_temp_directories(job: ProcessingJob) -> tuple[int, int]:
     deleted_directories = 0
 
     for temp_dir in JOB_TEMP_DIRS:
-        job_temp_dir = temp_dir / str(job.job_id)
+        try:
+            job_temp_dir = resolve_path_in_base(temp_dir, str(job.job_id))
+        except ValueError as error:
+            logger.warning(
+                'cleanup_skipped_unsafe_temp_path',
+                job_id=str(job.job_id),
+                temp_dir=str(temp_dir),
+                error=str(error),
+            )
+            continue
 
         if not job_temp_dir.exists():
             continue

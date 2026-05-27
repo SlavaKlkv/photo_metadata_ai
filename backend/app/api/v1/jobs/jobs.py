@@ -23,7 +23,11 @@ from app.schemas.job import (
     UpdateProcessingJobMetadataRequest,
     UpdateProcessingJobSettingsRequest,
 )
-from app.services.export.export import generate_job_export, run_job_export
+from app.services.export.export import (
+    generate_job_export,
+    load_stored_job_export,
+    run_job_export,
+)
 from app.services.processing import (
     cancel_job_processing,
     process_job,
@@ -38,6 +42,7 @@ router = APIRouter(
 )
 
 # --- загрузка и обработка ---
+
 
 @router.post('/upload', response_model=ProcessingJob)
 async def upload_photos(
@@ -404,7 +409,15 @@ async def export_job(
         )
 
     try:
-        content, filename, media_type = generate_job_export(job, export_format)
+        stored_export = load_stored_job_export(job, export_format)
+
+        if stored_export is None:
+            content, filename, media_type = generate_job_export(
+                job,
+                export_format,
+            )
+        else:
+            content, filename, media_type = stored_export
     except ValueError as error:
         raise HTTPException(
             status_code=400,
