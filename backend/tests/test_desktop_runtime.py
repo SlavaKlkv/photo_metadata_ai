@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from app.core.config import Settings, settings
+from app.core.config import Settings
 from app.core.constants import RESULTS_DIR
 from app.core.runtime import resolve_path_in_base
 from app.main import app
@@ -122,9 +122,7 @@ def test_desktop_runtime_endpoints_are_available():
             assert Path(runtime_payload[path_key]).exists()
 
 
-def test_desktop_flow_upload_process_review_export(monkeypatch):
-    monkeypatch.setattr(settings, 'DEFAULT_AI_PROVIDER', 'mock')
-
+def test_desktop_flow_upload_process_review_export():
     files = {
         'files': ('sample.jpg', _build_tiny_jpeg_bytes(), 'image/jpeg'),
     }
@@ -135,6 +133,13 @@ def test_desktop_flow_upload_process_review_export(monkeypatch):
 
         job_payload = upload_response.json()
         job_id = job_payload['job_id']
+
+        settings_response = client.patch(
+            f'/api/v1/jobs/{job_id}/settings',
+            json={'ai_provider': 'mock'},
+        )
+        assert settings_response.status_code == 200
+        assert settings_response.json()['ai_provider'] == 'mock'
 
         process_response = client.post(f'/api/v1/jobs/{job_id}/process')
         assert process_response.status_code == 200
@@ -169,3 +174,21 @@ def test_desktop_flow_upload_process_review_export(monkeypatch):
 
         stored_exports = list((RESULTS_DIR / job_id).glob('*.csv'))
         assert stored_exports
+
+
+def test_process_requires_ai_provider_selection():
+    files = {
+        'files': ('sample.jpg', _build_tiny_jpeg_bytes(), 'image/jpeg'),
+    }
+
+    with TestClient(app) as client:
+        upload_response = client.post('/api/v1/jobs/upload', files=files)
+        assert upload_response.status_code == 200
+
+        job_id = upload_response.json()['job_id']
+        process_response = client.post(f'/api/v1/jobs/{job_id}/process')
+
+    assert process_response.status_code == 400
+    assert process_response.json()['detail'] == (
+        'AI provider must be selected before processing'
+    )
