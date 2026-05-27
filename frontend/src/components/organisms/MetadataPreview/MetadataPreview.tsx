@@ -223,7 +223,7 @@ export const MetadataPreview: React.FC = () => {
         ))}
       </div>
 
-      {/* Regenerate — внизу (перенесли) */}
+      {/* Regenerate — внизу (перенесли) 
       <Button
         variant="secondary"
         size="sm"
@@ -232,7 +232,7 @@ export const MetadataPreview: React.FC = () => {
         className={styles.regenerateBtn}
       >
         Regenerate
-      </Button>
+      </Button>*/}
     </Panel>
   );
 };

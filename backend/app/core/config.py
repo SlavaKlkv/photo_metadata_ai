@@ -7,7 +7,7 @@ class Settings(BaseSettings):
 
     # AI Providers Settings
 
-    DEFAULT_AI_PROVIDER: str = 'ollama'
+    DEFAULT_AI_PROVIDER: str = 'mock'
 
     CLAUDE_API_KEY: str | None = None
 
