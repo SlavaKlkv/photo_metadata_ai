@@ -5,7 +5,6 @@ import { Panel } from '../../atoms/Panel/Panel';
 import { Input } from '../../atoms/Input/Input';
 import { Select } from '../../atoms/Select/Select';
 import { Checkbox } from '../../atoms/Checkbox/Checkbox';
-import { Slider } from '../../atoms/Slider/Slider';
 import styles from './SettingsPanel.module.scss';
 import { SectionHeader } from '../../molecules/SectionHeader/SectionHeader';
 
@@ -30,7 +29,6 @@ export const SettingsPanel: React.FC = () => {
     iptc: true,
     json: false,
   });
-  const [quality, setQuality] = React.useState(72);
 
   const CHAR_LIMIT = 600;
   const charCount = settings.shootingContext.length;
@@ -110,19 +108,6 @@ export const SettingsPanel: React.FC = () => {
           value={settings.aiProvider}
           onChange={(e) => updateSettings("aiProvider", e.target.value)}
         />
-
-        <div className={styles.sliderRow}>
-          <label htmlFor="quality" className={styles.sliderLabel}>
-            Export Quality
-          </label>
-          <Slider
-            id="quality"
-            min={0}
-            max={100}
-            value={quality}
-            onChange={(e) => setQuality(Number(e.target.value))}
-          />
-        </div>
 
         {/*<Button variant="primary" size="md" onClick={saveSettings}>
           Save Settings

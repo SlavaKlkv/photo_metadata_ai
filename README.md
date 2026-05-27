@@ -95,7 +95,6 @@ uv run ruff check --fix
 uv run pytest
 ```
 
-
 ## Установка новых зависимостей
 
 Backend (runtime)
@@ -114,7 +113,7 @@ cd frontend
 npm install <new_lib_name>
 ```
 
-## Ollama и модель Qwen2.5-VL (опционально)
+## Установка Ollama и модели Qwen2.5-VL
 
 ```bash
 brew install ollama

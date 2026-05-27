@@ -26,10 +26,18 @@ export const BottomActionBar: React.FC = () => {
   const openExportModal = useUIStore((state) => state.openExportModal);
   const addToast = useToastStore((state) => state.addToast);
   const currentJobId = useUIStore((state) => state.currentJobId);
-
+  const setCurrentJobId = useUIStore((state) => state.setCurrentJobId);
 
   // текущий шаг степпера
-  const currentStep = !isUploaded ? 0 : isProcessing ? 2 : isExporting ? 4 : isExportReady ? 3 : 1;
+  const currentStep = !isUploaded
+    ? 0
+    : isProcessing
+      ? 2
+      : isExporting
+        ? 4
+        : isExportReady
+          ? 3
+          : 1;
   const previews = useAppStore((state) => state.previews);
 
   const handleRestart = () => {
@@ -37,33 +45,31 @@ export const BottomActionBar: React.FC = () => {
     clearAll();
     setIsUploaded(false);
     setIsExportReady(false);
+    setIsPollingActive(false);
+    setCurrentJobId(null);
   };
 
   const handleStartProcessing = async () => {
-  if (!currentJobId) return;
-
-  try {
-    await jobsApi.updateSettings(currentJobId, {
-      shooting_context: settings.shootingContext,
-      stock_platform: settings.exportFormat,
-      ai_provider: settings.aiProvider,
-    });
+    if (!currentJobId) return;
 
     try {
-      await jobsApi.startProcessing(currentJobId);
-    } catch (processError: any) {
-      // игнорируем если уже запущен
-      if (!processError?.response?.data?.detail?.includes('already been started')) {
-        throw processError;
-      }
-    }
+      await jobsApi.updateSettings(currentJobId, {
+        shooting_context: settings.shootingContext,
+        stock_platform: settings.exportFormat,
+        ai_provider: settings.aiProvider,
+      });
 
-    setIsPollingActive(true);
-    openProgressModal();
-  } catch (error) {
-    addToast('Failed to start processing', 'error');
-  }
-};
+      const processResponse = await jobsApi.startProcessing(currentJobId);
+      // обновляем jobId из ответа на случай если бэкенд вернул новый
+      const actualJobId = processResponse.data.job_id ?? currentJobId;
+      setCurrentJobId(actualJobId);
+
+      setIsPollingActive(true);
+      openProgressModal();
+    } catch (error: any) {
+      addToast("Failed to start processing", "error");
+    }
+  };
 
   return (
     <footer className={styles.bar}>
@@ -88,7 +94,7 @@ export const BottomActionBar: React.FC = () => {
 
       {/* Кнопки */}
       <div className={styles.actions}>
-        {/* Restart — появляется после загрузки */}
+        {/* Restart — появляется после загрузки*/}
         {isUploaded && (
           <Button
             variant="secondary"
@@ -106,7 +112,10 @@ export const BottomActionBar: React.FC = () => {
           size="md"
           icon={<Icon name="start-icon" className={styles.btnIcon} />}
           disabled={
-            !isUploaded || isProcessing || !settings.shootingContext.trim() || isExportReady
+            !isUploaded ||
+            isProcessing ||
+            !settings.shootingContext.trim() ||
+            isExportReady
           }
           title={
             !settings.shootingContext.trim()

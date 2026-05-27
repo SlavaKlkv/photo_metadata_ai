@@ -18,6 +18,8 @@ from app.services.desktop_open import (
     get_job_results_dir,
     open_path_in_default_app,
 )
+from app.schemas.provider_discovery import ProvidersDiscoveryResponse
+from app.services.provider_discovery import discover_ai_providers
 
 router = APIRouter(
     prefix='/desktop',
@@ -158,6 +160,14 @@ async def open_result_file(
         path=str(file_path),
     )
 
+  
+@router.get(
+    '/providers/discovery',
+    response_model=ProvidersDiscoveryResponse,
+)
+async def discover_desktop_ai_providers():
+    return await discover_ai_providers()
+
 
 def _build_runtime_info() -> DesktopRuntimeInfo:
     runtime_directories = get_runtime_directories()
@@ -197,3 +207,4 @@ def _build_error_response(
             message=message,
         ).model_dump(),
     )
+

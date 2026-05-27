@@ -79,8 +79,7 @@ export const FileUploadSection: React.FC = () => {
       setIsUploading(true);
       const response = await apiClient.post<{
         job_id: string;
-        files: Array<{ file_id: string }>;
-      }>("/api/v1/jobs/upload", formData, {
+        files: Array<{ file_id: string }>; }>("/api/v1/jobs/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
