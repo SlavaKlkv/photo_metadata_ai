@@ -34,7 +34,7 @@ from app.services.processing import (
     retry_failed_files,
 )
 from app.services.storage import storage
-from app.services.upload import save_upload_file
+from app.services.upload import UploadValidationError, save_upload_file
 
 router = APIRouter(
     prefix='/jobs',
@@ -50,20 +50,30 @@ async def upload_photos(
     shooting_context: str | None = Form(None),
 ):
     """
-    Загружает несколько JPG/PNG файлов и создает задачу обработки.
+    Загружает несколько JPEG-файлов и создает задачу обработки.
     """
     job_files = []
 
     for file in files:
-        saved_filename = await save_upload_file(file)
-        original_filename = file.filename or saved_filename
+        original_filename = file.filename or 'uploaded_file'
 
-        job_files.append(
-            ProcessingJobFile(
-                filename=saved_filename,
-                original_filename=original_filename,
+        try:
+            saved_filename = await save_upload_file(file)
+            job_files.append(
+                ProcessingJobFile(
+                    filename=saved_filename,
+                    original_filename=original_filename,
+                )
             )
-        )
+        except UploadValidationError as error:
+            job_files.append(
+                ProcessingJobFile(
+                    filename=original_filename,
+                    original_filename=original_filename,
+                    status=FileStatus.FAILED,
+                    error_message=str(error),
+                )
+            )
 
     job = ProcessingJob(
         files=job_files,
@@ -111,6 +121,16 @@ async def start_job_processing(
         raise HTTPException(
             status_code=404,
             detail='Job not found',
+        )
+
+    queued_files = [
+        file for file in job.files if file.status == FileStatus.QUEUED
+    ]
+
+    if not queued_files:
+        raise HTTPException(
+            status_code=400,
+            detail='No valid JPEG files to process',
         )
 
     if job.status != JobStatus.QUEUED:
