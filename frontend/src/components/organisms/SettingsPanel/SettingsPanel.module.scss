@@ -46,21 +46,6 @@
   flex-wrap: wrap;
 }
 
-.sliderRow {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.sliderLabel {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-}
-
-.slider {
-  width: 100%;
-}
-
 @media (max-width: 760px) {
   .header {
     flex-direction: column;
