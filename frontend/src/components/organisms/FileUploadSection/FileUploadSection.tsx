@@ -24,7 +24,7 @@ export const FileUploadSection: React.FC = () => {
   const addToast = useToastStore((state) => state.addToast);
   const [isUploading, setIsUploading] = useState(false);
   const addPreviews = useAppStore((state) => state.addPreviews);
-  const settings = useAppStore((state) => state.settings);
+  const draftBatchSettings = useAppStore((state) => state.draftBatchSettings);
 
   const validateFile = (file: File): { valid: boolean; error?: string } => {
     if (!ALLOWED_FORMATS.includes(file.type)) {
@@ -70,16 +70,16 @@ export const FileUploadSection: React.FC = () => {
 
     const formData = new FormData();
     validFiles.forEach((file) => formData.append("files", file));
-    // только shooting_context — остальное бэкенд не ожидает
-    if (settings.shootingContext) {
-      formData.append("shooting_context", settings.shootingContext);
+    if (draftBatchSettings.shootingContext) {
+      formData.append("shooting_context", draftBatchSettings.shootingContext);
     }
 
     try {
       setIsUploading(true);
       const response = await apiClient.post<{
         job_id: string;
-        files: Array<{ file_id: string }>; }>("/api/v1/jobs/upload", formData, {
+        files: Array<{ file_id: string }>;
+      }>("/api/v1/jobs/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 

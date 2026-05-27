@@ -1,79 +1,94 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import { ProcessingJob, AppSettings } from '../types';
+import {
+  ProcessingJob,
+  SessionSettings,
+  BatchSettings,
+} from '../types';
 
-/**
- * App State - полное состояние приложения
- */
+const defaultSessionSettings: SessionSettings = {
+  aiProvider: 'ollama',
+};
+
+const defaultBatchSettings: BatchSettings = {
+  shootingContext: '',
+  stockPlatform: 'getty_images',
+  exportFormats: {
+    csv: true,
+    iptc: false,
+  },
+};
+
 export interface AppState {
-  // Data
   jobs: ProcessingJob[];
-  settings: AppSettings;
+  sessionSettings: SessionSettings;
+  draftBatchSettings: BatchSettings;
+  lockedBatchSettings: BatchSettings | null;
   isProcessing: boolean;
   diagnosticCount: number;
 
-  // Actions - File Management
   addJobs: (files: ProcessingJob[]) => void;
-  updateJobStatus: (jobId: string, status: ProcessingJob['status'], error?: string) => void;
-  updateMetadata: (jobId: string, metadata: ProcessingJob['metadata']) => void;
+  updateJobStatus: (
+    jobId: string,
+    status: ProcessingJob['status'],
+    error?: string,
+  ) => void;
+  updateMetadata: (
+    jobId: string,
+    metadata: ProcessingJob['metadata'],
+  ) => void;
   removeJob: (jobId: string) => void;
-  
-  // Actions - Settings
-  updateSettings: (key: keyof AppSettings, value: any) => void;
-  
-  // Actions - UI
+
+  updateSessionSetting: (
+    key: keyof SessionSettings,
+    value: SessionSettings[keyof SessionSettings],
+  ) => void;
+  updateDraftBatchSetting: <K extends keyof BatchSettings>(
+    key: K,
+    value: BatchSettings[K],
+  ) => void;
+  updateExportFormat: (
+    key: keyof BatchSettings['exportFormats'],
+    value: boolean,
+  ) => void;
+  lockBatchSettings: () => void;
+  unlockBatchSettings: () => void;
+  resetBatchState: () => void;
+
   setIsProcessing: (isProcessing: boolean) => void;
   inc: () => void;
-  
-  // Actions - Utilities
-  getOverallProgress: () => number; // 0-100
+
+  getOverallProgress: () => number;
   getFileById: (fileId: string) => ProcessingJob | undefined;
   hasErrors: () => boolean;
   clearAll: () => void;
 
-  // Previews
-  previews: Record<string, string>; // fileId → objectURL
+  previews: Record<string, string>;
   addPreviews: (previews: Record<string, string>) => void;
   clearPreviews: () => void;
 
-  // Persistence
-  loadSettings: () => void;
-  saveSettings: () => void;
+  loadSessionSettings: () => void;
+  saveSessionSettings: () => void;
 }
 
-/**
- * Zustand Store для управления состоянием приложения
- * Интегрирован с Redux DevTools для отладки
- */
 export const useAppStore = create<AppState>()(
   devtools((set, get) => ({
-    // Initial State
     jobs: [],
-    settings: {
-      aiProvider: "ollama",
-      shootingContext: "",
-      exportFormat: "getty_images",
-    },
+    sessionSettings: defaultSessionSettings,
+    draftBatchSettings: defaultBatchSettings,
+    lockedBatchSettings: null,
     isProcessing: false,
     diagnosticCount: 0,
 
-    // === File Management Actions ===
-
-    /**
-     * Добавить новые файлы в очередь обработки
-     */
     addJobs: (newJobs: ProcessingJob[]) => {
       set((state) => ({
         jobs: [...state.jobs, ...newJobs],
       }));
     },
 
-    /**
-     * Обновить статус обработки файла
-     */
     updateJobStatus: (
       jobId: string,
-      status: ProcessingJob["status"],
+      status: ProcessingJob['status'],
       error?: string,
     ) => {
       set((state) => ({
@@ -83,10 +98,10 @@ export const useAppStore = create<AppState>()(
       }));
     },
 
-    /**
-     * Обновить метаданные файла
-     */
-    updateMetadata: (jobId: string, metadata: ProcessingJob["metadata"]) => {
+    updateMetadata: (
+      jobId: string,
+      metadata: ProcessingJob['metadata'],
+    ) => {
       set((state) => ({
         jobs: state.jobs.map((job) =>
           job.id === jobId ? { ...job, metadata } : job,
@@ -94,119 +109,139 @@ export const useAppStore = create<AppState>()(
       }));
     },
 
-    /**
-     * Удалить файл из очереди
-     */
     removeJob: (jobId: string) => {
       set((state) => ({
         jobs: state.jobs.filter((job) => job.id !== jobId),
       }));
     },
 
-    // === Settings Actions ===
-
-    /**
-     * Обновить одну из настроек
-     */
-    updateSettings: (key: keyof AppSettings, value: any) => {
+    updateSessionSetting: (key, value) => {
       set((state) => ({
-        settings: { ...state.settings, [key]: value },
+        sessionSettings: {
+          ...state.sessionSettings,
+          [key]: value,
+        },
       }));
     },
 
-    // === UI Actions ===
+    updateDraftBatchSetting: (key, value) => {
+      set((state) => ({
+        draftBatchSettings: {
+          ...state.draftBatchSettings,
+          [key]: value,
+        },
+      }));
+    },
 
-    /**
-     * Установить флаг обработки
-     */
+    updateExportFormat: (key, value) => {
+      set((state) => ({
+        draftBatchSettings: {
+          ...state.draftBatchSettings,
+          exportFormats: {
+            ...state.draftBatchSettings.exportFormats,
+            [key]: value,
+          },
+        },
+      }));
+    },
+
+    lockBatchSettings: () => {
+      const { draftBatchSettings } = get();
+      set({
+        lockedBatchSettings: {
+          shootingContext: draftBatchSettings.shootingContext,
+          stockPlatform: draftBatchSettings.stockPlatform,
+          exportFormats: { ...draftBatchSettings.exportFormats },
+        },
+      });
+    },
+
+    unlockBatchSettings: () => {
+      set({ lockedBatchSettings: null });
+    },
+
+    resetBatchState: () => {
+      set({
+        draftBatchSettings: defaultBatchSettings,
+        lockedBatchSettings: null,
+        jobs: [],
+        isProcessing: false,
+        previews: {},
+      });
+    },
+
     setIsProcessing: (isProcessing: boolean) => {
       set({ isProcessing });
     },
 
-    /**
-     * Диагностический инкремент для development-only проверки DevTools
-     */
     inc: () => {
-      set((state) => ({ diagnosticCount: state.diagnosticCount + 1 }));
+      set((state) => ({
+        diagnosticCount: state.diagnosticCount + 1,
+      }));
     },
 
-    // === Previews Management ===
     previews: {},
     addPreviews: (newPreviews) =>
-      set((state) => ({ previews: { ...state.previews, ...newPreviews } })),
+      set((state) => ({
+        previews: { ...state.previews, ...newPreviews },
+      })),
     clearPreviews: () => set({ previews: {} }),
 
-    // === Computed / Utility Methods ===
-
-    /**
-     * Получить общий прогресс обработки (0-100%)
-     */
     getOverallProgress: () => {
       const { jobs } = get();
       if (jobs.length === 0) return 0;
 
       const completedCount = jobs.filter(
-        (job) => job.status === "done" || job.status === "error",
+        (job) => job.status === 'done' || job.status === 'error',
       ).length;
 
       return Math.round((completedCount / jobs.length) * 100);
     },
 
-    /**
-     * Получить файл по ID
-     */
     getFileById: (fileId: string) => {
       const { jobs } = get();
       return jobs.find((job) => job.id === fileId);
     },
 
-    /**
-     * Проверить, есть ли файлы с ошибками
-     */
     hasErrors: () => {
       const { jobs } = get();
-      return jobs.some((job) => job.status === "error");
+      return jobs.some((job) => job.status === 'error');
     },
 
-    /**
-     * Очистить все данные
-     */
     clearAll: () => {
       set({
         jobs: [],
         isProcessing: false,
-        previews: {}
+        previews: {},
       });
     },
 
-    // === Persistence ===
-
-    /**
-     * Загрузить настройки из localStorage
-     */
-    loadSettings: () => {
+    loadSessionSettings: () => {
       try {
-        const saved = localStorage.getItem("app_settings");
+        const saved = localStorage.getItem('session_settings');
         if (saved) {
           const parsed = JSON.parse(saved);
           set((state) => ({
-            settings: { ...state.settings, ...parsed },
+            sessionSettings: {
+              ...state.sessionSettings,
+              ...parsed,
+            },
           }));
         }
       } catch (err) {
-        console.error("Failed to load settings from localStorage:", err);
+        console.error('Failed to load session settings:', err);
       }
     },
 
-    /**
-     * Сохранить настройки в localStorage
-     */
-    saveSettings: () => {
+    saveSessionSettings: () => {
       try {
-        const { settings } = get();
-        localStorage.setItem("app_settings", JSON.stringify(settings));
+        const { sessionSettings } = get();
+        localStorage.setItem(
+          'session_settings',
+          JSON.stringify(sessionSettings),
+        );
       } catch (err) {
-        console.error("Failed to save settings to localStorage:", err);
+        console.error('Failed to save session settings:', err);
       }
     },
   })),
