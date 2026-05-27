@@ -113,6 +113,12 @@ async def start_job_processing(
             detail='Job not found',
         )
 
+    if job.ai_provider is None:
+        raise HTTPException(
+            status_code=400,
+            detail='AI provider must be selected before processing',
+        )
+
     if job.status != JobStatus.QUEUED:
         raise HTTPException(
             status_code=400,

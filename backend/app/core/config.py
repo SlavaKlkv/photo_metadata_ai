@@ -13,8 +13,6 @@ class Settings(BaseSettings):
 
     # AI Providers Settings
 
-    DEFAULT_AI_PROVIDER: str = 'ollama'
-
     CLAUDE_API_KEY: str | None = None
 
     OPENAI_API_KEY: str | None = None
