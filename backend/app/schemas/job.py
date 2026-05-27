@@ -69,11 +69,6 @@ class JobSettingsMixin(BaseModel):
     stock_platform: StockPlatform | None = None
     export_formats: list[ExportFormat] = Field(default_factory=list)
     ai_provider: AIProvider | None = None
-    export_quality: int | None = Field(
-        default=None,
-        ge=0,
-        le=100,
-    )
 
 
 class ExportStatusMixin(BaseModel):

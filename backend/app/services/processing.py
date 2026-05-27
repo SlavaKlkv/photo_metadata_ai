@@ -2,8 +2,12 @@ import asyncio
 from uuid import UUID
 
 import structlog
+from starlette.concurrency import run_in_threadpool
 
-from app.core.constants import MAX_CONCURRENT_AI_REQUESTS
+from app.core.constants import (
+    DEFAULT_AI_RESIZE_LONG_SIDE_PX,
+    MAX_CONCURRENT_AI_REQUESTS,
+)
 from app.schemas.job import (
     FileStatus,
     JobStatus,
@@ -13,6 +17,7 @@ from app.services.ai_provider import (
     BaseAIProvider,
     get_ai_provider,
 )
+from app.services.image_preprocessing import resize_image_for_ai
 from app.services.metadata_embedding import get_upload_file_path
 from app.services.storage import storage
 
@@ -52,8 +57,17 @@ async def _process_file(
 
             file.status = FileStatus.PROCESSING
 
+            source_image_path = get_upload_file_path(file.filename)
+            preprocessed_image_path = await run_in_threadpool(
+                resize_image_for_ai,
+                source_image_path,
+                job_id=job_id,
+                file_id=file.file_id,
+                max_long_side_px=DEFAULT_AI_RESIZE_LONG_SIDE_PX,
+            )
+
             metadata = await ai_provider.generate_metadata(
-                get_upload_file_path(file.filename),
+                preprocessed_image_path,
                 shooting_context=shooting_context,
                 file_number=file_number,
             )
@@ -110,8 +124,10 @@ async def process_job(job_id: UUID) -> None:
     )
 
     job.status = JobStatus.PROCESSING
-
-    for file in job.files:
+    queued_files = [
+        file for file in job.files if file.status == FileStatus.QUEUED
+    ]
+    for file in queued_files:
         file.status = FileStatus.PROCESSING
 
     await storage.update_job(job)
@@ -136,7 +152,7 @@ async def process_job(job_id: UUID) -> None:
                 job.shooting_context,
                 file_number=index,
             )
-            for index, file in enumerate(job.files, start=1)
+            for index, file in enumerate(queued_files, start=1)
         ],
     )
 
