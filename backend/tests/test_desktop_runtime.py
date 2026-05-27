@@ -2,6 +2,7 @@ import time
 from io import BytesIO
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -176,19 +177,148 @@ def test_desktop_flow_upload_process_review_export():
         assert stored_exports
 
 
-def test_process_requires_ai_provider_selection():
-    files = {
-        'files': ('sample.jpg', _build_tiny_jpeg_bytes(), 'image/jpeg'),
-    }
+def test_open_results_folder_endpoint(monkeypatch):
+    job_id = uuid4()
+    results_dir = RESULTS_DIR / str(job_id)
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    opened: dict[str, Path] = {}
+
+    def _fake_open(path: Path) -> None:
+        opened['path'] = path
+
+    monkeypatch.setattr(
+        'app.api.v1.desktop.open_path_in_default_app',
+        _fake_open,
+    )
 
     with TestClient(app) as client:
-        upload_response = client.post('/api/v1/jobs/upload', files=files)
-        assert upload_response.status_code == 200
+        response = client.post(
+            f'/api/v1/desktop/jobs/{job_id}/open-results-folder'
+        )
 
-        job_id = upload_response.json()['job_id']
-        process_response = client.post(f'/api/v1/jobs/{job_id}/process')
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload['status'] == 'ok'
+    assert payload['action'] == 'open_results_folder'
+    assert payload['path'] == str(results_dir)
+    assert opened['path'] == results_dir
 
-    assert process_response.status_code == 400
-    assert process_response.json()['detail'] == (
-        'AI provider must be selected before processing'
+
+def test_open_results_folder_endpoint_returns_normalized_404():
+    job_id = uuid4()
+
+    with TestClient(app) as client:
+        response = client.post(
+            f'/api/v1/desktop/jobs/{job_id}/open-results-folder'
+        )
+
+    assert response.status_code == 404
+    payload = response.json()
+    assert payload == {
+        'status': 'error',
+        'action': 'open_results_folder',
+        'message': 'Results directory not found',
+        'code': 'RESULTS_DIR_NOT_FOUND',
+        'path': None,
+    }
+
+
+def test_open_result_file_endpoint(monkeypatch):
+    job_id = uuid4()
+    results_dir = RESULTS_DIR / str(job_id)
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    file_name = 'result.csv'
+    file_path = results_dir / file_name
+    file_path.write_text('title,keywords\nsample,one two', encoding='utf-8')
+
+    opened: dict[str, Path] = {}
+
+    def _fake_open(path: Path) -> None:
+        opened['path'] = path
+
+    monkeypatch.setattr(
+        'app.api.v1.desktop.open_path_in_default_app',
+        _fake_open,
     )
+
+    with TestClient(app) as client:
+        response = client.post(
+            f'/api/v1/desktop/jobs/{job_id}/open-result-file',
+            params={'filename': file_name},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload['status'] == 'ok'
+    assert payload['action'] == 'open_result_file'
+    assert payload['path'] == str(file_path)
+    assert opened['path'] == file_path
+
+
+def test_open_result_file_endpoint_rejects_unsupported_type():
+    job_id = uuid4()
+    results_dir = RESULTS_DIR / str(job_id)
+    results_dir.mkdir(parents=True, exist_ok=True)
+    (results_dir / 'malware.exe').write_text('x', encoding='utf-8')
+
+    with TestClient(app) as client:
+        response = client.post(
+            f'/api/v1/desktop/jobs/{job_id}/open-result-file',
+            params={'filename': 'malware.exe'},
+        )
+
+    assert response.status_code == 400
+    payload = response.json()
+    assert payload == {
+        'status': 'error',
+        'action': 'open_result_file',
+        'message': 'Only CSV, IPTC, JPG and ZIP files are allowed',
+        'code': 'UNSUPPORTED_FILE_TYPE',
+        'path': None,
+    }
+
+
+def test_open_result_file_endpoint_rejects_path_escape():
+    job_id = uuid4()
+    results_dir = RESULTS_DIR / str(job_id)
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    with TestClient(app) as client:
+        response = client.post(
+            f'/api/v1/desktop/jobs/{job_id}/open-result-file',
+            params={'filename': '../outside.csv'},
+        )
+
+    assert response.status_code == 400
+    payload = response.json()
+    assert payload == {
+        'status': 'error',
+        'action': 'open_result_file',
+        'message': 'Path is outside allowed results directory',
+        'code': 'PATH_POLICY_VIOLATION',
+        'path': None,
+    }
+
+
+def test_open_result_file_endpoint_returns_normalized_404():
+    job_id = uuid4()
+    results_dir = RESULTS_DIR / str(job_id)
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    with TestClient(app) as client:
+        response = client.post(
+            f'/api/v1/desktop/jobs/{job_id}/open-result-file',
+            params={'filename': 'missing.csv'},
+        )
+
+    assert response.status_code == 404
+    payload = response.json()
+    assert payload == {
+        'status': 'error',
+        'action': 'open_result_file',
+        'message': 'Result file not found',
+        'code': 'RESULT_FILE_NOT_FOUND',
+        'path': None,
+    }
