@@ -13,9 +13,11 @@ export const SuccessModal: React.FC = () => {
   const setIsUploaded = useUIStore((state) => state.setIsUploaded);
   const setIsExportReady = useUIStore((state) => state.setIsExportReady);
   const setIsExporting = useUIStore((state) => state.setIsExporting);
-  const clearAll = useAppStore((state) => state.clearAll);
+  const resetBatchState = useAppStore((state) => state.resetBatchState);
   const previews = useAppStore((state) => state.previews);
   const jobs = useAppStore((state) => state.jobs);
+  const setCurrentJobId = useUIStore((state) => state.setCurrentJobId);
+  const setSelectedJobId = useUIStore((state) => state.setSelectedJobId);
 
   const handleBackToResults = () => {
     closeSuccessModal();
@@ -24,10 +26,12 @@ export const SuccessModal: React.FC = () => {
 
   const handleStartNewBatch = () => {
     Object.values(previews).forEach((url) => URL.revokeObjectURL(url));
-    clearAll();
+    resetBatchState();
     setIsUploaded(false);
     setIsExportReady(false);
     setIsExporting(false);
+    setCurrentJobId(null);
+    setSelectedJobId(null);
     closeSuccessModal();
   };
 
