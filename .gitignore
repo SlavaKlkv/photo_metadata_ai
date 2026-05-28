@@ -33,6 +33,6 @@ Thumbs.db
 
 
 # Runtime Artifacts
-jobs/
-results/
-temp/
+backend/jobs
+backend/results/
+backend/temp/

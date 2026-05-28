@@ -13,12 +13,12 @@ from app.schemas.desktop import (
     DesktopHealthResponse,
     DesktopRuntimeInfo,
 )
+from app.schemas.provider_discovery import ProvidersDiscoveryResponse
 from app.services.desktop_open import (
     get_job_result_file_path,
     get_job_results_dir,
     open_path_in_default_app,
 )
-from app.schemas.provider_discovery import ProvidersDiscoveryResponse
 from app.services.provider_discovery import discover_ai_providers
 
 router = APIRouter(
@@ -160,7 +160,7 @@ async def open_result_file(
         path=str(file_path),
     )
 
-  
+
 @router.get(
     '/providers/discovery',
     response_model=ProvidersDiscoveryResponse,
@@ -207,4 +207,3 @@ def _build_error_response(
             message=message,
         ).model_dump(),
     )
-
