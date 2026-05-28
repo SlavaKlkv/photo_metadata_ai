@@ -86,6 +86,23 @@ async def _process_file(
             file.title = metadata.title
             file.description = metadata.description
             file.keywords = metadata.keywords
+            file.categories = metadata.categories
+            file.category_2 = metadata.category_2
+            file.license_type = metadata.license_type
+            file.location_metadata = metadata.location_metadata
+            file.editorial_date = metadata.editorial_date
+            file.is_editorial = metadata.is_editorial
+            file.editorial_caption = metadata.editorial_caption
+            file.has_people = metadata.has_people
+            file.people_count = metadata.people_count
+            file.model_release_available = metadata.model_release_available
+            file.releases = metadata.releases
+            file.ai_generated_content_disclosure = (
+                metadata.ai_generated_content_disclosure
+            )
+            file.is_illustration = metadata.is_illustration
+            file.mature_content = metadata.mature_content
+            file.iptc_embedded_metadata = False
 
             file.status = FileStatus.COMPLETED
             logger.info(
