@@ -1,3 +1,4 @@
+// frontend/src/store/useAppStore.ts
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import {
@@ -5,6 +6,7 @@ import {
   SessionSettings,
   BatchSettings,
 } from '../types';
+import { jobsApi } from '../services/api/api';
 
 const defaultSessionSettings: SessionSettings = {
   aiProvider: 'ollama',
@@ -69,6 +71,13 @@ export interface AppState {
 
   loadSessionSettings: () => void;
   saveSessionSettings: () => void;
+
+  // regenerate одного файла, используя lockedBatchSettings — не дёргает весь batch
+  regeneratingFileId: string | null;
+  regenerateFile: (
+    fileId: string,
+    currentJobId: string,
+  ) => Promise<{ success: boolean; error?: string }>;
 }
 
 export const useAppStore = create<AppState>()(
@@ -79,6 +88,7 @@ export const useAppStore = create<AppState>()(
     lockedBatchSettings: null,
     isProcessing: false,
     diagnosticCount: 0,
+    regeneratingFileId: null,
 
     addJobs: (newJobs: ProcessingJob[]) => {
       set((state) => ({
@@ -167,6 +177,7 @@ export const useAppStore = create<AppState>()(
         jobs: [],
         isProcessing: false,
         previews: {},
+        regeneratingFileId: null,
       });
     },
 
@@ -242,6 +253,45 @@ export const useAppStore = create<AppState>()(
         );
       } catch (err) {
         console.error('Failed to save session settings:', err);
+      }
+    },
+
+    // Regenerate одного файла используя lockedBatchSettings.
+    // lockedBatchSettings гарантирует что используется оригинальный shooting context,
+    // а не текущий draft — даже если пользователь его уже поменял.
+    regenerateFile: async (fileId, currentJobId) => {
+      const { lockedBatchSettings, sessionSettings, updateMetadata } = get();
+
+      // regenerate доступен только после processing — locked settings обязательны
+      if (!lockedBatchSettings) {
+        return { success: false, error: 'No locked batch settings found' };
+      }
+
+      set({ regeneratingFileId: fileId });
+
+      try {
+        const response = await jobsApi.regenerateFile(currentJobId, fileId, {
+          shooting_context: lockedBatchSettings.shootingContext,
+          stock_platform: lockedBatchSettings.stockPlatform,
+          ai_provider: sessionSettings.aiProvider,
+        });
+
+        const newMetadata = response.data?.metadata;
+        if (newMetadata) {
+          updateMetadata(fileId, newMetadata);
+        }
+
+        return { success: true };
+      } catch (err: unknown) {
+        // TODO(backend): убрать mock когда появится реальный endpoint
+        // Пока endpoint не реализован — логируем и возвращаем ошибку наверх
+        console.warn('[regenerateFile] Backend endpoint not yet implemented:', err);
+        return {
+          success: false,
+          error: 'Regenerate is not yet available. Backend endpoint pending.',
+        };
+      } finally {
+        set({ regeneratingFileId: null });
       }
     },
   })),
