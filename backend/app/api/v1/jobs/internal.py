@@ -98,11 +98,14 @@ async def embed_file_metadata(
         )
 
     await run_in_threadpool(embed_metadata_into_jpg, job_file)
+    job_file.iptc_embedded_metadata = True
+    await storage.update_job(job)
 
     return EmbeddedMetadataResult(
         file_id=job_file.file_id,
         filename=job_file.filename,
         original_filename=job_file.original_filename,
+        iptc_embedded_metadata=job_file.iptc_embedded_metadata,
     )
 
 

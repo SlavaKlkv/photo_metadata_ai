@@ -5,10 +5,16 @@ import structlog
 from starlette.concurrency import run_in_threadpool
 
 from app.core.constants import RESULTS_DIR
-from app.core.enums import ExportFormat, ExportStatus, StockPlatform
+from app.core.enums import (
+    ExportFormat,
+    ExportStatus,
+    FileStatus,
+    StockPlatform,
+)
 from app.core.runtime import resolve_path_in_base
 from app.schemas.job import ProcessingJob
 from app.services.export.csv import generate_metadata_csv
+from app.services.stock_metadata import validate_file_metadata_for_stock
 from app.services.storage import storage
 
 logger = structlog.get_logger(__name__)
@@ -22,6 +28,17 @@ def generate_job_export(
     Генерирует экспорт задачи в выбранном формате.
     """
     if export_format == ExportFormat.CSV:
+        stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
+        validation_errors = _collect_export_validation_errors(
+            job,
+            stock_platform,
+        )
+
+        if validation_errors:
+            raise ValueError(
+                _format_export_validation_error(validation_errors)
+            )
+
         csv_content = generate_metadata_csv(job)
         filename = get_export_filename(job, export_format)
         return csv_content, filename, 'text/csv; charset=utf-8'
@@ -155,3 +172,55 @@ async def run_job_export(
     job.export_progress = 100
     job.export_error_message = None
     await storage.update_job(job)
+
+
+def _collect_export_validation_errors(
+    job: ProcessingJob,
+    stock_platform: StockPlatform,
+) -> list[dict[str, object]]:
+    validation_errors: list[dict[str, object]] = []
+
+    for file in job.files:
+        if file.status != FileStatus.COMPLETED:
+            continue
+
+        validation_result = validate_file_metadata_for_stock(
+            file,
+            stock_platform,
+        )
+
+        if not validation_result.errors:
+            continue
+
+        validation_errors.append(
+            {
+                'filename': file.original_filename,
+                'errors': [
+                    issue.message for issue in validation_result.errors
+                ],
+            }
+        )
+
+    return validation_errors
+
+
+def _format_export_validation_error(
+    validation_errors: list[dict[str, object]],
+) -> str:
+    preview_messages: list[str] = []
+
+    for file_error in validation_errors[:3]:
+        filename = str(file_error.get('filename', 'unknown'))
+        errors = file_error.get('errors') or []
+        first_error = str(errors[0]) if errors else 'unknown validation error'
+        preview_messages.append(f'{filename}: {first_error}')
+
+    preview = '; '.join(preview_messages)
+    hidden_count = len(validation_errors) - len(preview_messages)
+
+    if hidden_count > 0:
+        preview = f'{preview}; and {hidden_count} more files'
+
+    return (
+        f'Export is blocked because metadata has validation errors: {preview}'
+    )

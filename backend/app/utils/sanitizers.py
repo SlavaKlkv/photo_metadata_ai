@@ -46,3 +46,30 @@ def sanitize_keywords(value: list[str] | None) -> list[str]:
         seen_keywords.add(sanitized_keyword)
 
     return sanitized_keywords
+
+
+def sanitize_string_list(value: list[str] | None) -> list[str]:
+    """
+    Очищает список строк и удаляет дубликаты с сохранением порядка.
+    """
+    if value is None:
+        return []
+
+    sanitized_values: list[str] = []
+    seen_values: set[str] = set()
+
+    for item in value:
+        normalized_item = ' '.join(str(item).strip().split())
+
+        if not normalized_item:
+            continue
+
+        dedupe_key = normalized_item.lower()
+
+        if dedupe_key in seen_values:
+            continue
+
+        sanitized_values.append(normalized_item)
+        seen_values.add(dedupe_key)
+
+    return sanitized_values
