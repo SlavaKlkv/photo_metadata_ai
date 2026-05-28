@@ -1,3 +1,4 @@
+//frontend/src/types/index.ts
 /**
  * Centralized TypeScript types for the application
  */
@@ -15,7 +16,9 @@ export interface ProcessingJob {
   };
 }
 
-export type AIProvider = 'mock' | 'ollama' | 'claude' | 'openai'; //TODO: Update with actual provider names as needed. Mock is for testing purposes and should be removed in production.
+// TODO: remove 'mock' before production; 'ollama' = QWEN 2.5 VL via Ollama
+export type AIProvider = 'mock' | 'ollama' | 'gemini' | 'openrouter';
+
 export type StockPlatform = 'getty_images' | 'shutterstock' | 'adobe_stock';
 
 export interface SessionSettings {
