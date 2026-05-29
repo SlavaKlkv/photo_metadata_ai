@@ -8,7 +8,7 @@ from app.core.constants import (
     DEFAULT_AI_RESIZE_LONG_SIDE_PX,
     MAX_CONCURRENT_AI_REQUESTS,
 )
-from app.core.enums import StockPlatform
+from app.core.enums import MetadataFieldSource, StockPlatform
 from app.schemas.job import (
     FileStatus,
     JobStatus,
@@ -106,6 +106,7 @@ async def _process_file(
             file.is_illustration = metadata.is_illustration
             file.mature_content = metadata.mature_content
             file.iptc_embedded_metadata = False
+            _mark_generated_field_sources(file)
 
             file.status = FileStatus.COMPLETED
             logger.info(
@@ -193,6 +194,31 @@ async def process_job(job_id: UUID) -> None:
         status=job.status,
     )
     await storage.update_job(job)
+
+
+def _mark_generated_field_sources(file: ProcessingJobFile) -> None:
+    generated_fields = [
+        'title',
+        'description',
+        'keywords',
+        'categories',
+        'category_2',
+        'license_type',
+        'location_metadata',
+        'editorial_date',
+        'is_editorial',
+        'editorial_caption',
+        'has_people',
+        'people_count',
+        'model_release_available',
+        'releases',
+        'ai_generated_content_disclosure',
+        'is_illustration',
+        'mature_content',
+    ]
+
+    for field_name in generated_fields:
+        file.field_sources[field_name] = MetadataFieldSource.GENERATED
 
 
 async def retry_failed_files(job_id: UUID) -> None:

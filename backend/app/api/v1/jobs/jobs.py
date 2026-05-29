@@ -19,6 +19,7 @@ from app.core.enums import (
     ExportFormat,
     ExportStatus,
     JobStatus,
+    MetadataFieldSource,
     StockPlatform,
 )
 from app.schemas.job import (
@@ -44,6 +45,7 @@ from app.services.processing import (
     retry_failed_files,
 )
 from app.services.stock_metadata import (
+    build_stock_aware_preview,
     build_stock_mapped_metadata,
     get_stock_field_options,
     validate_file_metadata_for_stock,
@@ -65,6 +67,15 @@ def _build_metadata_result(
     Собирает stock-aware результат metadata для preview и PATCH-ответов.
     """
     mapped_metadata = build_stock_mapped_metadata(file, stock_platform)
+    validation = validate_file_metadata_for_stock(
+        file,
+        stock_platform,
+    )
+    edited_fields = sorted(
+        field_name
+        for field_name, source in file.field_sources.items()
+        if source == MetadataFieldSource.EDITED
+    )
 
     return ProcessingJobMetadataResult(
         file_id=file.file_id,
@@ -91,11 +102,12 @@ def _build_metadata_result(
         is_illustration=mapped_metadata.is_illustration,
         mature_content=mapped_metadata.mature_content,
         iptc_embedded_metadata=mapped_metadata.iptc_embedded_metadata,
+        selected_for_export=file.selected_for_export,
+        field_sources=file.field_sources,
+        edited_fields=edited_fields,
+        preview=build_stock_aware_preview(file, stock_platform),
         error_message=file.error_message,
-        validation=validate_file_metadata_for_stock(
-            file,
-            stock_platform,
-        ),
+        validation=validation,
     )
 
 
@@ -144,9 +156,7 @@ def _build_zip_export_response(
         content=zip_content,
         media_type='application/zip',
         headers={
-            'Content-Disposition': (
-                f'attachment; filename="{archive_name}"'
-            ),
+            'Content-Disposition': (f'attachment; filename="{archive_name}"'),
         },
     )
 
@@ -383,7 +393,13 @@ async def get_job_status(job_id: UUID):
 
 
 @router.get('/{job_id}/results', response_model=ProcessingJobMetadataResults)
-async def get_job_results(job_id: UUID):
+async def get_job_results(
+    job_id: UUID,
+    stock_platform: StockPlatform | None = Query(
+        default=None,
+        description='Optional stock platform override for preview remap',
+    ),
+):
     """
     Возвращает preview-результаты метаданных для задачи.
     """
@@ -396,7 +412,9 @@ async def get_job_results(job_id: UUID):
             detail='Job not found',
         )
 
-    stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
+    stock_platform = (
+        stock_platform or job.stock_platform or StockPlatform.SHUTTERSTOCK
+    )
 
     return ProcessingJobMetadataResults(
         job_id=job.job_id,
@@ -446,42 +464,75 @@ async def update_file_metadata(
     # PATCH обновляет только поля, которые прислал фронтенд.
     if 'title' in payload.model_fields_set:
         job_file.title = payload.title
+        job_file.field_sources['title'] = MetadataFieldSource.EDITED
     if 'description' in payload.model_fields_set:
         job_file.description = payload.description
+        job_file.field_sources['description'] = MetadataFieldSource.EDITED
     if 'keywords' in payload.model_fields_set:
         job_file.keywords = payload.keywords or []
+        job_file.field_sources['keywords'] = MetadataFieldSource.EDITED
+    if (
+        'selected_for_export' in payload.model_fields_set
+        and payload.selected_for_export is not None
+    ):
+        job_file.selected_for_export = bool(payload.selected_for_export)
     if 'categories' in payload.model_fields_set:
         job_file.categories = payload.categories or []
+        job_file.field_sources['categories'] = MetadataFieldSource.EDITED
     if 'releases' in payload.model_fields_set:
         job_file.releases = payload.releases or []
+        job_file.field_sources['releases'] = MetadataFieldSource.EDITED
     if 'category_2' in payload.model_fields_set:
         job_file.category_2 = payload.category_2
+        job_file.field_sources['category_2'] = MetadataFieldSource.EDITED
     if 'license_type' in payload.model_fields_set:
         job_file.license_type = payload.license_type
+        job_file.field_sources['license_type'] = MetadataFieldSource.EDITED
     if 'location_metadata' in payload.model_fields_set:
         job_file.location_metadata = payload.location_metadata
+        job_file.field_sources['location_metadata'] = (
+            MetadataFieldSource.EDITED
+        )
     if 'editorial_date' in payload.model_fields_set:
         job_file.editorial_date = payload.editorial_date
+        job_file.field_sources['editorial_date'] = MetadataFieldSource.EDITED
     if 'is_editorial' in payload.model_fields_set:
         job_file.is_editorial = bool(payload.is_editorial)
+        job_file.field_sources['is_editorial'] = MetadataFieldSource.EDITED
     if 'editorial_caption' in payload.model_fields_set:
         job_file.editorial_caption = payload.editorial_caption
+        job_file.field_sources['editorial_caption'] = (
+            MetadataFieldSource.EDITED
+        )
     if 'has_people' in payload.model_fields_set:
         job_file.has_people = payload.has_people
+        job_file.field_sources['has_people'] = MetadataFieldSource.EDITED
     if 'people_count' in payload.model_fields_set:
         job_file.people_count = payload.people_count
+        job_file.field_sources['people_count'] = MetadataFieldSource.EDITED
     if 'model_release_available' in payload.model_fields_set:
         job_file.model_release_available = payload.model_release_available
+        job_file.field_sources['model_release_available'] = (
+            MetadataFieldSource.EDITED
+        )
     if 'ai_generated_content_disclosure' in payload.model_fields_set:
         job_file.ai_generated_content_disclosure = bool(
             payload.ai_generated_content_disclosure
         )
+        job_file.field_sources['ai_generated_content_disclosure'] = (
+            MetadataFieldSource.EDITED
+        )
     if 'is_illustration' in payload.model_fields_set:
         job_file.is_illustration = payload.is_illustration
+        job_file.field_sources['is_illustration'] = MetadataFieldSource.EDITED
     if 'mature_content' in payload.model_fields_set:
         job_file.mature_content = payload.mature_content
+        job_file.field_sources['mature_content'] = MetadataFieldSource.EDITED
     if 'iptc_embedded_metadata' in payload.model_fields_set:
         job_file.iptc_embedded_metadata = bool(payload.iptc_embedded_metadata)
+        job_file.field_sources['iptc_embedded_metadata'] = (
+            MetadataFieldSource.EDITED
+        )
 
     await storage.update_job(job)
 
@@ -532,12 +583,14 @@ async def start_job_export(
         )
 
     completed_files = [
-        file for file in job.files if file.status == FileStatus.COMPLETED
+        file
+        for file in job.files
+        if file.status == FileStatus.COMPLETED and file.selected_for_export
     ]
     if not completed_files:
         raise HTTPException(
             status_code=400,
-            detail='No completed files available for export',
+            detail='No selected completed files available for export',
         )
 
     stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
@@ -710,9 +763,7 @@ async def export_job(
             content=file_path.read_bytes(),
             media_type=media_type,
             headers={
-                'Content-Disposition': (
-                    f'attachment; filename="{filename}"'
-                ),
+                'Content-Disposition': (f'attachment; filename="{filename}"'),
             },
         )
 
