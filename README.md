@@ -21,26 +21,43 @@ AI-сервис для автоматической обработки фото�
 - npm
 - react-scripts
 
-### Инфраструктура
+## Локальная разработка на хосте
 
-- Docker
-- Docker Compose
-
-## Старт локальной разработки в Docker
-
-### Создание файла с переменными окружения
+### Подготовка переменных окружения
 
 ```bash
-cp  .env.example  .env
+cp .env.example .env
 ```
 
-### Запуск сервисов
+Если используете Ollama локально на этой же машине, задайте в `.env`:
 
 ```bash
-docker compose up -d
+OLLAMA_BASE_URL=http://localhost:11434
 ```
 
-## Адреса
+### Перейти в backend
+
+```bash
+cd backend
+```
+
+### Запуск backend (uv + FastAPI)
+
+```bash
+uv sync --dev
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### Запуск frontend
+
+```bash
+cd frontend
+npm install
+npm start
+```
+
+
+## Адреса локально
 
 Frontend
 
@@ -66,37 +83,34 @@ ReDoc
 http://localhost:8000/redoc
 ```
 
-## [ backend ] Форматирование кода и проверка с автоисправлением
+## [backend] Форматирование и линтинг (ruff)
 
 ```bash
-docker compose run --rm backend uv run ruff format
-docker compose run --rm backend uv run ruff check --fix
+uv run ruff format
+uv run ruff check --fix
 ```
 
-## Перезапуск проекта с пересборкой без кеша
-
+## [backend] Запуск тестов
 ```bash
-docker compose down -v
-docker compose build --no-cache
-docker compose up -d
+uv run pytest
 ```
-
-## Запуск тестов
-```bash
-docker compose run --rm backend uv run pytest
-```
-
 
 ## Установка новых зависимостей
 
-Backend
+Backend (runtime)
 ```bash
-docker compose run --rm backend uv add <new_lib_name>
+uv add <new_lib_name>
+```
+
+Backend (dev)
+```bash
+uv add --dev <new_lib_name>
 ```
 
 Frontend
 ```bash
-docker compose run --rm --no-deps frontend npm install <new_lib_name>
+cd frontend
+npm install <new_lib_name>
 ```
 
 ## Установка Ollama и модели Qwen2.5-VL

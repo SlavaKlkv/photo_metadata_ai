@@ -1,4 +1,4 @@
-// ProgressModal
+// frontend/src/components/organisms/ProgressModal/ProgressModal.tsx
 import React from 'react';
 import styles from './ProgressModal.module.scss';
 import { Modal } from '../../atoms/Modal/Modal';
@@ -18,7 +18,10 @@ export const ProgressModal: React.FC = () => {
   ).length;
   const percent = total > 0 ? Math.round((current / total) * 100) : 0;
 
+  const setIsPollingActive = useUIStore((state) => state.setIsPollingActive);
+
   const handleCancel = () => {
+    setIsPollingActive(false);
     closeModal();
   };
 

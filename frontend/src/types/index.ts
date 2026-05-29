@@ -1,3 +1,4 @@
+//frontend/src/types/index.ts
 /**
  * Centralized TypeScript types for the application
  */
@@ -15,10 +16,22 @@ export interface ProcessingJob {
   };
 }
 
-export interface AppSettings {
-  aiProvider: 'ollama' | 'claude' | 'openai';
+// TODO: remove 'mock' before production; 'ollama' = QWEN 2.5 VL via Ollama
+export type AIProvider = 'mock' | 'ollama' | 'gemini' | 'openrouter';
+
+export type StockPlatform = 'getty_images' | 'shutterstock' | 'adobe_stock';
+
+export interface SessionSettings {
+  aiProvider: AIProvider;
+}
+
+export interface BatchSettings {
   shootingContext: string;
-  exportFormat: 'getty_images' | 'shutterstock' | 'adobe_stock';
+  stockPlatform: StockPlatform;
+  exportFormats: {
+    csv: boolean;
+    iptc: boolean;
+  };
 }
 
 export interface ApiUploadResponse {

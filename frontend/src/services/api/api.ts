@@ -60,6 +60,16 @@ export const jobsApi = {
   // обновление метаданных файла
   updateMetadata: (jobId: string, fileId: string, metadata: object) =>
     apiClient.patch(`/api/v1/jobs/${jobId}/files/${fileId}/metadata`, metadata),
+
+  // TODO(backend): implement POST /api/v1/jobs/:jobId/files/:fileId/regenerate
+  // должен принимать { shooting_context, stock_platform, ai_provider } из lockedBatchSettings
+  // и возвращать новый metadata объект для одного файла без перезапуска всего batch
+  regenerateFile: (jobId: string, fileId: string, settings: {
+    shooting_context: string;
+    stock_platform: string;
+    ai_provider: string;
+  }) =>
+    apiClient.post(`/api/v1/jobs/${jobId}/files/${fileId}/regenerate`, settings),
 };
 
 export default apiClient;

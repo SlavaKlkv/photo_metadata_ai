@@ -21,11 +21,10 @@ JOB_TEMP_DIRS = [
 ]
 
 # Ограничения и поддерживаемые форматы изображений.
-ALLOWED_IMAGE_TYPES = {'image/jpeg', 'image/png'}
-JPG_IMAGE_SUFFIXES = {'.jpg', '.jpeg'}
-PNG_IMAGE_SUFFIXES = {'.png'}
-ALLOWED_IMAGE_SUFFIXES = JPG_IMAGE_SUFFIXES | PNG_IMAGE_SUFFIXES
+ALLOWED_IMAGE_TYPES = {'image/jpeg'}
+ALLOWED_IMAGE_SUFFIXES = {'.jpg', '.jpeg'}
 MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
+DEFAULT_AI_RESIZE_LONG_SIDE_PX = 1800
 
 # Ограничения AI processing pipeline.
 MAX_CONCURRENT_AI_REQUESTS = 3
