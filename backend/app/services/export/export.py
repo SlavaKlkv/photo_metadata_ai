@@ -126,33 +126,6 @@ def ensure_job_export(
     return store_job_export(job, export_format)
 
 
-def invalidate_job_export_cache(job: ProcessingJob) -> None:
-    """
-    Инвалидирует сохраненные export-файлы задачи.
-    Вызывается после изменения metadata/settings.
-    """
-    job_result_dir = resolve_path_in_base(RESULTS_DIR, str(job.job_id))
-    removed_files = 0
-
-    if job_result_dir.is_dir():
-        for path in job_result_dir.glob(f'{job.job_id}_*'):
-            if not path.is_file():
-                continue
-            path.unlink(missing_ok=True)
-            removed_files += 1
-
-    job.export_status = None
-    job.export_progress = 0
-    job.export_format = None
-    job.export_error_message = None
-
-    logger.info(
-        'job_export_cache_invalidated',
-        job_id=str(job.job_id),
-        removed_files=removed_files,
-    )
-
-
 def load_stored_job_export(
     job: ProcessingJob,
     export_format: ExportFormat,
