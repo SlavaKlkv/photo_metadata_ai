@@ -13,23 +13,26 @@ import { SectionHeader } from '../../molecules/SectionHeader/SectionHeader';
 export const MetadataPreview: React.FC = () => {
   const jobs = useAppStore((state) => state.jobs);
   const updateMetadata = useAppStore((state) => state.updateMetadata);
+  const regenerateFile = useAppStore((state) => state.regenerateFile);
+  const regeneratingFileId = useAppStore((state) => state.regeneratingFileId);
+  const lockedBatchSettings = useAppStore((state) => state.lockedBatchSettings);
+
   const selectedJobId = useUIStore((state) => state.selectedJobId);
   const setSelectedJobId = useUIStore((state) => state.setSelectedJobId);
   const currentJobId = useUIStore((state) => state.currentJobId);
   const addToast = useToastStore((state) => state.addToast);
   const previews = useAppStore((state) => state.previews);
 
-  const doneJobs = jobs.filter((j) => j.status === "done");
+  const doneJobs = jobs.filter((j) => j.status === 'done');
   const currentIndex = doneJobs.findIndex((j) => j.id === selectedJobId);
-  //const job = currentIndex >= 0 ? doneJobs[currentIndex] : doneJobs[0];
-  const job = doneJobs.find((j) => j.id === selectedJobId); // может быть undefined, если выбран job с ошибкой или еще не выбран
+  const job = doneJobs.find((j) => j.id === selectedJobId);
 
   // локальный стейт для редактирования
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValues, setEditValues] = useState({
-    title: "",
-    description: "",
-    keywords: "",
+    title: '',
+    description: '',
+    keywords: '',
   });
 
   // навигация — ввод номера вручную
@@ -39,9 +42,9 @@ export const MetadataPreview: React.FC = () => {
   useEffect(() => {
     if (job?.metadata) {
       setEditValues({
-        title: job.metadata.title ?? "",
-        description: job.metadata.description ?? "",
-        keywords: job.metadata.keywords?.join(", ") ?? "",
+        title: job.metadata.title ?? '',
+        description: job.metadata.description ?? '',
+        keywords: job.metadata.keywords?.join(', ') ?? '',
       });
     }
     setEditingField(null);
@@ -54,35 +57,35 @@ export const MetadataPreview: React.FC = () => {
     }
   }, [doneJobs, selectedJobId]);
 
-  const handleNavigate = (direction: "prev" | "next") => {
+  const handleNavigate = (direction: 'prev' | 'next') => {
     if (doneJobs.length === 0) return;
     const newIndex =
-      direction === "prev"
+      direction === 'prev'
         ? Math.max(0, currentIndex - 1)
         : Math.min(doneJobs.length - 1, currentIndex + 1);
     setSelectedJobId(doneJobs[newIndex].id);
   };
 
   const handleIndexSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && indexInput !== null) {
+    if (e.key === 'Enter' && indexInput !== null) {
       const num = parseInt(indexInput, 10);
       if (!isNaN(num) && num >= 1 && num <= doneJobs.length) {
         setSelectedJobId(doneJobs[num - 1].id);
       }
       setIndexInput(null);
     }
-    if (e.key === "Escape") setIndexInput(null);
+    if (e.key === 'Escape') setIndexInput(null);
   };
 
-  const handleSave = async (field: "title" | "description" | "keywords") => {
+  const handleSave = async (field: 'title' | 'description' | 'keywords') => {
     if (!job || !currentJobId) return;
 
     const updatedMetadata = {
       ...job.metadata,
       [field]:
-        field === "keywords"
+        field === 'keywords'
           ? editValues.keywords
-              .split(",")
+              .split(',')
               .map((k) => k.trim())
               .filter(Boolean)
           : editValues[field],
@@ -91,9 +94,9 @@ export const MetadataPreview: React.FC = () => {
     try {
       await jobsApi.updateMetadata(currentJobId, job.id, updatedMetadata);
       updateMetadata(job.id, updatedMetadata as any);
-      addToast("Saved", "success");
+      addToast('Saved', 'success');
     } catch {
-      addToast("Failed to save", "error");
+      addToast('Failed to save', 'error');
     }
 
     setEditingField(null);
@@ -101,11 +104,29 @@ export const MetadataPreview: React.FC = () => {
 
   const handleKeyDown = (
     e: React.KeyboardEvent,
-    field: "title" | "description" | "keywords",
+    field: 'title' | 'description' | 'keywords',
   ) => {
-    if (e.key === "Enter" && !e.shiftKey) handleSave(field);
-    if (e.key === "Escape") setEditingField(null);
+    if (e.key === 'Enter' && !e.shiftKey) handleSave(field);
+    if (e.key === 'Escape') setEditingField(null);
   };
+
+  // Regenerate использует lockedBatchSettings — оригинальные настройки batch,
+  // а не текущий draft. Это гарантирует воспроизводимость результата.
+  const handleRegenerate = async () => {
+    if (!job || !currentJobId) return;
+
+    const result = await regenerateFile(job.id, currentJobId);
+
+    if (result.success) {
+      addToast('Metadata regenerated', 'success');
+    } else {
+      addToast(result.error ?? 'Failed to regenerate', 'error');
+    }
+  };
+
+  const isRegenerating = regeneratingFileId === job?.id;
+  // Regenerate доступен только когда batch зафиксирован (после processing)
+  const canRegenerate = !!lockedBatchSettings && !!currentJobId;
 
   if (!job) {
     return (
@@ -130,7 +151,7 @@ export const MetadataPreview: React.FC = () => {
       <div className={styles.nav}>
         <button
           className={styles.navBtn}
-          onClick={() => handleNavigate("prev")}
+          onClick={() => handleNavigate('prev')}
         >
           ‹
         </button>
@@ -154,7 +175,7 @@ export const MetadataPreview: React.FC = () => {
         )}
         <button
           className={styles.navBtn}
-          onClick={() => handleNavigate("next")}
+          onClick={() => handleNavigate('next')}
         >
           ›
         </button>
@@ -178,13 +199,13 @@ export const MetadataPreview: React.FC = () => {
 
       {/* Поля метаданных */}
       <div className={styles.fields}>
-        {(["title", "description", "keywords"] as const).map((field) => (
+        {(['title', 'description', 'keywords'] as const).map((field) => (
           <div key={field} className={styles.field}>
             <span className={styles.fieldLabel}>
               {field.charAt(0).toUpperCase() + field.slice(1)}
             </span>
             {editingField === field ? (
-              field === "description" ? (
+              field === 'description' ? (
                 <textarea
                   autoFocus
                   className={styles.fieldTextarea}
@@ -213,9 +234,9 @@ export const MetadataPreview: React.FC = () => {
                 onDoubleClick={() => setEditingField(field)}
                 title="Double-click to edit"
               >
-                {field === "keywords"
-                  ? job.metadata?.keywords?.join(", ") || "—"
-                  : job.metadata?.[field] || "—"}
+                {field === 'keywords'
+                  ? job.metadata?.keywords?.join(', ') || '—'
+                  : job.metadata?.[field] || '—'}
                 <Icon name="edit-icon" className={styles.editIcon} />
               </div>
             )}
@@ -223,16 +244,24 @@ export const MetadataPreview: React.FC = () => {
         ))}
       </div>
 
-      {/* Regenerate — внизу (перенесли) 
+      {/* Regenerate — активен только после processing, использует locked settings */}
       <Button
         variant="secondary"
         size="sm"
         icon={<Icon name="restart-icon" className={styles.btnIcon} />}
-        onClick={() => addToast("Regenerate coming soon", "info")}
+        onClick={handleRegenerate}
+        disabled={!canRegenerate || isRegenerating}
+        title={
+          !canRegenerate
+            ? 'Available after processing'
+            : isRegenerating
+              ? 'Regenerating...'
+              : 'Regenerate using original batch settings'
+        }
         className={styles.regenerateBtn}
       >
-        Regenerate
-      </Button>*/}
+        {isRegenerating ? 'Regenerating...' : 'Regenerate'}
+      </Button>
     </Panel>
   );
 };
