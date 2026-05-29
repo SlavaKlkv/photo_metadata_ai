@@ -16,6 +16,7 @@ from app.core.enums import (
     FileStatus,
     JobStatus,
     StockPlatform,
+    StockPlatformType,
 )
 from app.utils.sanitizers import (
     sanitize_keywords,
@@ -138,6 +139,18 @@ class JobSettingsMixin(BaseModel):
     ai_provider: AIProvider | None = None
 
 
+class ExportArtifact(BaseModel):
+    """
+    Описание одного экспортного артефакта.
+    """
+
+    export_format: ExportFormat
+    path: str
+    filename: str
+    size_bytes: int
+    count: int = 1
+
+
 class ExportStatusMixin(BaseModel):
     """
     Общие поля статуса экспорта для response-схем.
@@ -147,6 +160,7 @@ class ExportStatusMixin(BaseModel):
     export_progress: int = 0
     export_format: ExportFormat | None = None
     export_error_message: str | None = None
+    export_artifacts: list[ExportArtifact] = Field(default_factory=list)
 
 
 class CreateProcessingJobFile(BaseModel):
@@ -321,7 +335,7 @@ class StockFieldOptions(BaseModel):
     """
 
     stock_platform: StockPlatform
-    platform_type: str = 'microstock'
+    platform_type: StockPlatformType
     categories: list[str] = Field(default_factory=list)
     license_types: list[str] = Field(default_factory=list)
     title_required: bool = True
