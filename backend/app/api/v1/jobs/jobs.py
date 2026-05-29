@@ -1,4 +1,7 @@
+from io import BytesIO
+from pathlib import Path
 from uuid import UUID
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import (
     APIRouter,
@@ -6,9 +9,11 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Query,
     UploadFile,
 )
 from fastapi.responses import Response
+from starlette.concurrency import run_in_threadpool
 
 from app.core.enums import (
     ExportFormat,
@@ -30,8 +35,7 @@ from app.schemas.job import (
     UpdateProcessingJobSettingsRequest,
 )
 from app.services.export.export import (
-    generate_job_export,
-    load_stored_job_export,
+    ensure_job_exports,
     run_job_export,
 )
 from app.services.processing import (
@@ -40,7 +44,7 @@ from app.services.processing import (
     retry_failed_files,
 )
 from app.services.stock_metadata import (
-    get_effective_categories,
+    build_stock_mapped_metadata,
     get_stock_field_options,
     validate_file_metadata_for_stock,
 )
@@ -60,39 +64,90 @@ def _build_metadata_result(
     """
     Собирает stock-aware результат metadata для preview и PATCH-ответов.
     """
-    mapped_categories = get_effective_categories(file, stock_platform)
-    mapped_category_2 = (
-        mapped_categories[1] if len(mapped_categories) > 1 else None
-    )
+    mapped_metadata = build_stock_mapped_metadata(file, stock_platform)
 
     return ProcessingJobMetadataResult(
         file_id=file.file_id,
         filename=file.filename,
         original_filename=file.original_filename,
         status=file.status,
-        title=file.title,
-        description=file.description,
-        keywords=file.keywords,
-        categories=mapped_categories,
-        category_2=mapped_category_2,
-        license_type=file.license_type,
-        location_metadata=file.location_metadata,
-        editorial_date=file.editorial_date,
-        is_editorial=file.is_editorial,
-        editorial_caption=file.editorial_caption,
-        has_people=file.has_people,
-        people_count=file.people_count,
-        model_release_available=file.model_release_available,
-        releases=file.releases,
-        ai_generated_content_disclosure=(file.ai_generated_content_disclosure),
-        is_illustration=file.is_illustration,
-        mature_content=file.mature_content,
-        iptc_embedded_metadata=file.iptc_embedded_metadata,
+        title=mapped_metadata.title,
+        description=mapped_metadata.description,
+        keywords=mapped_metadata.keywords,
+        categories=mapped_metadata.categories,
+        category_2=mapped_metadata.category_2,
+        license_type=mapped_metadata.license_type,
+        location_metadata=mapped_metadata.location_metadata,
+        editorial_date=mapped_metadata.editorial_date,
+        is_editorial=mapped_metadata.is_editorial,
+        editorial_caption=mapped_metadata.editorial_caption,
+        has_people=mapped_metadata.has_people,
+        people_count=mapped_metadata.people_count,
+        model_release_available=mapped_metadata.model_release_available,
+        releases=mapped_metadata.releases,
+        ai_generated_content_disclosure=(
+            mapped_metadata.ai_generated_content_disclosure
+        ),
+        is_illustration=mapped_metadata.is_illustration,
+        mature_content=mapped_metadata.mature_content,
+        iptc_embedded_metadata=mapped_metadata.iptc_embedded_metadata,
         error_message=file.error_message,
         validation=validate_file_metadata_for_stock(
             file,
             stock_platform,
         ),
+    )
+
+
+def _resolve_selected_export_formats(
+    *,
+    csv: bool,
+    iptc: bool,
+) -> list[ExportFormat]:
+    selected: list[ExportFormat] = []
+
+    if csv:
+        selected.append(ExportFormat.CSV)
+
+    if iptc:
+        selected.append(ExportFormat.IPTC)
+
+    return selected
+
+
+def _detect_artifact_media_type(
+    export_format: ExportFormat,
+) -> str:
+    if export_format == ExportFormat.CSV:
+        return 'text/csv; charset=utf-8'
+
+    if export_format == ExportFormat.IPTC:
+        return 'image/jpeg'
+
+    return 'application/octet-stream'
+
+
+def _build_zip_export_response(
+    job_id: UUID,
+    artifacts: list[tuple[Path, str]],
+) -> Response:
+    zip_buffer = BytesIO()
+
+    with ZipFile(zip_buffer, mode='w', compression=ZIP_DEFLATED) as zip_file:
+        for file_path, arc_name in artifacts:
+            zip_file.write(file_path, arcname=arc_name)
+
+    zip_content = zip_buffer.getvalue()
+    archive_name = f'{job_id}_exports.zip'
+
+    return Response(
+        content=zip_content,
+        media_type='application/zip',
+        headers={
+            'Content-Disposition': (
+                f'attachment; filename="{archive_name}"'
+            ),
+        },
     )
 
 
@@ -439,16 +494,23 @@ async def update_file_metadata(
 
 
 @router.post(
-    '/{job_id}/export/{export_format}',
+    '/{job_id}/export',
     response_model=ProcessingJobExportStatus,
 )
 async def start_job_export(
     job_id: UUID,
-    export_format: ExportFormat,
     background_tasks: BackgroundTasks,
+    csv: bool = Query(
+        default=False,
+        description='Include CSV export format',
+    ),
+    iptc: bool = Query(
+        default=False,
+        description='Include IPTC export format',
+    ),
 ):
     """
-    Запускает подготовку экспорта задачи в выбранном формате.
+    Запускает подготовку экспорта задачи в выбранных форматах.
     """
     job = await storage.get_job(job_id)
 
@@ -456,6 +518,17 @@ async def start_job_export(
         raise HTTPException(
             status_code=404,
             detail='Job not found',
+        )
+
+    selected_export_formats = _resolve_selected_export_formats(
+        csv=csv,
+        iptc=iptc,
+    )
+
+    if not selected_export_formats:
+        raise HTTPException(
+            status_code=400,
+            detail='At least one export format must be selected',
         )
 
     stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
@@ -496,11 +569,18 @@ async def start_job_export(
 
     job.export_status = ExportStatus.QUEUED
     job.export_progress = 0
-    job.export_format = export_format
+    job.export_formats = selected_export_formats
+    trigger_export_format = selected_export_formats[0]
+    job.export_format = trigger_export_format
     job.export_error_message = None
+    job.export_artifacts = []
     await storage.update_job(job)
 
-    background_tasks.add_task(run_job_export, job.job_id, export_format)
+    background_tasks.add_task(
+        run_job_export,
+        job.job_id,
+        trigger_export_format,
+    )
 
     return ProcessingJobExportStatus(
         job_id=job.job_id,
@@ -508,6 +588,7 @@ async def start_job_export(
         export_progress=job.export_progress,
         export_format=job.export_format,
         export_error_message=job.export_error_message,
+        export_artifacts=job.export_artifacts,
     )
 
 
@@ -533,16 +614,24 @@ async def get_job_export_status(job_id: UUID):
         export_progress=job.export_progress,
         export_format=job.export_format,
         export_error_message=job.export_error_message,
+        export_artifacts=job.export_artifacts,
     )
 
 
-@router.get('/{job_id}/export/{export_format}')
+@router.get('/{job_id}/export')
 async def export_job(
     job_id: UUID,
-    export_format: ExportFormat,
+    csv: bool = Query(
+        default=False,
+        description='Download CSV export artifacts',
+    ),
+    iptc: bool = Query(
+        default=False,
+        description='Download IPTC export artifacts',
+    ),
 ):
     """
-    Возвращает экспорт задачи в выбранном формате.
+    Возвращает экспорт задачи в выбранных форматах.
     """
 
     job = await storage.get_job(job_id)
@@ -553,26 +642,78 @@ async def export_job(
             detail='Job not found',
         )
 
-    try:
-        stored_export = load_stored_job_export(job, export_format)
+    selected_export_formats = _resolve_selected_export_formats(
+        csv=csv,
+        iptc=iptc,
+    )
 
-        if stored_export is None:
-            content, filename, media_type = generate_job_export(
-                job,
-                export_format,
-            )
-        else:
-            content, filename, media_type = stored_export
+    if not selected_export_formats:
+        raise HTTPException(
+            status_code=400,
+            detail='At least one export format must be selected',
+        )
+
+    previous_export_formats = list(job.export_formats)
+    job.export_formats = selected_export_formats
+
+    try:
+        export_artifacts = await run_in_threadpool(
+            ensure_job_exports,
+            job,
+            selected_export_formats[0],
+        )
     except ValueError as error:
         raise HTTPException(
             status_code=400,
             detail=str(error),
         ) from error
+    finally:
+        job.export_formats = previous_export_formats
 
-    return Response(
-        content=content,
-        media_type=media_type,
-        headers={
-            'Content-Disposition': f'attachment; filename="{filename}"',
-        },
+    filtered_artifacts = [
+        artifact
+        for artifact in export_artifacts
+        if artifact.export_format in selected_export_formats
+    ]
+
+    if not filtered_artifacts:
+        raise HTTPException(
+            status_code=404,
+            detail='No export artifacts found',
+        )
+
+    resolved_artifacts: list[tuple[Path, str, ExportFormat]] = []
+
+    for artifact in filtered_artifacts:
+        artifact_path = Path(artifact.path)
+        if not artifact_path.is_file():
+            raise HTTPException(
+                status_code=404,
+                detail=f'Export file not found: {artifact.filename}',
+            )
+
+        resolved_artifacts.append(
+            (artifact_path, artifact.filename, artifact.export_format)
+        )
+
+    if len(resolved_artifacts) == 1:
+        file_path, filename, artifact_format = resolved_artifacts[0]
+        media_type = _detect_artifact_media_type(artifact_format)
+
+        return Response(
+            content=file_path.read_bytes(),
+            media_type=media_type,
+            headers={
+                'Content-Disposition': (
+                    f'attachment; filename="{filename}"'
+                ),
+            },
+        )
+
+    return _build_zip_export_response(
+        job_id=job_id,
+        artifacts=[
+            (artifact_path, filename)
+            for artifact_path, filename, _ in resolved_artifacts
+        ],
     )

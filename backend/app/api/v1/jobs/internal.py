@@ -6,6 +6,7 @@ from fastapi import (
 )
 from starlette.concurrency import run_in_threadpool
 
+from app.core.enums import StockPlatform
 from app.schemas.job import (
     CleanupJobResult,
     CreateProcessingJobRequest,
@@ -15,6 +16,7 @@ from app.schemas.job import (
 )
 from app.services.cleanup import cleanup_job_temp_files
 from app.services.metadata_embedding import embed_metadata_into_jpg
+from app.services.stock_metadata import build_stock_iptc_payload
 from app.services.storage import storage
 
 router = APIRouter(
@@ -76,7 +78,7 @@ async def embed_file_metadata(
     file_id: UUID,
 ):
     """
-    Записывает текущие метаданные файла в EXIF-поля JPG.
+    Записывает текущие метаданные файла в IPTC-поля JPG.
     """
     job = await storage.get_job(job_id)
 
@@ -97,7 +99,14 @@ async def embed_file_metadata(
             detail='File not found',
         )
 
-    await run_in_threadpool(embed_metadata_into_jpg, job_file)
+    stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
+    iptc_payload = build_stock_iptc_payload(job_file, stock_platform)
+
+    await run_in_threadpool(
+        embed_metadata_into_jpg,
+        job_file,
+        iptc_payload,
+    )
     job_file.iptc_embedded_metadata = True
     await storage.update_job(job)
 

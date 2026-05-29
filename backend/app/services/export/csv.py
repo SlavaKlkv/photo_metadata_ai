@@ -3,9 +3,12 @@ from io import StringIO
 
 import structlog
 
-from app.core.enums import StockPlatform
+from app.core.enums import FileStatus, StockPlatform
 from app.schemas.job import ProcessingJob, ProcessingJobFile
-from app.services.stock_metadata import get_effective_categories
+from app.services.stock_metadata import (
+    StockMappedMetadata,
+    build_stock_mapped_metadata,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -59,7 +62,11 @@ def generate_metadata_csv(
     writer = csv.writer(output)
     writer.writerow(CSV_HEADERS[export_platform])
 
-    for file in job.files:
+    export_files = [
+        file for file in job.files if file.status == FileStatus.COMPLETED
+    ]
+
+    for file in export_files:
         writer.writerow(_build_csv_row(file, export_platform))
 
     csv_content = output.getvalue()
@@ -68,7 +75,7 @@ def generate_metadata_csv(
         'csv_generation_completed',
         job_id=str(job.job_id),
         export_platform=export_platform,
-        files_count=len(job.files),
+        files_count=len(export_files),
         csv_size=len(csv_content),
     )
 
@@ -116,15 +123,17 @@ def _build_csv_row(
     Преобразует файл задачи в строку CSV нужного формата.
     """
 
-    keywords = _format_keywords(file.keywords)
-    title = file.title or ''
-    description = file.description or ''
-    categories = get_effective_categories(file, export_platform)
-    categories_value = _format_list(categories)
-    primary_category = categories[0] if categories else ''
-    editorial = _format_bool(file.is_editorial)
-    location = file.location_metadata or ''
-    releases = _format_releases(file)
+    mapped_metadata = build_stock_mapped_metadata(file, export_platform)
+    keywords = _format_keywords(mapped_metadata.keywords)
+    title = mapped_metadata.title or ''
+    description = mapped_metadata.description or ''
+    categories_value = _format_list(mapped_metadata.categories)
+    primary_category = (
+        mapped_metadata.categories[0] if mapped_metadata.categories else ''
+    )
+    editorial = _format_bool(mapped_metadata.is_editorial)
+    location = mapped_metadata.location_metadata or ''
+    releases = _format_releases(mapped_metadata)
 
     if export_platform == StockPlatform.SHUTTERSTOCK:
         return [
@@ -133,8 +142,8 @@ def _build_csv_row(
             description,
             keywords,
             categories_value,
-            _format_bool(file.is_illustration),
-            _format_bool(file.mature_content),
+            _format_bool(mapped_metadata.is_illustration),
+            _format_bool(mapped_metadata.mature_content),
             editorial,
             location,
             releases,
@@ -201,17 +210,17 @@ def _format_keywords(keywords: list[str]) -> str:
     )
 
 
-def _format_releases(file: ProcessingJobFile) -> str:
+def _format_releases(mapped_metadata: StockMappedMetadata) -> str:
     """
     Форматирует release-данные для CSV.
     """
-    if file.releases:
-        return _format_list(file.releases)
+    if mapped_metadata.releases:
+        return _format_list(mapped_metadata.releases)
 
-    if file.model_release_available is True:
+    if mapped_metadata.model_release_available is True:
         return 'Yes'
 
-    if file.model_release_available is False:
+    if mapped_metadata.model_release_available is False:
         return 'No'
 
     return ''

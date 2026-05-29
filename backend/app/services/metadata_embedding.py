@@ -1,9 +1,10 @@
+import re
+from dataclasses import dataclass
 from pathlib import Path
 
-import piexif
-import piexif.helper
 import structlog
 from fastapi import HTTPException
+from iptcinfo3 import IPTCInfo
 
 from app.core.constants import ALLOWED_IMAGE_SUFFIXES, UPLOAD_DIR
 from app.core.runtime import resolve_path_in_base
@@ -12,9 +13,23 @@ from app.schemas.job import ProcessingJobFile
 logger = structlog.get_logger(__name__)
 
 
-def embed_metadata_into_jpg(file: ProcessingJobFile) -> None:
+@dataclass(frozen=True)
+class IPTCEmbeddingPayload:
+    object_name: str
+    caption_abstract: str
+    keywords: list[str]
+    supplemental_category: list[str]
+    city: str | None = None
+    date_created: str | None = None
+    special_instructions: str | None = None
+
+
+def embed_metadata_into_jpg(
+    file: ProcessingJobFile,
+    payload: IPTCEmbeddingPayload | None = None,
+) -> None:
     """
-    Записывает title, description и keywords в EXIF-поля JPG-файла.
+    Записывает metadata в IPTC-поля JPG-файла.
     """
     logger.info(
         'metadata_embedding_started',
@@ -26,35 +41,14 @@ def embed_metadata_into_jpg(file: ProcessingJobFile) -> None:
     _validate_jpg_file_path(file_path)
 
     try:
-        exif_dict = piexif.load(str(file_path))
-        exif_dict['0th'][piexif.ImageIFD.XPTitle] = _encode_windows_text(
-            file.title or ''
-        )
-        exif_dict['0th'][piexif.ImageIFD.XPKeywords] = _encode_windows_text(
-            ', '.join(file.keywords)
-        )
-        exif_dict['0th'][piexif.ImageIFD.XPComment] = _encode_windows_text(
-            file.description or ''
-        )
-        exif_dict['Exif'][piexif.ExifIFD.UserComment] = (
-            piexif.helper.UserComment.dump(
-                file.description or '',
-                encoding='unicode',
-            )
-        )
-
-        description = file.description or file.title or ''
-        if description:
-            exif_dict['0th'][piexif.ImageIFD.ImageDescription] = (
-                _encode_ascii_text(description)
-            )
-        piexif.insert(piexif.dump(exif_dict), str(file_path))
+        effective_payload = payload or _build_default_iptc_payload(file)
+        _embed_iptc_metadata(file_path, effective_payload)
 
         logger.info(
             'metadata_embedding_completed',
             file_id=str(file.file_id),
             filename=file.filename,
-            keywords_count=len(file.keywords),
+            keywords_count=len(effective_payload.keywords),
         )
     except HTTPException:
         raise
@@ -69,6 +63,124 @@ def embed_metadata_into_jpg(file: ProcessingJobFile) -> None:
             status_code=500,
             detail='Failed to embed metadata into JPG',
         ) from error
+
+
+def _embed_iptc_metadata(
+    file_path: Path,
+    payload: IPTCEmbeddingPayload,
+) -> None:
+    """
+    Встраивает IPTC metadata в JPG.
+    """
+    try:
+        iptc_info = IPTCInfo(
+            str(file_path),
+            force=True,
+            out_charset='utf_8',
+        )
+        iptc_info['object name'] = payload.object_name
+        iptc_info['caption/abstract'] = payload.caption_abstract
+        iptc_info['keywords'] = _normalize_iptc_list(payload.keywords)
+        iptc_info['supplemental category'] = _normalize_iptc_list(
+            payload.supplemental_category
+        )
+
+        _set_iptc_optional_text(
+            iptc_info,
+            'city',
+            payload.city,
+        )
+        _set_iptc_optional_text(
+            iptc_info,
+            'date created',
+            _normalize_iptc_date(payload.date_created),
+        )
+        _set_iptc_optional_text(
+            iptc_info,
+            'special instructions',
+            payload.special_instructions,
+        )
+
+        iptc_info.save(options={'overwrite': True})
+    except Exception as error:
+        logger.exception(
+            'iptc_embedding_failed',
+            file_path=str(file_path),
+            error=str(error),
+        )
+        raise HTTPException(
+            status_code=500,
+            detail='Failed to embed IPTC metadata into JPG',
+        ) from error
+
+
+def _build_default_iptc_payload(
+    file: ProcessingJobFile,
+) -> IPTCEmbeddingPayload:
+    return IPTCEmbeddingPayload(
+        object_name=file.title or '',
+        caption_abstract=file.description or '',
+        keywords=list(file.keywords),
+        supplemental_category=list(file.categories),
+        city=file.location_metadata,
+        date_created=file.editorial_date if file.is_editorial else None,
+    )
+
+
+def _normalize_iptc_list(values: list[str]) -> list[str]:
+    """
+    Нормализует список строк для IPTC list-полей.
+    """
+    normalized_values: list[str] = []
+    seen_values: set[str] = set()
+
+    for raw_value in values:
+        value = raw_value.strip()
+        if not value:
+            continue
+        marker = value.casefold()
+        if marker in seen_values:
+            continue
+        seen_values.add(marker)
+        normalized_values.append(value)
+
+    return normalized_values
+
+
+def _normalize_iptc_date(value: str | None) -> str | None:
+    if value is None:
+        return None
+
+    normalized = value.strip()
+    if not normalized:
+        return None
+
+    if re.fullmatch(r'\d{8}', normalized):
+        return normalized
+
+    if re.fullmatch(r'\d{4}-\d{2}-\d{2}', normalized):
+        return normalized.replace('-', '')
+
+    return None
+
+
+def _set_iptc_optional_text(
+    iptc_info: IPTCInfo,
+    field: str,
+    value: str | None,
+) -> None:
+    normalized = (value or '').strip()
+
+    if not normalized:
+        return
+
+    try:
+        iptc_info[field] = normalized
+    except Exception:
+        logger.warning(
+            'iptc_field_write_skipped',
+            field=field,
+        )
 
 
 def get_upload_file_path(filename: str) -> Path:
@@ -122,19 +234,3 @@ def _validate_jpg_file_path(file_path: Path) -> None:
             status_code=404,
             detail='Uploaded file not found',
         )
-
-
-def _encode_windows_text(value: str) -> bytes:
-    """
-    Кодирует строку для EXIF XP* полей.
-    """
-
-    return f'{value}\0'.encode('utf-16le')
-
-
-def _encode_ascii_text(value: str) -> bytes:
-    """
-    Кодирует строку для ASCII EXIF-поля без ошибки на Unicode.
-    """
-
-    return value.encode('ascii', errors='replace')

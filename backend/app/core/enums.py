@@ -38,6 +38,11 @@ class StockPlatform(StrEnum):
     ADOBE_STOCK = 'adobe_stock'
 
 
+class StockPlatformType(StrEnum):
+    MICROSTOCK = 'microstock'
+    PREMIUM_STOCK_AGENCY = 'premium_stock_agency'
+
+
 class ExportFormat(StrEnum):
     CSV = 'csv'
     IPTC = 'iptc'
