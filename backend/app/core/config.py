@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     OLLAMA_MODEL: str = 'llava'
     OLLAMA_REQUIRED_MODEL: str = 'qwen2.5vl'
 
+    DESKTOP_STARTUP_AI_CHECK_TIMEOUT_SECONDS: float = 8.0
+    DESKTOP_STARTUP_AI_CHECK_RETRY_ATTEMPTS: int = 2
+    DESKTOP_STARTUP_AI_CHECK_RETRY_DELAY_SECONDS: float = 0.5
+
     BACKEND_RUNTIME_PROFILE: RuntimeProfile = 'desktop'
     WORKSPACE_DIR: Path = Path.cwd()
     DESKTOP_WORKSPACE_DIR: Path | None = None
