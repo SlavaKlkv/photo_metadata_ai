@@ -12,83 +12,112 @@ const STEPS = ['Upload', 'Context', 'Process', 'Review', 'Export'] as const;
 
 export const BottomActionBar: React.FC = () => {
   const jobs = useAppStore((state) => state.jobs);
+  const previews = useAppStore((state) => state.previews);
+  const draftBatchSettings = useAppStore((state) => state.draftBatchSettings);
+  const sessionSettings = useAppStore((state) => state.sessionSettings);
+
+  const lockBatchSettings = useAppStore((state) => state.lockBatchSettings);
+  const unlockBatchSettings = useAppStore((state) => state.unlockBatchSettings);
+  const resetBatchState = useAppStore((state) => state.resetBatchState);
+  const saveSessionSettings = useAppStore((state) => state.saveSessionSettings);
+
   const isUploaded = useUIStore((state) => state.isUploaded);
   const isProcessing = useUIStore((state) => state.isProcessing);
   const isExportReady = useUIStore((state) => state.isExportReady);
+  const isExporting = useUIStore((state) => state.isExporting);
+  const currentJobId = useUIStore((state) => state.currentJobId);
+
+  const setIsProcessing = useUIStore((state) => state.setIsProcessing);
   const openProgressModal = useUIStore((state) => state.openProgressModal);
-  const clearAll = useAppStore((state) => state.clearAll);
   const setIsUploaded = useUIStore((state) => state.setIsUploaded);
   const setIsExportReady = useUIStore((state) => state.setIsExportReady);
   const setIsPollingActive = useUIStore((state) => state.setIsPollingActive);
-  const settings = useAppStore((state) => state.settings);
-  const isExporting = useUIStore((state) => state.isExporting);
   const setIsExporting = useUIStore((state) => state.setIsExporting);
   const openExportModal = useUIStore((state) => state.openExportModal);
+  const setCurrentJobId = useUIStore((state) => state.setCurrentJobId);
+  const setSelectedJobId = useUIStore((state) => state.setSelectedJobId);
+
   const addToast = useToastStore((state) => state.addToast);
-  const currentJobId = useUIStore((state) => state.currentJobId);
 
-
-  // текущий шаг степпера
-  const currentStep = !isUploaded ? 0 : isProcessing ? 2 : isExporting ? 4 : isExportReady ? 3 : 1;
-  const previews = useAppStore((state) => state.previews);
+  const currentStep = !isUploaded
+    ? 0
+    : isProcessing
+      ? 2
+      : isExporting
+        ? 4
+        : isExportReady
+          ? 3
+          : 1;
 
   const handleRestart = () => {
     Object.values(previews).forEach((url) => URL.revokeObjectURL(url));
-    clearAll();
+    resetBatchState();
     setIsUploaded(false);
     setIsExportReady(false);
+    setIsPollingActive(false);
+    setIsProcessing(false);
+    setCurrentJobId(null);
+    setSelectedJobId(null);
   };
 
   const handleStartProcessing = async () => {
-  if (!currentJobId) return;
+    if (!currentJobId) return;
 
-  try {
-    await jobsApi.updateSettings(currentJobId, {
-      shooting_context: settings.shootingContext,
-      stock_platform: settings.exportFormat,
-      ai_provider: settings.aiProvider,
-    });
+    lockBatchSettings();
+    saveSessionSettings();
+
+    const { draftBatchSettings: batchSnapshot } = useAppStore.getState();
+
+    const selectedExportFormats = Object.entries(
+      batchSnapshot.exportFormats,
+    )
+      .filter(([, enabled]) => enabled)
+      .map(([format]) => format);
 
     try {
-      await jobsApi.startProcessing(currentJobId);
-    } catch (processError: any) {
-      // игнорируем если уже запущен
-      if (!processError?.response?.data?.detail?.includes('already been started')) {
-        throw processError;
-      }
-    }
+      setIsProcessing(true);
 
-    setIsPollingActive(true);
-    openProgressModal();
-  } catch (error) {
-    addToast('Failed to start processing', 'error');
-  }
-};
+      await jobsApi.updateSettings(currentJobId, {
+        shooting_context: batchSnapshot.shootingContext,
+        stock_platform: batchSnapshot.stockPlatform,
+        ai_provider: sessionSettings.aiProvider,
+        export_formats: selectedExportFormats,
+      });
+
+      const processResponse = await jobsApi.startProcessing(currentJobId);
+      const actualJobId = processResponse.data.job_id ?? currentJobId;
+
+      setCurrentJobId(actualJobId);
+      setIsPollingActive(true);
+      openProgressModal();
+    } catch (error) {
+      unlockBatchSettings();
+      setIsProcessing(false);
+      addToast('Failed to start processing', 'error');
+    }
+  };
 
   return (
     <footer className={styles.bar}>
-      {/* Степпер */}
       <nav className={styles.stepper}>
         {STEPS.map((step, index) => (
           <React.Fragment key={step}>
             <div
-              className={`${styles.step} ${index <= currentStep ? styles.active : ""}`}
+              className={`${styles.step} ${index <= currentStep ? styles.active : ''}`}
             >
               <span className={styles.stepNumber}>{index + 1}</span>
               <span className={styles.stepLabel}>{step}</span>
             </div>
             {index < STEPS.length - 1 && (
               <div
-                className={`${styles.line} ${index < currentStep ? styles.activeLine : ""}`}
+                className={`${styles.line} ${index < currentStep ? styles.activeLine : ''}`}
               />
             )}
           </React.Fragment>
         ))}
       </nav>
 
-      {/* Кнопки */}
       <div className={styles.actions}>
-        {/* Restart — появляется после загрузки */}
         {isUploaded && (
           <Button
             variant="secondary"
@@ -100,17 +129,18 @@ export const BottomActionBar: React.FC = () => {
           </Button>
         )}
 
-        {/* Start processing — активна после загрузки */}
         <Button
           variant="primary"
           size="md"
           icon={<Icon name="start-icon" className={styles.btnIcon} />}
           disabled={
-            !isUploaded || isProcessing || !settings.shootingContext.trim() || isExportReady
+            !isUploaded ||
+            isProcessing ||
+            !draftBatchSettings.shootingContext.trim()
           }
           title={
-            !settings.shootingContext.trim()
-              ? "Add shoot notes to start processing"
+            !draftBatchSettings.shootingContext.trim()
+              ? 'Add shoot notes to start processing'
               : undefined
           }
           onClick={handleStartProcessing}
@@ -118,7 +148,6 @@ export const BottomActionBar: React.FC = () => {
           Start processing
         </Button>
 
-        {/* Export — активна только после processing */}
         <Button
           variant="primary"
           size="md"

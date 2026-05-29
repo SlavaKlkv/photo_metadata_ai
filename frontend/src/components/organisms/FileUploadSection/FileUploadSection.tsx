@@ -10,7 +10,8 @@ import { Panel } from "../../atoms/Panel/Panel";
 import styles from "./FileUploadSection.module.scss";
 import { SectionHeader } from "../../molecules/SectionHeader/SectionHeader";
 
-const ALLOWED_FORMATS = ["image/jpeg", "image/png"];
+const ALLOWED_FORMATS = ["image/jpeg"];
+const ALLOWED_EXTENSIONS = [".jpg", ".jpeg"];
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
 export const FileUploadSection: React.FC = () => {
@@ -24,17 +25,22 @@ export const FileUploadSection: React.FC = () => {
   const addToast = useToastStore((state) => state.addToast);
   const [isUploading, setIsUploading] = useState(false);
   const addPreviews = useAppStore((state) => state.addPreviews);
-  const settings = useAppStore((state) => state.settings);
+  const draftBatchSettings = useAppStore((state) => state.draftBatchSettings);
 
   const validateFile = (file: File): { valid: boolean; error?: string } => {
-    if (!ALLOWED_FORMATS.includes(file.type)) {
-      return { valid: false, error: `Формат не поддержан: ${file.type}` };
+    // проверяем MIME и расширение — MIME можно подделать, расширение — fallback
+    const ext = file.name.toLowerCase().slice(file.name.lastIndexOf("."));
+    const validMime = ALLOWED_FORMATS.includes(file.type);
+    const validExt = ALLOWED_EXTENSIONS.includes(ext);
+
+    if (!validMime && !validExt) {
+      return { valid: false, error: `Only JPEG files are supported` };
     }
 
     if (file.size > MAX_FILE_SIZE) {
       return {
         valid: false,
-        error: `Файл слишком большой: ${(file.size / 1024 / 1024).toFixed(1)}MB`,
+        error: `File too large: ${(file.size / 1024 / 1024).toFixed(1)}MB`,
       };
     }
 
@@ -60,19 +66,18 @@ export const FileUploadSection: React.FC = () => {
     const invalidFiles = files.filter((file) => !validateFile(file).valid);
 
     if (invalidFiles.length > 0) {
-      invalidFiles.forEach((file) => {
-        const error = validateFile(file).error ?? "Invalid file";
-        addToast(`${file.name}: ${error}`, "error");
-      });
+      addToast(
+        `${invalidFiles.length} file${invalidFiles.length > 1 ? "s" : ""} skipped — only JPEG is supported`,
+        "error",
+      );
     }
 
     if (validFiles.length === 0) return;
 
     const formData = new FormData();
     validFiles.forEach((file) => formData.append("files", file));
-    // только shooting_context — остальное бэкенд не ожидает
-    if (settings.shootingContext) {
-      formData.append("shooting_context", settings.shootingContext);
+    if (draftBatchSettings.shootingContext) {
+      formData.append("shooting_context", draftBatchSettings.shootingContext);
     }
 
     try {
@@ -136,7 +141,7 @@ export const FileUploadSection: React.FC = () => {
     ? "This may take a moment."
     : hasUploads
       ? "You can add more photos"
-      : "Upload JPG or PNG photos to begin";
+      : "Upload JPEG photos to begin";
   const iconName = hasUploads ? "img-modal-icon" : "img-icon";
 
   const cards = [
@@ -193,7 +198,7 @@ export const FileUploadSection: React.FC = () => {
             ref={fileInputRef}
             type="file"
             multiple
-            accept={ALLOWED_FORMATS.join(",")}
+            accept={[...ALLOWED_FORMATS, ...ALLOWED_EXTENSIONS].join(",")}
             onChange={handleChange}
             className={styles.input}
           />

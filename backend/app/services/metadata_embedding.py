@@ -5,7 +5,8 @@ import piexif.helper
 import structlog
 from fastapi import HTTPException
 
-from app.core.constants import JPG_IMAGE_SUFFIXES, UPLOAD_DIR
+from app.core.constants import ALLOWED_IMAGE_SUFFIXES, UPLOAD_DIR
+from app.core.runtime import resolve_path_in_base
 from app.schemas.job import ProcessingJobFile
 
 logger = structlog.get_logger(__name__)
@@ -74,8 +75,18 @@ def get_upload_file_path(filename: str) -> Path:
     """
     Формирует путь к файлу внутри директории uploads.
     """
-
-    file_path = UPLOAD_DIR / Path(filename).name
+    try:
+        file_path = resolve_path_in_base(UPLOAD_DIR, Path(filename).name)
+    except ValueError as error:
+        logger.warning(
+            'upload_file_path_rejected',
+            filename=filename,
+            error=str(error),
+        )
+        raise HTTPException(
+            status_code=400,
+            detail='Unsafe file path',
+        ) from error
 
     logger.debug(
         'upload_file_path_resolved',
@@ -91,7 +102,7 @@ def _validate_jpg_file_path(file_path: Path) -> None:
     Проверяет, что файл существует и является JPG/JPEG.
     """
 
-    if file_path.suffix.lower() not in JPG_IMAGE_SUFFIXES:
+    if file_path.suffix.lower() not in ALLOWED_IMAGE_SUFFIXES:
         logger.warning(
             'metadata_embedding_invalid_file_type',
             file_path=str(file_path),

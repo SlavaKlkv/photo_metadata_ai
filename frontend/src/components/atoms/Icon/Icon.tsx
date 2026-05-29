@@ -18,23 +18,35 @@ import { ReactComponent as RestartIcon } from '../../../assets/icons/restart-ico
 import { ReactComponent as ResultsIcon } from '../../../assets/icons/results-icon.svg';
 import { ReactComponent as SettingsIcon } from '../../../assets/icons/settings-icon.svg';
 import { ReactComponent as StartIcon } from '../../../assets/icons/start-icon.svg';
+import { ReactComponent as AiSetupIcon } from '../../../assets/icons/ai-setup-icon.svg';
+import { ReactComponent as ConnectAccountIcon } from '../../../assets/icons/connect-account-icon.svg';
+import { ReactComponent as GeminiIcon } from '../../../assets/icons/gemini-icon.svg';
+import { ReactComponent as LinkIcon } from '../../../assets/icons/link-icon.svg';
+import { ReactComponent as OpenRouterIcon } from '../../../assets/icons/openrouter-icon.svg';
+import { ReactComponent as QwenIcon } from '../../../assets/icons/qwen-icon.svg';
 
 export type IconName =
+  | 'ai-setup-icon'
   | 'arrow-down'
   | 'checkmark-icon'
   | 'clock-icon'
+  | 'connect-account-icon'
   | 'dash-icon'
   | 'doc-icon'
   | 'download-icon'
   | 'edit-icon'
   | 'error-icon'
   | 'folder-icon'
+  | 'gemini-icon'
   | 'img-icon'
   | 'img-modal-icon'
   | 'info-icon'
+  | 'link-icon'
   | 'load-icon'
   | 'logo'
   | 'meta-icon'
+  | 'openrouter-icon'
+  | 'qwen-icon'
   | 'restart-icon'
   | 'results-icon'
   | 'settings-icon'
@@ -64,6 +76,12 @@ const icons: Record<IconName, ComponentType<SVGProps<SVGSVGElement>>> = {
   'results-icon': ResultsIcon,
   'settings-icon': SettingsIcon,
   'start-icon': StartIcon,
+  'ai-setup-icon': AiSetupIcon,
+  'connect-account-icon': ConnectAccountIcon,
+  'gemini-icon': GeminiIcon,
+  'link-icon': LinkIcon,
+  'openrouter-icon': OpenRouterIcon,
+  'qwen-icon': QwenIcon,
 };
 
 export const Icon = ({ name, ...props }: IconProps) => {

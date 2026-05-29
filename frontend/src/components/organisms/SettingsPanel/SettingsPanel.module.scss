@@ -39,26 +39,16 @@
   font-size: var(--font-size-sm);
 }
 
+.hintText {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
 .checkboxRow {
   display: flex;
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-}
-
-.sliderRow {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.sliderLabel {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-}
-
-.slider {
-  width: 100%;
 }
 
 @media (max-width: 760px) {

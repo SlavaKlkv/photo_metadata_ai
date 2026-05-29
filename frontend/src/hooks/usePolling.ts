@@ -9,8 +9,11 @@ const POLLING_INTERVAL = 2000;
 export const usePolling = (jobId: string | null) => {
   const updateJobStatus = useAppStore((state) => state.updateJobStatus);
   const updateMetadata = useAppStore((state) => state.updateMetadata);
+
   const closeProgressModal = useUIStore((state) => state.closeProgressModal);
   const setIsExportReady = useUIStore((state) => state.setIsExportReady);
+  const setIsPollingActive = useUIStore((state) => state.setIsPollingActive);
+  const setIsProcessing = useUIStore((state) => state.setIsProcessing);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -31,60 +34,71 @@ export const usePolling = (jobId: string | null) => {
 
         if (statusData.files) {
           statusData.files.forEach((file: any) => {
-            const status = file.status === "completed" ? "done" : file.status;
+            const status = file.status === 'completed' ? 'done' : file.status;
             updateJobStatus(file.file_id, status, file.error_message);
-
-            /*if (file.status === 'completed' && file.metadata) {
-              updateMetadata(file.file_id, file.metadata);
-            }*/
           });
         }
 
         const isDone =
-          statusData.status === "completed" ||
-          statusData.status === "error" ||
-          statusData.status === "cancelled" ||
-          statusData.status === "failed";
+          statusData.status === 'completed' ||
+          statusData.status === 'error' ||
+          statusData.status === 'cancelled' ||
+          statusData.status === 'failed';
+
         if (isDone) {
           stopPolling();
-          if (statusData.status === "failed") {
+          setIsPollingActive(false);
+          setIsProcessing(false);
+
+          if (
+            statusData.status === 'failed' ||
+            statusData.status === 'error' ||
+            statusData.status === 'cancelled'
+          ) {
             closeProgressModal();
-            // не ставим isExportReady — показываем ошибку
             return;
           }
-          // забираем результаты с метаданными
+
           try {
             const resultsResponse = await jobsApi.getResults(jobId);
             const results = resultsResponse.data;
-            // results — массив файлов с metadata
+
             if (results.results) {
               results.results.forEach((file: any) => {
                 updateMetadata(file.file_id, {
-                  title: file.title ?? "",
-                  description: file.description ?? "",
+                  title: file.title ?? '',
+                  description: file.description ?? '',
                   keywords: file.keywords ?? [],
                 });
               });
             }
           } catch (error) {
-            console.error("[Results fetch error]:", error);
+            console.error('[Results fetch error]:', error);
           }
+
           closeProgressModal();
           setIsExportReady(true);
         }
-      }
-
-      catch (error) {
+      } catch (error) {
         console.error('[Polling error]:', error);
-        // при ошибке останавливаем опрос и закрываем модалку
         stopPolling();
+        setIsPollingActive(false);
+        setIsProcessing(false);
         closeProgressModal();
       }
-    }
+    };
 
     poll();
     intervalRef.current = setInterval(poll, POLLING_INTERVAL);
 
     return () => stopPolling();
-  }, [jobId]);
+  }, [
+    jobId,
+    updateJobStatus,
+    updateMetadata,
+    closeProgressModal,
+    setIsExportReady,
+    setIsPollingActive,
+    setIsProcessing,
+  ]);
 };
