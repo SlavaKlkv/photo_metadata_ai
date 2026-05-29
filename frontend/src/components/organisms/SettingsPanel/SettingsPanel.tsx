@@ -1,4 +1,4 @@
-//frontend/src/components/organisms/SettingsPanel/SettingsPanel.tsx
+// frontend/src/components/organisms/SettingsPanel/SettingsPanel.tsx
 import React from 'react';
 import { useAppStore } from '../../../store/useAppStore';
 import { Panel } from '../../atoms/Panel/Panel';
@@ -14,12 +14,14 @@ const platformOptions = [
   { value: 'adobe_stock', label: 'Adobe Stock' },
 ];
 
+// TODO: заменить на ['QWEN 2.5 VL', 'gemini', 'openrouter'] после onboarding scan
+// Mock оставлен только для dev/testing
 const providerOptions = [
   { value: 'mock', label: 'Mock' },
-  { value: 'claude', label: 'Claude' },
   { value: 'ollama', label: 'Ollama' },
-  { value: 'openai', label: 'OpenAI' },
-]; //TODO: Update with actual provider names as needed. Mock is for testing purposes and should be removed in production.
+  { value: 'gemini', label: 'Gemini' },
+  { value: 'openrouter', label: 'OpenRouter' },
+];
 
 export const SettingsPanel: React.FC = () => {
   const sessionSettings = useAppStore((state) => state.sessionSettings);
@@ -39,12 +41,17 @@ export const SettingsPanel: React.FC = () => {
     lockedBatchSettings?.shootingContext ?? draftBatchSettings.shootingContext;
   const isPromptLocked = lockedBatchSettings !== null;
 
+  // Показываем hint о re-export когда batch зафиксирован и stock изменился
+  const stockChangedAfterLock =
+    isPromptLocked &&
+    draftBatchSettings.stockPlatform !== lockedBatchSettings?.stockPlatform;
+
   const CHAR_LIMIT = 600;
   const charCount = displayedShootingContext.length;
   const isOverLimit = charCount > CHAR_LIMIT;
 
   const handleFormatChange =
-    (key: "csv" | "iptc") => (e: React.ChangeEvent<HTMLInputElement>) => {
+    (key: 'csv' | 'iptc') => (e: React.ChangeEvent<HTMLInputElement>) => {
       updateExportFormat(key, e.target.checked);
     };
 
@@ -62,14 +69,14 @@ export const SettingsPanel: React.FC = () => {
           <Input
             value={displayedShootingContext}
             onChange={(e) =>
-              updateDraftBatchSetting("shootingContext", e.target.value)
+              updateDraftBatchSetting('shootingContext', e.target.value)
             }
-            placeholder="Describe the context of the shooting, and the following questions will help you — Where? What? When? E.g., “New York, Central Park, Sunset, two people on a bench 10 May 2026”"
+            placeholder='Describe the context of the shooting, and the following questions will help you — Where? What? When? E.g., "New York, Central Park, Sunset, two people on a bench 10 May 2026"'
             hasError={isOverLimit}
             disabled={isPromptLocked}
           />
           <div
-            className={`${styles.charCounter} ${isOverLimit ? styles.counterError : ""}`}
+            className={`${styles.charCounter} ${isOverLimit ? styles.counterError : ''}`}
           >
             {charCount}/{CHAR_LIMIT}
           </div>
@@ -85,30 +92,38 @@ export const SettingsPanel: React.FC = () => {
           )}
         </div>
 
-        <Select
-          label="Stock Platform"
-          options={platformOptions}
-          value={draftBatchSettings.stockPlatform}
-          onChange={(e) =>
-            updateDraftBatchSetting(
-              "stockPlatform",
-              e.target.value as typeof draftBatchSettings.stockPlatform,
-            )
-          }
-        />
+        <div className={styles.selectGroup}>
+          <Select
+            label="Stock Platform"
+            options={platformOptions}
+            value={draftBatchSettings.stockPlatform}
+            onChange={(e) =>
+              updateDraftBatchSetting(
+                'stockPlatform',
+                e.target.value as typeof draftBatchSettings.stockPlatform,
+              )
+            }
+          />
+          {/* Re-export hint: меняем stock после processing → export без новой AI генерации */}
+          {stockChangedAfterLock && (
+            <small className={styles.hintText}>
+              Exporting with new platform settings. No new AI generation needed.
+            </small>
+          )}
+        </div>
 
         <div className={styles.checkboxRow}>
           <Checkbox
             id="csv"
             label="CSV"
             checked={draftBatchSettings.exportFormats.csv}
-            onChange={handleFormatChange("csv")}
+            onChange={handleFormatChange('csv')}
           />
           <Checkbox
             id="iptc"
             label="IPTC"
             checked={draftBatchSettings.exportFormats.iptc}
-            onChange={handleFormatChange("iptc")}
+            onChange={handleFormatChange('iptc')}
           />
         </div>
 
@@ -118,7 +133,7 @@ export const SettingsPanel: React.FC = () => {
           value={sessionSettings.aiProvider}
           onChange={(e) => {
             updateSessionSetting(
-              "aiProvider",
+              'aiProvider',
               e.target.value as typeof sessionSettings.aiProvider,
             );
             saveSessionSettings();

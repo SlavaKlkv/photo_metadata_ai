@@ -1,3 +1,4 @@
+//frontend/src/App.tsx
 import React, { useEffect } from 'react';
 import { useUIStore } from './store/useUIStore';
 import { usePolling } from './hooks/usePolling';
