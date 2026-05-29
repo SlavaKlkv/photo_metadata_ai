@@ -9,9 +9,11 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.responses import Response
+from starlette.concurrency import run_in_threadpool
 
 from app.core.enums import ExportFormat, ExportStatus, JobStatus
 from app.schemas.job import (
+    CleanupJobResult,
     FileStatus,
     ProcessingJob,
     ProcessingJobExportStatus,
@@ -23,6 +25,7 @@ from app.schemas.job import (
     UpdateProcessingJobMetadataRequest,
     UpdateProcessingJobSettingsRequest,
 )
+from app.services.cleanup import cleanup_job_temp_files
 from app.services.export.export import generate_job_export, run_job_export
 from app.services.processing import (
     cancel_job_processing,
@@ -146,6 +149,31 @@ async def cancel_job(job_id: UUID):
         )
 
     return cancelled_job
+
+
+@router.post('/{job_id}/cleanup', response_model=CleanupJobResult)
+async def cleanup_job(job_id: UUID):
+    """
+    Очищает временные файлы задачи по запросу фронтенда.
+    """
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail='Job not found',
+        )
+
+    deleted_files, deleted_directories = await run_in_threadpool(
+        cleanup_job_temp_files,
+        job,
+    )
+
+    return CleanupJobResult(
+        job_id=job.job_id,
+        deleted_files=deleted_files,
+        deleted_directories=deleted_directories,
+    )
 
 
 @router.post('/{job_id}/retry-failed', response_model=ProcessingJob)
