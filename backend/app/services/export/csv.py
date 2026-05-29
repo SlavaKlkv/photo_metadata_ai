@@ -3,8 +3,9 @@ from io import StringIO
 
 import structlog
 
-from app.core.enums import StockPlatform
+from app.core.enums import FileStatus, StockPlatform
 from app.schemas.job import ProcessingJob, ProcessingJobFile
+from app.services.stock_metadata import get_effective_categories
 
 logger = structlog.get_logger(__name__)
 
@@ -12,24 +13,34 @@ logger = structlog.get_logger(__name__)
 CSV_HEADERS: dict[StockPlatform, list[str]] = {
     StockPlatform.SHUTTERSTOCK: [
         'Filename',
+        'Title',
         'Description',
         'Keywords',
         'Categories',
         'Illustration',
         'Mature Content',
         'Editorial',
+        'Location',
+        'Releases',
     ],
     StockPlatform.GETTY_IMAGES: [
         'Filename',
         'Title',
         'Description',
         'Keywords',
+        'Categories',
+        'Editorial',
+        'Location',
+        'Releases',
     ],
     StockPlatform.ADOBE_STOCK: [
         'Filename',
         'Title',
+        'Description',
         'Keywords',
         'Category',
+        'Editorial',
+        'Location',
         'Releases',
     ],
 }
@@ -48,7 +59,11 @@ def generate_metadata_csv(
     writer = csv.writer(output)
     writer.writerow(CSV_HEADERS[export_platform])
 
-    for file in job.files:
+    export_files = [
+        file for file in job.files if file.status == FileStatus.COMPLETED
+    ]
+
+    for file in export_files:
         writer.writerow(_build_csv_row(file, export_platform))
 
     csv_content = output.getvalue()
@@ -57,7 +72,7 @@ def generate_metadata_csv(
         'csv_generation_completed',
         job_id=str(job.job_id),
         export_platform=export_platform,
-        files_count=len(job.files),
+        files_count=len(export_files),
         csv_size=len(csv_content),
     )
 
@@ -106,18 +121,27 @@ def _build_csv_row(
     """
 
     keywords = _format_keywords(file.keywords)
-    title = file.title or ''  # защита от None
-    description = file.description or title
+    title = file.title or ''
+    description = file.description or ''
+    categories = get_effective_categories(file, export_platform)
+    categories_value = _format_list(categories)
+    primary_category = categories[0] if categories else ''
+    editorial = _format_bool(file.is_editorial)
+    location = file.location_metadata or ''
+    releases = _format_releases(file)
 
     if export_platform == StockPlatform.SHUTTERSTOCK:
         return [
             file.filename,
+            title,
             description,
             keywords,
-            '',
-            '',
-            '',
-            '',
+            categories_value,
+            _format_bool(file.is_illustration),
+            _format_bool(file.mature_content),
+            editorial,
+            location,
+            releases,
         ]
 
     if export_platform == StockPlatform.GETTY_IMAGES:
@@ -126,15 +150,49 @@ def _build_csv_row(
             title,
             description,
             keywords,
+            categories_value,
+            editorial,
+            location,
+            releases,
         ]
 
-    return [
-        file.filename,
-        title,
-        keywords,
-        '',
-        '',
-    ]
+    if export_platform == StockPlatform.ADOBE_STOCK:
+        return [
+            file.filename,
+            title,
+            description,
+            keywords,
+            primary_category,
+            editorial,
+            location,
+            releases,
+        ]
+
+    logger.warning(
+        'unsupported_stock_platform_for_csv_row',
+        stock_platform=export_platform,
+    )
+
+    return [file.filename, title, description, keywords]
+
+
+def _format_bool(value: bool | None) -> str:
+    """
+    Приводит boolean к ожидаемому CSV-представлению.
+    """
+    if value:
+        return 'Yes'
+    if value is False:
+        return 'No'
+
+    return ''
+
+
+def _format_list(values: list[str]) -> str:
+    """
+    Форматирует список в одну CSV-ячейку.
+    """
+    return ' | '.join(value for value in values if value.strip())
 
 
 def _format_keywords(keywords: list[str]) -> str:
@@ -145,3 +203,19 @@ def _format_keywords(keywords: list[str]) -> str:
     return ', '.join(
         keyword.strip() for keyword in keywords if keyword.strip()
     )
+
+
+def _format_releases(file: ProcessingJobFile) -> str:
+    """
+    Форматирует release-данные для CSV.
+    """
+    if file.releases:
+        return _format_list(file.releases)
+
+    if file.model_release_available is True:
+        return 'Yes'
+
+    if file.model_release_available is False:
+        return 'No'
+
+    return ''

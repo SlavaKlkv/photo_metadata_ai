@@ -34,9 +34,6 @@ Thumbs.db
 backend/uploads/
 
 # Runtime Artifacts
-jobs/
-results/
-temp/
-backend/jobs/
+backend/jobs
 backend/results/
 backend/temp/

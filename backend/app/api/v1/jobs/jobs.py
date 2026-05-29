@@ -10,7 +10,12 @@ from fastapi import (
 )
 from fastapi.responses import Response
 
-from app.core.enums import ExportFormat, ExportStatus, JobStatus
+from app.core.enums import (
+    ExportFormat,
+    ExportStatus,
+    JobStatus,
+    StockPlatform,
+)
 from app.schemas.job import (
     FileStatus,
     ProcessingJob,
@@ -20,11 +25,13 @@ from app.schemas.job import (
     ProcessingJobMetadataResult,
     ProcessingJobMetadataResults,
     ProcessingJobStatus,
+    StockFieldOptions,
     UpdateProcessingJobMetadataRequest,
     UpdateProcessingJobSettingsRequest,
 )
 from app.services.export.export import (
     generate_job_export,
+    invalidate_job_export_cache,
     load_stored_job_export,
     run_job_export,
 )
@@ -33,6 +40,11 @@ from app.services.processing import (
     process_job,
     retry_failed_files,
 )
+from app.services.stock_metadata import (
+    get_effective_categories,
+    get_stock_field_options,
+    validate_file_metadata_for_stock,
+)
 from app.services.storage import storage
 from app.services.upload import UploadValidationError, save_upload_file
 
@@ -40,6 +52,50 @@ router = APIRouter(
     prefix='/jobs',
     tags=['jobs'],
 )
+
+
+def _build_metadata_result(
+    file: ProcessingJobFile,
+    stock_platform: StockPlatform,
+) -> ProcessingJobMetadataResult:
+    """
+    Собирает stock-aware результат metadata для preview и PATCH-ответов.
+    """
+    mapped_categories = get_effective_categories(file, stock_platform)
+    mapped_category_2 = (
+        mapped_categories[1] if len(mapped_categories) > 1 else None
+    )
+
+    return ProcessingJobMetadataResult(
+        file_id=file.file_id,
+        filename=file.filename,
+        original_filename=file.original_filename,
+        status=file.status,
+        title=file.title,
+        description=file.description,
+        keywords=file.keywords,
+        categories=mapped_categories,
+        category_2=mapped_category_2,
+        license_type=file.license_type,
+        location_metadata=file.location_metadata,
+        editorial_date=file.editorial_date,
+        is_editorial=file.is_editorial,
+        editorial_caption=file.editorial_caption,
+        has_people=file.has_people,
+        people_count=file.people_count,
+        model_release_available=file.model_release_available,
+        releases=file.releases,
+        ai_generated_content_disclosure=(file.ai_generated_content_disclosure),
+        is_illustration=file.is_illustration,
+        mature_content=file.mature_content,
+        iptc_embedded_metadata=file.iptc_embedded_metadata,
+        error_message=file.error_message,
+        validation=validate_file_metadata_for_stock(
+            file,
+            stock_platform,
+        ),
+    )
+
 
 # --- загрузка и обработка ---
 
@@ -104,7 +160,21 @@ async def update_job_settings(
     for field_name in payload.model_fields_set:
         setattr(job, field_name, getattr(payload, field_name))
 
+    if payload.model_fields_set:
+        invalidate_job_export_cache(job)
+
     return await storage.update_job(job)
+
+
+@router.get(
+    '/stock-options/{stock_platform}',
+    response_model=StockFieldOptions,
+)
+async def get_stock_options(stock_platform: StockPlatform):
+    """
+    Возвращает допустимые значения категорий и license_type для стока.
+    """
+    return get_stock_field_options(stock_platform)
 
 
 @router.post('/{job_id}/process', response_model=ProcessingJob)
@@ -132,6 +202,7 @@ async def start_job_processing(
             status_code=400,
             detail='No valid JPEG files to process',
         )
+
     if job.ai_provider is None:
         raise HTTPException(
             status_code=400,
@@ -274,22 +345,13 @@ async def get_job_results(job_id: UUID):
             detail='Job not found',
         )
 
+    stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
+
     return ProcessingJobMetadataResults(
         job_id=job.job_id,
         status=job.status,
         results=[
-            # Ответ results сформирован как строки таблицы для фронтенда.
-            ProcessingJobMetadataResult(
-                file_id=file.file_id,
-                filename=file.filename,
-                original_filename=file.original_filename,
-                status=file.status,
-                title=file.title,
-                description=file.description,
-                keywords=file.keywords,
-                error_message=file.error_message,
-            )
-            for file in job.files
+            _build_metadata_result(file, stock_platform) for file in job.files
         ],
     )
 
@@ -318,10 +380,11 @@ async def update_file_metadata(
             detail='Job not found',
         )
 
-    job_file = next(
-        (file for file in job.files if file.file_id == file_id),
-        None,
-    )
+    job_file: ProcessingJobFile | None = None
+    for candidate in job.files:
+        if candidate.file_id == file_id:
+            job_file = candidate
+            break
 
     if job_file is None:
         raise HTTPException(
@@ -336,19 +399,47 @@ async def update_file_metadata(
         job_file.description = payload.description
     if 'keywords' in payload.model_fields_set:
         job_file.keywords = payload.keywords or []
+    if 'categories' in payload.model_fields_set:
+        job_file.categories = payload.categories or []
+    if 'releases' in payload.model_fields_set:
+        job_file.releases = payload.releases or []
+    if 'category_2' in payload.model_fields_set:
+        job_file.category_2 = payload.category_2
+    if 'license_type' in payload.model_fields_set:
+        job_file.license_type = payload.license_type
+    if 'location_metadata' in payload.model_fields_set:
+        job_file.location_metadata = payload.location_metadata
+    if 'editorial_date' in payload.model_fields_set:
+        job_file.editorial_date = payload.editorial_date
+    if 'is_editorial' in payload.model_fields_set:
+        job_file.is_editorial = bool(payload.is_editorial)
+    if 'editorial_caption' in payload.model_fields_set:
+        job_file.editorial_caption = payload.editorial_caption
+    if 'has_people' in payload.model_fields_set:
+        job_file.has_people = payload.has_people
+    if 'people_count' in payload.model_fields_set:
+        job_file.people_count = payload.people_count
+    if 'model_release_available' in payload.model_fields_set:
+        job_file.model_release_available = payload.model_release_available
+    if 'ai_generated_content_disclosure' in payload.model_fields_set:
+        job_file.ai_generated_content_disclosure = bool(
+            payload.ai_generated_content_disclosure
+        )
+    if 'is_illustration' in payload.model_fields_set:
+        job_file.is_illustration = payload.is_illustration
+    if 'mature_content' in payload.model_fields_set:
+        job_file.mature_content = payload.mature_content
+    if 'iptc_embedded_metadata' in payload.model_fields_set:
+        job_file.iptc_embedded_metadata = bool(payload.iptc_embedded_metadata)
+
+    if payload.model_fields_set:
+        invalidate_job_export_cache(job)
 
     await storage.update_job(job)
 
-    return ProcessingJobMetadataResult(
-        file_id=job_file.file_id,
-        filename=job_file.filename,
-        original_filename=job_file.original_filename,
-        status=job_file.status,
-        title=job_file.title,
-        description=job_file.description,
-        keywords=job_file.keywords,
-        error_message=job_file.error_message,
-    )
+    stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
+
+    return _build_metadata_result(job_file, stock_platform)
 
 
 # --- экспорт ---
@@ -372,6 +463,49 @@ async def start_job_export(
         raise HTTPException(
             status_code=404,
             detail='Job not found',
+        )
+
+    completed_files = [
+        file for file in job.files if file.status == FileStatus.COMPLETED
+    ]
+
+    if not completed_files:
+        raise HTTPException(
+            status_code=400,
+            detail='No completed files available for export',
+        )
+
+    stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
+    validation_errors: list[dict[str, object]] = []
+
+    for file in completed_files:
+        validation_result = validate_file_metadata_for_stock(
+            file,
+            stock_platform,
+        )
+
+        if validation_result.errors:
+            validation_errors.append(
+                {
+                    'file_id': str(file.file_id),
+                    'filename': file.original_filename,
+                    'errors': [
+                        issue.model_dump()
+                        for issue in validation_result.errors
+                    ],
+                }
+            )
+
+    if validation_errors:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                'message': (
+                    'Export is blocked because metadata has validation errors.'
+                ),
+                'stock_platform': stock_platform.value,
+                'files': validation_errors,
+            },
         )
 
     job.export_status = ExportStatus.QUEUED
