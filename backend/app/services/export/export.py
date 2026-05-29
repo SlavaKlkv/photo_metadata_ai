@@ -41,6 +41,12 @@ def generate_job_export(
     Генерирует экспорт задачи в выбранном формате.
     """
     if export_format == ExportFormat.CSV:
+        has_completed_files = any(
+            file.status == FileStatus.COMPLETED for file in job.files
+        )
+        if not has_completed_files:
+            raise ValueError('No completed files available for export')
+
         stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
         validation_errors = _collect_export_validation_errors(
             job,
@@ -131,6 +137,33 @@ def ensure_job_export(
         return export_path
 
     return store_job_export(job, export_format)
+
+
+def invalidate_job_export_cache(job: ProcessingJob) -> None:
+    """
+    Инвалидирует сохраненные export-файлы задачи.
+    Вызывается после изменения metadata/settings.
+    """
+    job_result_dir = resolve_path_in_base(RESULTS_DIR, str(job.job_id))
+    removed_files = 0
+
+    if job_result_dir.is_dir():
+        for path in job_result_dir.glob(f'{job.job_id}_*'):
+            if not path.is_file():
+                continue
+            path.unlink(missing_ok=True)
+            removed_files += 1
+
+    job.export_status = None
+    job.export_progress = 0
+    job.export_format = None
+    job.export_error_message = None
+
+    logger.info(
+        'job_export_cache_invalidated',
+        job_id=str(job.job_id),
+        removed_files=removed_files,
+    )
 
 
 def load_stored_job_export(

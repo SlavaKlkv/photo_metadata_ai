@@ -8,13 +8,11 @@ from starlette.concurrency import run_in_threadpool
 
 from app.core.enums import StockPlatform
 from app.schemas.job import (
-    CleanupJobResult,
     CreateProcessingJobRequest,
     EmbeddedMetadataResult,
     ProcessingJob,
     ProcessingJobFile,
 )
-from app.services.cleanup import cleanup_job_temp_files
 from app.services.metadata_embedding import embed_metadata_into_jpg
 from app.services.stock_metadata import build_stock_iptc_payload
 from app.services.storage import storage
@@ -42,31 +40,6 @@ async def create_job(payload: CreateProcessingJobRequest):
     )
 
     return await storage.create_job(job)
-
-
-@router.post('/{job_id}/cleanup', response_model=CleanupJobResult)
-async def cleanup_job(job_id: UUID):
-    """
-    Очищает временные файлы задачи по запросу фронтенда.
-    """
-    job = await storage.get_job(job_id)
-
-    if job is None:
-        raise HTTPException(
-            status_code=404,
-            detail='Job not found',
-        )
-
-    deleted_files, deleted_directories = await run_in_threadpool(
-        cleanup_job_temp_files,
-        job,
-    )
-
-    return CleanupJobResult(
-        job_id=job.job_id,
-        deleted_files=deleted_files,
-        deleted_directories=deleted_directories,
-    )
 
 
 @router.post(

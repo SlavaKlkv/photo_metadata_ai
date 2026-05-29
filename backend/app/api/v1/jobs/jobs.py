@@ -22,6 +22,7 @@ from app.core.enums import (
     StockPlatform,
 )
 from app.schemas.job import (
+    CleanupJobResult,
     FileStatus,
     ProcessingJob,
     ProcessingJobExportStatus,
@@ -34,8 +35,12 @@ from app.schemas.job import (
     UpdateProcessingJobMetadataRequest,
     UpdateProcessingJobSettingsRequest,
 )
+from app.services.cleanup import cleanup_job_temp_files
 from app.services.export.export import (
     ensure_job_exports,
+    generate_job_export,
+    invalidate_job_export_cache,
+    load_stored_job_export,
     run_job_export,
 )
 from app.services.processing import (
@@ -45,6 +50,7 @@ from app.services.processing import (
 )
 from app.services.stock_metadata import (
     build_stock_mapped_metadata,
+    get_effective_categories,
     get_stock_field_options,
     validate_file_metadata_for_stock,
 )
@@ -65,6 +71,10 @@ def _build_metadata_result(
     Собирает stock-aware результат metadata для preview и PATCH-ответов.
     """
     mapped_metadata = build_stock_mapped_metadata(file, stock_platform)
+    mapped_categories = get_effective_categories(file, stock_platform)
+    mapped_category_2 = (
+        mapped_categories[1] if len(mapped_categories) > 1 else None
+    )
 
     return ProcessingJobMetadataResult(
         file_id=file.file_id,
@@ -214,6 +224,9 @@ async def update_job_settings(
     for field_name in payload.model_fields_set:
         setattr(job, field_name, getattr(payload, field_name))
 
+    if payload.model_fields_set:
+        invalidate_job_export_cache(job)
+
     return await storage.update_job(job)
 
 
@@ -298,6 +311,31 @@ async def cancel_job(job_id: UUID):
         )
 
     return cancelled_job
+
+
+@router.post('/{job_id}/cleanup', response_model=CleanupJobResult)
+async def cleanup_job(job_id: UUID):
+    """
+    Очищает временные файлы задачи по запросу фронтенда.
+    """
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail='Job not found',
+        )
+
+    deleted_files, deleted_directories = await run_in_threadpool(
+        cleanup_job_temp_files,
+        job,
+    )
+
+    return CleanupJobResult(
+        job_id=job.job_id,
+        deleted_files=deleted_files,
+        deleted_directories=deleted_directories,
+    )
 
 
 @router.post('/{job_id}/retry-failed', response_model=ProcessingJob)
@@ -482,6 +520,9 @@ async def update_file_metadata(
         job_file.mature_content = payload.mature_content
     if 'iptc_embedded_metadata' in payload.model_fields_set:
         job_file.iptc_embedded_metadata = bool(payload.iptc_embedded_metadata)
+
+    if payload.model_fields_set:
+        invalidate_job_export_cache(job)
 
     await storage.update_job(job)
 

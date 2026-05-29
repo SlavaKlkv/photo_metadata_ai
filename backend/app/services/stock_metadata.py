@@ -494,6 +494,18 @@ def _build_stock_iptc_special_instructions(
         return None
 
     return '; '.join(parts)
+  
+  
+def _collect_validation_categories(file: ProcessingJobFile) -> list[str]:
+    """
+    Возвращает исходный набор категорий для валидации без platform-trimming.
+    """
+    categories = list(file.categories)
+
+    if file.category_2:
+        categories.append(file.category_2)
+
+    return categories
 
 
 def _build_restricted_terms_message(terms: list[str]) -> str:
@@ -542,7 +554,8 @@ def validate_file_metadata_for_stock(
     title = file.title or ''
     description = file.description or ''
     keywords = list(file.keywords)
-    categories = get_effective_categories(file, stock_platform)
+    effective_categories = get_effective_categories(file, stock_platform)
+    validation_categories = _collect_validation_categories(file)
 
     if rules.title_required and not title:
         errors.append(
@@ -793,7 +806,7 @@ def validate_file_metadata_for_stock(
             )
         )
 
-    if rules.categories_required and not categories:
+    if rules.categories_required and not effective_categories:
         errors.append(
             MetadataValidationIssue(
                 field='categories',
@@ -801,7 +814,7 @@ def validate_file_metadata_for_stock(
                 message='Category is required.',
             )
         )
-    if len(categories) > rules.max_categories:
+    if len(validation_categories) > rules.max_categories:
         errors.append(
             MetadataValidationIssue(
                 field='categories',
@@ -813,16 +826,19 @@ def validate_file_metadata_for_stock(
         )
 
     invalid_categories = [
-        category for category in categories if category not in rules.categories
+        category
+        for category in validation_categories
+        if category not in rules.categories
     ]
     if invalid_categories:
+        unique_invalid_categories = list(dict.fromkeys(invalid_categories))
         errors.append(
             MetadataValidationIssue(
                 field='categories',
                 code='invalid_value',
                 message=(
                     'Unsupported category values for selected platform: '
-                    + ', '.join(invalid_categories)
+                    + ', '.join(unique_invalid_categories)
                 ),
             )
         )
