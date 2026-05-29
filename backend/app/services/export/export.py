@@ -214,6 +214,10 @@ def ensure_job_exports(
     """
     Обеспечивает экспорт всех форматов, выбранных в настройках задачи.
     """
+    completed_files_count = _count_completed_files(job)
+    if completed_files_count == 0:
+        raise ValueError('No completed files available for export')
+
     stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
     validation_errors = _collect_export_validation_errors(
         job,
@@ -228,7 +232,6 @@ def ensure_job_exports(
         requested_export_format,
     )
     export_artifacts: list[ExportArtifact] = []
-    completed_files_count = _count_completed_files(job)
 
     for export_format in export_formats:
         if export_format == ExportFormat.CSV:

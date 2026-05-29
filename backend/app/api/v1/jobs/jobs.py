@@ -531,13 +531,19 @@ async def start_job_export(
             detail='At least one export format must be selected',
         )
 
+    completed_files = [
+        file for file in job.files if file.status == FileStatus.COMPLETED
+    ]
+    if not completed_files:
+        raise HTTPException(
+            status_code=400,
+            detail='No completed files available for export',
+        )
+
     stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
     validation_errors: list[dict[str, object]] = []
 
-    for file in job.files:
-        if file.status != FileStatus.COMPLETED:
-            continue
-
+    for file in completed_files:
         validation_result = validate_file_metadata_for_stock(
             file,
             stock_platform,
