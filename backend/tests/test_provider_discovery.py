@@ -4,15 +4,28 @@ from fastapi.testclient import TestClient
 
 from app.core.config import settings
 from app.main import app
+from app.services.desktop_startup import desktop_startup_orchestrator
 
 
 @pytest.fixture(autouse=True)
 def reset_provider_settings(monkeypatch):
+    desktop_startup_orchestrator.reset_for_tests()
     monkeypatch.setattr(settings, 'GEMINI_API_KEY', None)
     monkeypatch.setattr(settings, 'OPENROUTER_API_KEY', None)
     monkeypatch.setattr(settings, 'OPENROUTER_MODEL', 'openrouter/auto')
     monkeypatch.setattr(settings, 'OLLAMA_REQUIRED_MODEL', 'qwen2.5vl')
     monkeypatch.setattr(settings, 'OLLAMA_BASE_URL', 'http://ollama.test')
+    monkeypatch.setattr(
+        settings, 'DESKTOP_STARTUP_AI_CHECK_TIMEOUT_SECONDS', 1
+    )
+    monkeypatch.setattr(settings, 'DESKTOP_STARTUP_AI_CHECK_RETRY_ATTEMPTS', 1)
+    monkeypatch.setattr(
+        settings,
+        'DESKTOP_STARTUP_AI_CHECK_RETRY_DELAY_SECONDS',
+        0,
+    )
+    yield
+    desktop_startup_orchestrator.reset_for_tests()
 
 
 def _provider_by_name(payload: dict, provider_name: str) -> dict:

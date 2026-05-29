@@ -12,13 +12,15 @@ from app.schemas.desktop import (
     DesktopActionResponse,
     DesktopHealthResponse,
     DesktopRuntimeInfo,
+    DesktopStartupStatusResponse,
 )
+from app.schemas.provider_discovery import ProvidersDiscoveryResponse
 from app.services.desktop_open import (
     get_job_result_file_path,
     get_job_results_dir,
     open_path_in_default_app,
 )
-from app.schemas.provider_discovery import ProvidersDiscoveryResponse
+from app.services.desktop_startup import get_desktop_startup_status
 from app.services.provider_discovery import discover_ai_providers
 
 router = APIRouter(
@@ -40,6 +42,11 @@ async def desktop_health_check():
 async def get_desktop_runtime_info():
     ensure_runtime_directories()
     return _build_runtime_info()
+
+
+@router.get('/startup/status', response_model=DesktopStartupStatusResponse)
+async def get_desktop_startup_status_endpoint():
+    return get_desktop_startup_status()
 
 
 @router.post(
@@ -160,7 +167,7 @@ async def open_result_file(
         path=str(file_path),
     )
 
-  
+
 @router.get(
     '/providers/discovery',
     response_model=ProvidersDiscoveryResponse,
@@ -207,4 +214,3 @@ def _build_error_response(
             message=message,
         ).model_dump(),
     )
-
