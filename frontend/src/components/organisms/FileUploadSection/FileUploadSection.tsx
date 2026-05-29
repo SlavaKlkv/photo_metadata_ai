@@ -12,7 +12,7 @@ import { SectionHeader } from "../../molecules/SectionHeader/SectionHeader";
 
 const ALLOWED_FORMATS = ["image/jpeg"];
 const ALLOWED_EXTENSIONS = [".jpg", ".jpeg"];
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB (бэкенд лимит)
 
 export const FileUploadSection: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);

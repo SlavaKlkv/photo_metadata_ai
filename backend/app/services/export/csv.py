@@ -9,6 +9,7 @@ from app.services.stock_metadata import (
     StockMappedMetadata,
     build_stock_mapped_metadata,
 )
+from app.services.stock_metadata import get_effective_categories
 
 logger = structlog.get_logger(__name__)
 
@@ -63,9 +64,7 @@ def generate_metadata_csv(
     writer.writerow(CSV_HEADERS[export_platform])
 
     export_files = [
-        file
-        for file in job.files
-        if file.status == FileStatus.COMPLETED and file.selected_for_export
+        file for file in job.files if file.status == FileStatus.COMPLETED
     ]
 
     for file in export_files:
