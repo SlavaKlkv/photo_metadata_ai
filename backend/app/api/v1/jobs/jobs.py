@@ -31,6 +31,7 @@ from app.schemas.job import (
 )
 from app.services.export.export import (
     generate_job_export,
+    invalidate_job_export_cache,
     load_stored_job_export,
     run_job_export,
 )
@@ -158,6 +159,9 @@ async def update_job_settings(
 
     for field_name in payload.model_fields_set:
         setattr(job, field_name, getattr(payload, field_name))
+
+    if payload.model_fields_set:
+        invalidate_job_export_cache(job)
 
     return await storage.update_job(job)
 
@@ -428,6 +432,9 @@ async def update_file_metadata(
     if 'iptc_embedded_metadata' in payload.model_fields_set:
         job_file.iptc_embedded_metadata = bool(payload.iptc_embedded_metadata)
 
+    if payload.model_fields_set:
+        invalidate_job_export_cache(job)
+
     await storage.update_job(job)
 
     stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
@@ -458,13 +465,20 @@ async def start_job_export(
             detail='Job not found',
         )
 
+    completed_files = [
+        file for file in job.files if file.status == FileStatus.COMPLETED
+    ]
+
+    if not completed_files:
+        raise HTTPException(
+            status_code=400,
+            detail='No completed files available for export',
+        )
+
     stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
     validation_errors: list[dict[str, object]] = []
 
-    for file in job.files:
-        if file.status != FileStatus.COMPLETED:
-            continue
-
+    for file in completed_files:
         validation_result = validate_file_metadata_for_stock(
             file,
             stock_platform,

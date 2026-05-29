@@ -3,7 +3,7 @@ from io import StringIO
 
 import structlog
 
-from app.core.enums import StockPlatform
+from app.core.enums import FileStatus, StockPlatform
 from app.schemas.job import ProcessingJob, ProcessingJobFile
 from app.services.stock_metadata import get_effective_categories
 
@@ -59,7 +59,11 @@ def generate_metadata_csv(
     writer = csv.writer(output)
     writer.writerow(CSV_HEADERS[export_platform])
 
-    for file in job.files:
+    export_files = [
+        file for file in job.files if file.status == FileStatus.COMPLETED
+    ]
+
+    for file in export_files:
         writer.writerow(_build_csv_row(file, export_platform))
 
     csv_content = output.getvalue()
@@ -68,7 +72,7 @@ def generate_metadata_csv(
         'csv_generation_completed',
         job_id=str(job.job_id),
         export_platform=export_platform,
-        files_count=len(job.files),
+        files_count=len(export_files),
         csv_size=len(csv_content),
     )
 
