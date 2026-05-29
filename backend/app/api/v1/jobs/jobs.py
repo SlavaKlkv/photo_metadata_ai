@@ -28,6 +28,11 @@ from app.services.export.export import (
     load_stored_job_export,
     run_job_export,
 )
+from app.services.app_settings import (
+    get_desktop_settings,
+    resolve_effective_ai_settings,
+    update_desktop_settings,
+)
 from app.services.processing import (
     cancel_job_processing,
     process_job,
@@ -75,9 +80,13 @@ async def upload_photos(
                 )
             )
 
+    desktop_settings = get_desktop_settings()
     job = ProcessingJob(
         files=job_files,
         shooting_context=shooting_context,
+        ai_provider=desktop_settings.selected_provider,
+        effective_ai_provider=desktop_settings.effective_provider,
+        effective_ai_model=desktop_settings.effective_model,
     )
 
     created_job = await storage.create_job(job)
@@ -103,6 +112,15 @@ async def update_job_settings(
 
     for field_name in payload.model_fields_set:
         setattr(job, field_name, getattr(payload, field_name))
+
+    if 'ai_provider' in payload.model_fields_set:
+        if payload.ai_provider is None:
+            job.effective_ai_provider = None
+            job.effective_ai_model = None
+        else:
+            desktop_settings = update_desktop_settings(payload.ai_provider)
+            job.effective_ai_provider = desktop_settings.effective_provider
+            job.effective_ai_model = desktop_settings.effective_model
 
     return await storage.update_job(job)
 
@@ -132,11 +150,6 @@ async def start_job_processing(
             status_code=400,
             detail='No valid JPEG files to process',
         )
-    if job.ai_provider is None:
-        raise HTTPException(
-            status_code=400,
-            detail='AI provider must be selected before processing',
-        )
 
     if job.status != JobStatus.QUEUED:
         raise HTTPException(
@@ -144,6 +157,10 @@ async def start_job_processing(
             detail='Job processing has already been started or finished',
         )
 
+    effective_ai_settings = resolve_effective_ai_settings(job.ai_provider)
+    job.ai_provider = effective_ai_settings.provider
+    job.effective_ai_provider = effective_ai_settings.provider
+    job.effective_ai_model = effective_ai_settings.model
     job.status = JobStatus.PROCESSING
     await storage.update_job(job)
 

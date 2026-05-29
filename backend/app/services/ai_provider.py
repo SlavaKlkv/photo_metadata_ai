@@ -7,7 +7,6 @@ import aiofiles
 import httpx
 import structlog
 from fastapi import HTTPException
-from openai import AsyncOpenAI
 
 from app.core.config import settings
 from app.core.constants import AI_PROVIDER_TIMEOUT
@@ -31,6 +30,9 @@ class BaseAIProvider(ABC):
     """
     Базовый интерфейс AI-провайдера для анализа изображений.
     """
+
+    def __init__(self, model: str | None = None):
+        self.model = model
 
     @abstractmethod
     async def generate_metadata(
@@ -103,7 +105,7 @@ class OllamaImageMetadataProvider(BaseAIProvider):
             'ollama_metadata_generation_started',
             file_number=file_number,
             image_path=str(image_path),
-            model=settings.OLLAMA_MODEL,
+            model=self.model,
         )
 
         image_base64 = await _encode_image_to_base64(image_path)
@@ -123,13 +125,13 @@ class OllamaImageMetadataProvider(BaseAIProvider):
                 'ollama_request_started',
                 file_number=file_number,
                 base_url=settings.OLLAMA_BASE_URL,
-                model=settings.OLLAMA_MODEL,
+                model=self.model,
             )
 
             response = await client.post(
                 f'{settings.OLLAMA_BASE_URL}/api/generate',
                 json={
-                    'model': settings.OLLAMA_MODEL,
+                    'model': self.model,
                     'prompt': prompt,
                     'images': [image_base64],
                     'stream': False,
@@ -182,19 +184,18 @@ class OllamaImageMetadataProvider(BaseAIProvider):
         return metadata_response
 
 
-class OpenAIImageMetadataProvider(BaseAIProvider):
+class GeminiImageMetadataProvider(BaseAIProvider):
     """
-    AI-провайдер на базе OpenAI для генерации metadata по изображению.
+    AI-провайдер на базе Gemini для генерации metadata по изображению.
     """
 
-    def __init__(self):
-        if settings.OPENAI_API_KEY is None:
+    def __init__(self, model: str | None = None):
+        super().__init__(model=model)
+        if settings.GEMINI_API_KEY is None:
             raise HTTPException(
                 status_code=500,
-                detail='OPENAI_API_KEY is not configured',
+                detail='GEMINI_API_KEY is not configured',
             )
-
-        self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
     async def generate_metadata(
         self,
@@ -203,47 +204,87 @@ class OpenAIImageMetadataProvider(BaseAIProvider):
         file_number: int | None = None,
     ) -> AIMetadataResponse:
         """
-        Генерирует метаданные через OpenAI.
+        Генерирует метаданные через Gemini.
         """
         logger.info(
-            'openai_metadata_generation_started',
+            'gemini_metadata_generation_started',
             file_number=file_number,
             image_path=str(image_path),
+            model=self.model,
         )
         raise HTTPException(
             status_code=501,
-            detail='OpenAI provider is not implemented yet',
+            detail='Gemini provider is not implemented yet',
         )
 
 
-def get_ai_provider(provider_name: str | AIProvider) -> BaseAIProvider:
-    """Возвращает AI-провайдер по имени."""
-    provider_key = str(provider_name)
+class OpenRouterImageMetadataProvider(BaseAIProvider):
+    """
+    AI-провайдер на базе OpenRouter для генерации metadata по изображению.
+    """
 
-    provider_classes: dict[str, type[BaseAIProvider]] = {
-        'mock': MockImageMetadataProvider,
-        'ollama': OllamaImageMetadataProvider,
-        'openai': OpenAIImageMetadataProvider,
+    def __init__(self, model: str | None = None):
+        super().__init__(model=model)
+        if settings.OPENROUTER_API_KEY is None:
+            raise HTTPException(
+                status_code=500,
+                detail='OPENROUTER_API_KEY is not configured',
+            )
+
+    async def generate_metadata(
+        self,
+        image_path: Path,
+        shooting_context: str | None = None,
+        file_number: int | None = None,
+    ) -> AIMetadataResponse:
+        """
+        Генерирует метаданные через OpenRouter.
+        """
+        logger.info(
+            'openrouter_metadata_generation_started',
+            file_number=file_number,
+            image_path=str(image_path),
+            model=self.model,
+        )
+        raise HTTPException(
+            status_code=501,
+            detail='OpenRouter provider is not implemented yet',
+        )
+
+
+def get_ai_provider(
+    provider_name: str | AIProvider,
+    model: str | None = None,
+) -> BaseAIProvider:
+    """Возвращает AI-провайдер по имени."""
+    provider = AIProvider(provider_name)
+
+    provider_classes: dict[AIProvider, type[BaseAIProvider]] = {
+        AIProvider.MOCK: MockImageMetadataProvider,
+        AIProvider.OLLAMA: OllamaImageMetadataProvider,
+        AIProvider.GEMINI: GeminiImageMetadataProvider,
+        AIProvider.OPENROUTER: OpenRouterImageMetadataProvider,
     }
 
-    provider_class = provider_classes.get(provider_key)
+    provider_class = provider_classes.get(provider)
 
     if provider_class is None:
         logger.error(
             'unsupported_ai_provider_configured',
-            provider=provider_key,
+            provider=provider,
         )
 
         raise HTTPException(
             status_code=500,
-            detail=f'Unsupported AI provider: {provider_key}',
+            detail=f'Unsupported AI provider: {provider}',
         )
 
     logger.info(
         'ai_provider_selected',
-        provider=provider_key,
+        provider=provider,
+        model=model,
     )
-    return provider_class()
+    return provider_class(model=model)
 
 
 async def _encode_image_to_base64(image_path: Path) -> str:

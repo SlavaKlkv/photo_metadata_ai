@@ -28,8 +28,8 @@ class ExportStatus(StrEnum):
 class AIProvider(StrEnum):
     MOCK = 'mock'
     OLLAMA = 'ollama'
-    CLAUDE = 'claude'
-    OPENAI = 'openai'
+    GEMINI = 'gemini'
+    OPENROUTER = 'openrouter'
 
 
 class StockPlatform(StrEnum):

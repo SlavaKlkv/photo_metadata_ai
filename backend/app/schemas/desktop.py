@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 
+from app.core.enums import AIProvider
+
 
 class DesktopRuntimeInfo(BaseModel):
     runtime_profile: str
@@ -21,3 +23,13 @@ class DesktopActionResponse(BaseModel):
     message: str
     code: str | None = None
     path: str | None = None
+
+
+class DesktopSettingsResponse(BaseModel):
+    selected_provider: AIProvider
+    effective_provider: AIProvider
+    effective_model: str | None = None
+
+
+class UpdateDesktopSettingsRequest(BaseModel):
+    selected_provider: AIProvider
