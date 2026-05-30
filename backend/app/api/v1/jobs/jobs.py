@@ -20,6 +20,7 @@ from app.core.enums import (
 from app.schemas.job import (
     CleanupJobResult,
     FileStatus,
+    MetadataSnapshot,
     ProcessingJob,
     ProcessingJobExportStatus,
     ProcessingJobFile,
@@ -27,10 +28,14 @@ from app.schemas.job import (
     ProcessingJobMetadataResult,
     ProcessingJobMetadataResults,
     ProcessingJobStatus,
+    RegenerateAttempt,
+    RegenerateFileMetadataRequest,
+    RegenerateFileMetadataResponse,
     StockFieldOptions,
     UpdateProcessingJobMetadataRequest,
     UpdateProcessingJobSettingsRequest,
 )
+from app.services.ai_provider import get_ai_provider
 from app.services.cleanup import cleanup_job_temp_files
 from app.services.export.export import (
     generate_job_export,
@@ -39,8 +44,10 @@ from app.services.export.export import (
     run_job_export,
 )
 from app.services.processing import (
+    apply_generated_metadata_to_file,
     cancel_job_processing,
     process_job,
+    regenerate_metadata_for_file,
     retry_failed_files,
 )
 from app.services.stock_metadata import (
@@ -97,6 +104,32 @@ def _build_metadata_result(
             file,
             stock_platform,
         ),
+    )
+
+
+def _build_metadata_snapshot(file: ProcessingJobFile) -> MetadataSnapshot:
+    """
+    Собирает snapshot текущих metadata для истории regenerate attempts.
+    """
+    return MetadataSnapshot(
+        title=file.title,
+        description=file.description,
+        keywords=list(file.keywords),
+        categories=list(file.categories),
+        category_2=file.category_2,
+        license_type=file.license_type,
+        location_metadata=file.location_metadata,
+        editorial_date=file.editorial_date,
+        is_editorial=file.is_editorial,
+        editorial_caption=file.editorial_caption,
+        has_people=file.has_people,
+        people_count=file.people_count,
+        model_release_available=file.model_release_available,
+        releases=list(file.releases),
+        ai_generated_content_disclosure=(file.ai_generated_content_disclosure),
+        is_illustration=file.is_illustration,
+        mature_content=file.mature_content,
+        iptc_embedded_metadata=file.iptc_embedded_metadata,
     )
 
 
@@ -274,6 +307,103 @@ async def cleanup_job(job_id: UUID):
         job_id=job.job_id,
         deleted_files=deleted_files,
         deleted_directories=deleted_directories,
+    )
+
+
+@router.post(
+    '/{job_id}/files/{file_id}/regenerate',
+    response_model=RegenerateFileMetadataResponse,
+)
+async def regenerate_file_metadata(
+    job_id: UUID,
+    file_id: UUID,
+    payload: RegenerateFileMetadataRequest | None = None,
+):
+    """
+    Регенерирует metadata для одного файла на этапе review.
+    """
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail='Job not found',
+        )
+
+    if job.status == JobStatus.PROCESSING:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                'Regenerate is unavailable while batch processing is running'
+            ),
+        )
+
+    job_file: ProcessingJobFile | None = None
+    for candidate in job.files:
+        if candidate.file_id == file_id:
+            job_file = candidate
+            break
+
+    if job_file is None:
+        raise HTTPException(
+            status_code=404,
+            detail='File not found',
+        )
+
+    if job_file.status != FileStatus.COMPLETED:
+        raise HTTPException(
+            status_code=400,
+            detail='Regenerate is available only for completed files',
+        )
+
+    payload = payload or RegenerateFileMetadataRequest()
+    resolved_shooting_context = (
+        payload.shooting_context
+        if payload.shooting_context is not None
+        else job.shooting_context
+    )
+    resolved_stock_platform = (
+        payload.stock_platform
+        or job.stock_platform
+        or StockPlatform.SHUTTERSTOCK
+    )
+    resolved_ai_provider = payload.ai_provider or job.ai_provider
+
+    if resolved_ai_provider is None:
+        raise HTTPException(
+            status_code=400,
+            detail='AI provider must be selected before regenerate',
+        )
+
+    previous_metadata = _build_metadata_snapshot(job_file)
+    ai_provider = get_ai_provider(resolved_ai_provider)
+    regenerated_metadata = await regenerate_metadata_for_file(
+        job_file,
+        ai_provider,
+        job.job_id,
+        resolved_shooting_context,
+    )
+    apply_generated_metadata_to_file(job_file, regenerated_metadata)
+    job_file.status = FileStatus.COMPLETED
+
+    regenerated_snapshot = _build_metadata_snapshot(job_file)
+    regenerate_attempt = RegenerateAttempt(
+        shooting_context=resolved_shooting_context,
+        stock_platform=resolved_stock_platform,
+        ai_provider=resolved_ai_provider,
+        previous_metadata=previous_metadata,
+        regenerated_metadata=regenerated_snapshot,
+    )
+    job_file.regenerate_attempts.append(regenerate_attempt)
+
+    await storage.update_job(job)
+
+    return RegenerateFileMetadataResponse(
+        job_id=job.job_id,
+        file_id=job_file.file_id,
+        attempt_id=regenerate_attempt.attempt_id,
+        metadata=_build_metadata_result(job_file, resolved_stock_platform),
+        previous_metadata=previous_metadata,
     )
 
 

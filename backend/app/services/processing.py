@@ -14,6 +14,7 @@ from app.schemas.job import (
     ProcessingJobFile,
 )
 from app.services.ai_provider import (
+    AIMetadataResponse,
     BaseAIProvider,
     get_ai_provider,
 )
@@ -57,18 +58,11 @@ async def _process_file(
 
             file.status = FileStatus.PROCESSING
 
-            source_image_path = get_upload_file_path(file.filename)
-            preprocessed_image_path = await run_in_threadpool(
-                resize_image_for_ai,
-                source_image_path,
-                job_id=job_id,
-                file_id=file.file_id,
-                max_long_side_px=DEFAULT_AI_RESIZE_LONG_SIDE_PX,
-            )
-
-            metadata = await ai_provider.generate_metadata(
-                preprocessed_image_path,
-                shooting_context=shooting_context,
+            metadata = await _generate_metadata_for_file(
+                file,
+                ai_provider,
+                job_id,
+                shooting_context,
                 file_number=file_number,
             )
 
@@ -83,26 +77,7 @@ async def _process_file(
                 )
                 return
 
-            file.title = metadata.title
-            file.description = metadata.description
-            file.keywords = metadata.keywords
-            file.categories = metadata.categories
-            file.category_2 = metadata.category_2
-            file.license_type = metadata.license_type
-            file.location_metadata = metadata.location_metadata
-            file.editorial_date = metadata.editorial_date
-            file.is_editorial = metadata.is_editorial
-            file.editorial_caption = metadata.editorial_caption
-            file.has_people = metadata.has_people
-            file.people_count = metadata.people_count
-            file.model_release_available = metadata.model_release_available
-            file.releases = metadata.releases
-            file.ai_generated_content_disclosure = (
-                metadata.ai_generated_content_disclosure
-            )
-            file.is_illustration = metadata.is_illustration
-            file.mature_content = metadata.mature_content
-            file.iptc_embedded_metadata = False
+            apply_generated_metadata_to_file(file, metadata)
 
             file.status = FileStatus.COMPLETED
             logger.info(
@@ -124,6 +99,57 @@ async def _process_file(
                 filename=file.original_filename,
                 error=str(error),
             )
+
+
+async def regenerate_metadata_for_file(
+    file: ProcessingJobFile,
+    ai_provider: BaseAIProvider,
+    job_id: UUID,
+    shooting_context: str | None,
+    file_number: int | None = None,
+) -> AIMetadataResponse:
+    """
+    Генерирует новые metadata для одного файла (без запуска batch processing)
+    с общим лимитом параллельных AI-запросов.
+    """
+    async with ai_requests_semaphore:
+        return await _generate_metadata_for_file(
+            file,
+            ai_provider,
+            job_id,
+            shooting_context,
+            file_number=file_number,
+        )
+
+
+def apply_generated_metadata_to_file(
+    file: ProcessingJobFile,
+    metadata: AIMetadataResponse,
+) -> None:
+    """
+    Применяет сгенерированные metadata к объекту файла.
+    """
+    file.title = metadata.title
+    file.description = metadata.description
+    file.keywords = metadata.keywords
+    file.categories = metadata.categories
+    file.category_2 = metadata.category_2
+    file.license_type = metadata.license_type
+    file.location_metadata = metadata.location_metadata
+    file.editorial_date = metadata.editorial_date
+    file.is_editorial = metadata.is_editorial
+    file.editorial_caption = metadata.editorial_caption
+    file.has_people = metadata.has_people
+    file.people_count = metadata.people_count
+    file.model_release_available = metadata.model_release_available
+    file.releases = metadata.releases
+    file.ai_generated_content_disclosure = (
+        metadata.ai_generated_content_disclosure
+    )
+    file.is_illustration = metadata.is_illustration
+    file.mature_content = metadata.mature_content
+    file.iptc_embedded_metadata = False
+    file.error_message = None
 
 
 async def process_job(job_id: UUID) -> None:
@@ -322,3 +348,26 @@ async def _mark_job_as_failed(job_id: UUID, error: Exception) -> None:
         error=str(error),
     )
     await storage.update_job(job)
+
+
+async def _generate_metadata_for_file(
+    file: ProcessingJobFile,
+    ai_provider: BaseAIProvider,
+    job_id: UUID,
+    shooting_context: str | None,
+    file_number: int | None = None,
+) -> AIMetadataResponse:
+    source_image_path = get_upload_file_path(file.filename)
+    preprocessed_image_path = await run_in_threadpool(
+        resize_image_for_ai,
+        source_image_path,
+        job_id=job_id,
+        file_id=file.file_id,
+        max_long_side_px=DEFAULT_AI_RESIZE_LONG_SIDE_PX,
+    )
+
+    return await ai_provider.generate_metadata(
+        preprocessed_image_path,
+        shooting_context=shooting_context,
+        file_number=file_number,
+    )

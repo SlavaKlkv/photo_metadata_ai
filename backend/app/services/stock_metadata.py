@@ -348,50 +348,6 @@ def get_effective_categories(
     return categories[: rules.max_categories]
 
 
-def _collect_validation_categories(file: ProcessingJobFile) -> list[str]:
-    """
-    Возвращает исходный набор категорий для валидации без platform-trimming.
-    """
-    categories = list(file.categories)
-
-    if file.category_2:
-        categories.append(file.category_2)
-
-    return categories
-
-
-def _build_restricted_terms_message(terms: list[str]) -> str:
-    preview_terms = terms[:10]
-    preview = ', '.join(preview_terms)
-
-    if len(terms) > 10:
-        preview = f'{preview}, ...'
-
-    return (
-        'Restricted names/brands/franchises detected: '
-        f'{preview}. Use generic terms instead.'
-    )
-
-
-def _resolve_file_megapixels(file: ProcessingJobFile) -> float | None:
-    if file.status == FileStatus.FAILED:
-        return None
-
-    try:
-        file_path = get_upload_file_path(file.filename)
-        with Image.open(file_path) as image:
-            width, height = image.size
-    except (UnidentifiedImageError, OSError, ValueError, RuntimeError):
-        return None
-    except Exception:
-        return None
-
-    if width <= 0 or height <= 0:
-        return None
-
-    return (width * height) / 1_000_000
-
-
 def validate_file_metadata_for_stock(
     file: ProcessingJobFile,
     stock_platform: StockPlatform,
@@ -824,3 +780,47 @@ def validate_file_metadata_for_stock(
         errors=errors,
         warnings=warnings,
     )
+
+
+def _collect_validation_categories(file: ProcessingJobFile) -> list[str]:
+    """
+    Возвращает исходный набор категорий для валидации без platform-trimming.
+    """
+    categories = list(file.categories)
+
+    if file.category_2:
+        categories.append(file.category_2)
+
+    return categories
+
+
+def _build_restricted_terms_message(terms: list[str]) -> str:
+    preview_terms = terms[:10]
+    preview = ', '.join(preview_terms)
+
+    if len(terms) > 10:
+        preview = f'{preview}, ...'
+
+    return (
+        'Restricted names/brands/franchises detected: '
+        f'{preview}. Use generic terms instead.'
+    )
+
+
+def _resolve_file_megapixels(file: ProcessingJobFile) -> float | None:
+    if file.status == FileStatus.FAILED:
+        return None
+
+    try:
+        file_path = get_upload_file_path(file.filename)
+        with Image.open(file_path) as image:
+            width, height = image.size
+    except (UnidentifiedImageError, OSError, ValueError, RuntimeError):
+        return None
+    except Exception:
+        return None
+
+    if width <= 0 or height <= 0:
+        return None
+
+    return (width * height) / 1_000_000
