@@ -8,6 +8,7 @@ from app.core.constants import (
     DEFAULT_AI_RESIZE_LONG_SIDE_PX,
     MAX_CONCURRENT_AI_REQUESTS,
 )
+from app.core.enums import StockPlatform
 from app.schemas.job import (
     FileStatus,
     JobStatus,
@@ -31,6 +32,7 @@ async def _process_file(
     ai_provider: BaseAIProvider,
     job_id: UUID,
     shooting_context: str | None,
+    stock_platform: StockPlatform | None,
     file_number: int | None = None,
 ) -> None:
     """
@@ -71,6 +73,7 @@ async def _process_file(
                 preprocessed_image_path,
                 shooting_context=shooting_context,
                 file_number=file_number,
+                stock_platform=stock_platform,
             )
 
             if await _is_job_cancelled(job_id):
@@ -87,6 +90,23 @@ async def _process_file(
             file.title = metadata.title
             file.description = metadata.description
             file.keywords = metadata.keywords
+            file.categories = metadata.categories
+            file.category_2 = metadata.category_2
+            file.license_type = metadata.license_type
+            file.location_metadata = metadata.location_metadata
+            file.editorial_date = metadata.editorial_date
+            file.is_editorial = metadata.is_editorial
+            file.editorial_caption = metadata.editorial_caption
+            file.has_people = metadata.has_people
+            file.people_count = metadata.people_count
+            file.model_release_available = metadata.model_release_available
+            file.releases = metadata.releases
+            file.ai_generated_content_disclosure = (
+                metadata.ai_generated_content_disclosure
+            )
+            file.is_illustration = metadata.is_illustration
+            file.mature_content = metadata.mature_content
+            file.iptc_embedded_metadata = False
 
             file.status = FileStatus.COMPLETED
             logger.info(
@@ -158,6 +178,7 @@ async def process_job(job_id: UUID) -> None:
                 ai_provider,
                 job.job_id,
                 job.shooting_context,
+                job.stock_platform,
                 file_number=index,
             )
             for index, file in enumerate(queued_files, start=1)
@@ -238,6 +259,7 @@ async def retry_failed_files(job_id: UUID) -> None:
                 ai_provider,
                 job.job_id,
                 job.shooting_context,
+                job.stock_platform,
                 file_number=file_number,
             )
             for file_number, file in failed_indexed_files

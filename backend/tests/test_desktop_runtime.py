@@ -1,3 +1,4 @@
+import asyncio
 import time
 from io import BytesIO
 from pathlib import Path
@@ -8,16 +9,31 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from app.core.config import Settings
+from app.core.config import Settings, settings
 from app.core.constants import RESULTS_DIR
 from app.core.runtime import resolve_path_in_base
 from app.main import app
+from app.schemas.provider_discovery import (
+    ProviderDiscoveryItem,
+    ProvidersDiscoveryResponse,
+)
+from app.services.desktop_startup import (
+    desktop_startup_orchestrator,
+    run_desktop_startup_checks,
+)
 
 
 def _build_tiny_jpeg_bytes() -> bytes:
     buffer = BytesIO()
     Image.new('RGB', (1, 1), color='white').save(buffer, format='JPEG')
     return buffer.getvalue()
+
+
+@pytest.fixture(autouse=True)
+def reset_desktop_startup_orchestrator():
+    desktop_startup_orchestrator.reset_for_tests()
+    yield
+    desktop_startup_orchestrator.reset_for_tests()
 
 
 def _wait_for_job_status(
@@ -123,6 +139,197 @@ def test_desktop_runtime_endpoints_are_available():
             assert Path(runtime_payload[path_key]).exists()
 
 
+def test_desktop_startup_status_endpoint_is_available():
+    with TestClient(app) as client:
+        response = client.get('/api/v1/desktop/startup/status')
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload['status'] in {'ready', 'degraded', 'not_ready'}
+    assert payload['phase'] in {'pending', 'checking', 'completed', 'failed'}
+    assert 'attempts' in payload
+    assert 'timeout_seconds' in payload
+
+
+@pytest.mark.asyncio
+async def test_desktop_startup_reports_ready_when_all_providers_ready(
+    monkeypatch,
+):
+    async def _fake_discovery() -> ProvidersDiscoveryResponse:
+        return ProvidersDiscoveryResponse(
+            providers=[
+                ProviderDiscoveryItem(
+                    provider='ollama',
+                    display_name='Ollama',
+                    ready=True,
+                    status='ready',
+                    configured=True,
+                    local=True,
+                ),
+            ],
+            ready_providers=['ollama'],
+            recommended_provider='ollama',
+            has_ready_provider=True,
+            hints=['ready'],
+        )
+
+    monkeypatch.setattr(
+        'app.services.desktop_startup.discover_ai_providers',
+        _fake_discovery,
+    )
+    monkeypatch.setattr(
+        settings, 'DESKTOP_STARTUP_AI_CHECK_TIMEOUT_SECONDS', 1
+    )
+    monkeypatch.setattr(settings, 'DESKTOP_STARTUP_AI_CHECK_RETRY_ATTEMPTS', 1)
+    monkeypatch.setattr(
+        settings,
+        'DESKTOP_STARTUP_AI_CHECK_RETRY_DELAY_SECONDS',
+        0,
+    )
+
+    status = await run_desktop_startup_checks()
+
+    assert status.status == 'ready'
+    assert status.phase == 'completed'
+    assert status.ready_providers == ['ollama']
+    assert status.reason_codes == []
+
+
+@pytest.mark.asyncio
+async def test_desktop_startup_reports_degraded_with_partial_readiness(
+    monkeypatch,
+):
+    async def _fake_discovery() -> ProvidersDiscoveryResponse:
+        return ProvidersDiscoveryResponse(
+            providers=[
+                ProviderDiscoveryItem(
+                    provider='ollama',
+                    display_name='Ollama',
+                    ready=True,
+                    status='ready',
+                    configured=True,
+                    local=True,
+                ),
+                ProviderDiscoveryItem(
+                    provider='gemini',
+                    display_name='Gemini',
+                    ready=False,
+                    status='not_ready',
+                    reason_code='gemini_api_key_missing',
+                    reason='Gemini API key is not configured.',
+                    configured=False,
+                    local=False,
+                ),
+            ],
+            ready_providers=['ollama'],
+            recommended_provider='ollama',
+            has_ready_provider=True,
+            hints=['partial'],
+        )
+
+    monkeypatch.setattr(
+        'app.services.desktop_startup.discover_ai_providers',
+        _fake_discovery,
+    )
+    monkeypatch.setattr(
+        settings, 'DESKTOP_STARTUP_AI_CHECK_TIMEOUT_SECONDS', 1
+    )
+    monkeypatch.setattr(settings, 'DESKTOP_STARTUP_AI_CHECK_RETRY_ATTEMPTS', 1)
+    monkeypatch.setattr(
+        settings,
+        'DESKTOP_STARTUP_AI_CHECK_RETRY_DELAY_SECONDS',
+        0,
+    )
+
+    status = await run_desktop_startup_checks()
+
+    assert status.status == 'degraded'
+    assert status.phase == 'completed'
+    assert status.has_ready_provider is True
+    assert status.reason_codes == ['gemini_api_key_missing']
+    assert status.degradation_reasons == ['Gemini API key is not configured.']
+
+
+@pytest.mark.asyncio
+async def test_desktop_startup_reports_not_ready_without_ready_providers(
+    monkeypatch,
+):
+    async def _fake_discovery() -> ProvidersDiscoveryResponse:
+        return ProvidersDiscoveryResponse(
+            providers=[
+                ProviderDiscoveryItem(
+                    provider='ollama',
+                    display_name='Ollama',
+                    ready=False,
+                    status='not_ready',
+                    reason_code='ollama_runtime_unavailable',
+                    reason='Ollama runtime is not reachable.',
+                    configured=True,
+                    local=True,
+                ),
+            ],
+            ready_providers=[],
+            recommended_provider=None,
+            has_ready_provider=False,
+            hints=['setup'],
+        )
+
+    monkeypatch.setattr(
+        'app.services.desktop_startup.discover_ai_providers',
+        _fake_discovery,
+    )
+    monkeypatch.setattr(
+        settings, 'DESKTOP_STARTUP_AI_CHECK_TIMEOUT_SECONDS', 1
+    )
+    monkeypatch.setattr(settings, 'DESKTOP_STARTUP_AI_CHECK_RETRY_ATTEMPTS', 1)
+    monkeypatch.setattr(
+        settings,
+        'DESKTOP_STARTUP_AI_CHECK_RETRY_DELAY_SECONDS',
+        0,
+    )
+
+    status = await run_desktop_startup_checks()
+
+    assert status.status == 'not_ready'
+    assert status.phase == 'completed'
+    assert status.has_ready_provider is False
+    assert status.reason_codes == ['ollama_runtime_unavailable']
+
+
+@pytest.mark.asyncio
+async def test_desktop_startup_retries_and_fails_on_timeout(monkeypatch):
+    attempts = 0
+
+    async def _slow_discovery() -> ProvidersDiscoveryResponse:
+        nonlocal attempts
+        attempts += 1
+        await asyncio.sleep(0.05)
+        return ProvidersDiscoveryResponse()
+
+    monkeypatch.setattr(
+        'app.services.desktop_startup.discover_ai_providers',
+        _slow_discovery,
+    )
+    monkeypatch.setattr(
+        settings,
+        'DESKTOP_STARTUP_AI_CHECK_TIMEOUT_SECONDS',
+        0.001,
+    )
+    monkeypatch.setattr(settings, 'DESKTOP_STARTUP_AI_CHECK_RETRY_ATTEMPTS', 2)
+    monkeypatch.setattr(
+        settings,
+        'DESKTOP_STARTUP_AI_CHECK_RETRY_DELAY_SECONDS',
+        0,
+    )
+
+    status = await run_desktop_startup_checks()
+
+    assert attempts == 2
+    assert status.status == 'not_ready'
+    assert status.phase == 'failed'
+    assert status.reason_codes == ['startup_ai_readiness_timeout']
+
+
 def test_desktop_flow_upload_process_review_export():
     files = {
         'files': ('sample.jpg', _build_tiny_jpeg_bytes(), 'image/jpeg'),
@@ -160,7 +367,8 @@ def test_desktop_flow_upload_process_review_export():
         assert len(results_payload['results']) == 1
 
         start_export_response = client.post(
-            f'/api/v1/jobs/{job_id}/export/csv'
+            f'/api/v1/jobs/{job_id}/export',
+            params={'csv': 'true'},
         )
         assert start_export_response.status_code == 200
 
@@ -171,7 +379,10 @@ def test_desktop_flow_upload_process_review_export():
         )
         assert export_status_payload['export_status'] == 'completed'
 
-        download_response = client.get(f'/api/v1/jobs/{job_id}/export/csv')
+        download_response = client.get(
+            f'/api/v1/jobs/{job_id}/export',
+            params={'csv': 'true'},
+        )
         assert download_response.status_code == 200
         assert 'text/csv' in download_response.headers.get('content-type', '')
 

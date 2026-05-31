@@ -10,7 +10,9 @@ from fastapi import HTTPException
 
 from app.core.config import settings
 from app.core.constants import AI_PROVIDER_TIMEOUT
-from app.core.enums import AIProvider
+from app.core.enums import AIProvider, StockPlatform
+from app.services.stock_metadata import get_stock_field_options
+from app.services.stock_validation_lists import load_adobe_restricted_terms
 
 logger = structlog.get_logger(__name__)
 
@@ -20,10 +22,43 @@ class AIMetadataResponse:
     Нормализованный ответ AI-провайдера с метаданными изображения.
     """
 
-    def __init__(self, title: str, description: str, keywords: list[str]):
+    def __init__(
+        self,
+        title: str,
+        description: str,
+        keywords: list[str],
+        categories: list[str] | None = None,
+        category_2: str | None = None,
+        license_type: str | None = None,
+        location_metadata: str | None = None,
+        editorial_date: str | None = None,
+        is_editorial: bool = False,
+        editorial_caption: str | None = None,
+        has_people: bool | None = None,
+        people_count: int | None = None,
+        model_release_available: bool | None = None,
+        releases: list[str] | None = None,
+        ai_generated_content_disclosure: bool = False,
+        is_illustration: bool | None = None,
+        mature_content: bool | None = None,
+    ):
         self.title = title
         self.description = description
         self.keywords = keywords
+        self.categories = categories or []
+        self.category_2 = category_2
+        self.license_type = license_type
+        self.location_metadata = location_metadata
+        self.editorial_date = editorial_date
+        self.is_editorial = is_editorial
+        self.editorial_caption = editorial_caption
+        self.has_people = has_people
+        self.people_count = people_count
+        self.model_release_available = model_release_available
+        self.releases = releases or []
+        self.ai_generated_content_disclosure = ai_generated_content_disclosure
+        self.is_illustration = is_illustration
+        self.mature_content = mature_content
 
 
 class BaseAIProvider(ABC):
@@ -40,6 +75,7 @@ class BaseAIProvider(ABC):
         image_path: Path,
         shooting_context: str | None = None,
         file_number: int | None = None,
+        stock_platform: StockPlatform | None = None,
     ) -> AIMetadataResponse:
         """
         Генерирует метаданные для изображения.
@@ -56,6 +92,7 @@ class MockImageMetadataProvider(BaseAIProvider):
         image_path: Path,
         shooting_context: str | None = None,
         file_number: int | None = None,
+        stock_platform: StockPlatform | None = None,
     ) -> AIMetadataResponse:
         """
         Возвращает тестовые метаданные для изображения.
@@ -71,9 +108,24 @@ class MockImageMetadataProvider(BaseAIProvider):
             description = f'{description} Context: {shooting_context}'
 
         metadata = AIMetadataResponse(
-            title=f'Test metadata for {image_path.name}',
+            title=f'Test stock metadata for {image_path.name} image',
             description=description,
-            keywords=['test', 'image', 'metadata'],
+            keywords=[
+                'test',
+                'image',
+                'metadata',
+                'stock',
+                'photo',
+                'creative',
+                'nature',
+            ],
+            categories=['Nature'],
+            license_type='commercial',
+            location_metadata='Unknown location',
+            has_people=False,
+            people_count=0,
+            model_release_available=False,
+            ai_generated_content_disclosure=False,
         )
 
         logger.info(
@@ -97,6 +149,7 @@ class OllamaImageMetadataProvider(BaseAIProvider):
         image_path: Path,
         shooting_context: str | None = None,
         file_number: int | None = None,
+        stock_platform: StockPlatform | None = None,
     ) -> AIMetadataResponse:
         """
         Отправляет изображение в локальную Ollama model и возвращает metadata.
@@ -110,15 +163,10 @@ class OllamaImageMetadataProvider(BaseAIProvider):
 
         image_base64 = await _encode_image_to_base64(image_path)
 
-        prompt = (
-            'Generate stock photo metadata for this image. '
-            'Return only valid JSON '
-            'with fields: title, description, keywords. '
-            'keywords must be an array of strings.'
+        prompt = _build_metadata_generation_prompt(
+            shooting_context=shooting_context,
+            stock_platform=stock_platform,
         )
-
-        if shooting_context:
-            prompt = f'{prompt} Use this shooting context: {shooting_context}'
 
         async with httpx.AsyncClient(timeout=AI_PROVIDER_TIMEOUT) as client:
             logger.info(
@@ -171,7 +219,37 @@ class OllamaImageMetadataProvider(BaseAIProvider):
         metadata_response = AIMetadataResponse(
             title=metadata.get('title') or '',
             description=metadata.get('description') or '',
-            keywords=metadata.get('keywords') or [],
+            keywords=_extract_string_list(metadata.get('keywords')),
+            categories=_extract_string_list(metadata.get('categories')),
+            category_2=_extract_optional_string(metadata.get('category_2')),
+            license_type=_extract_optional_string(
+                metadata.get('license_type')
+            ),
+            location_metadata=_extract_optional_string(
+                metadata.get('location_metadata')
+            ),
+            editorial_date=_extract_optional_string(
+                metadata.get('editorial_date')
+            ),
+            is_editorial=bool(metadata.get('is_editorial') or False),
+            editorial_caption=_extract_optional_string(
+                metadata.get('editorial_caption')
+            ),
+            has_people=_extract_optional_bool(metadata.get('has_people')),
+            people_count=_extract_optional_int(metadata.get('people_count')),
+            model_release_available=_extract_optional_bool(
+                metadata.get('model_release_available')
+            ),
+            releases=_extract_string_list(metadata.get('releases')),
+            ai_generated_content_disclosure=bool(
+                metadata.get('ai_generated_content_disclosure') or False
+            ),
+            is_illustration=_extract_optional_bool(
+                metadata.get('is_illustration')
+            ),
+            mature_content=_extract_optional_bool(
+                metadata.get('mature_content')
+            ),
         )
 
         logger.info(
@@ -202,6 +280,7 @@ class GeminiImageMetadataProvider(BaseAIProvider):
         image_path: Path,
         shooting_context: str | None = None,
         file_number: int | None = None,
+        stock_platform: StockPlatform | None = None,
     ) -> AIMetadataResponse:
         """
         Генерирует метаданные через Gemini.
@@ -295,3 +374,122 @@ async def _encode_image_to_base64(image_path: Path) -> str:
         image_bytes = await image_file.read()
 
     return base64.b64encode(image_bytes).decode('utf-8')
+
+
+def _extract_string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+
+    return [str(item) for item in value if str(item).strip()]
+
+
+def _extract_optional_string(value: object) -> str | None:
+    if value is None:
+        return None
+
+    normalized = str(value).strip()
+    return normalized or None
+
+
+def _extract_optional_bool(value: object) -> bool | None:
+    if value is None:
+        return None
+
+    if isinstance(value, bool):
+        return value
+
+    normalized = str(value).strip().lower()
+
+    if normalized in {'true', '1', 'yes'}:
+        return True
+    if normalized in {'false', '0', 'no'}:
+        return False
+
+    return None
+
+
+def _extract_optional_int(value: object) -> int | None:
+    if value is None:
+        return None
+
+    if isinstance(value, bool):
+        return None
+
+    if isinstance(value, int):
+        return value if value >= 0 else None
+
+    normalized = str(value).strip()
+
+    if not normalized:
+        return None
+
+    try:
+        parsed = int(normalized)
+    except ValueError:
+        return None
+
+    return parsed if parsed >= 0 else None
+
+
+def _build_metadata_generation_prompt(
+    shooting_context: str | None,
+    stock_platform: StockPlatform | None,
+) -> str:
+    effective_stock_platform = stock_platform or StockPlatform.SHUTTERSTOCK
+    stock_options = get_stock_field_options(effective_stock_platform)
+    stock_rules_json = json.dumps(
+        stock_options.model_dump(mode='json'),
+        ensure_ascii=False,
+        separators=(',', ':'),
+    )
+
+    prompt = (
+        'Generate stock photo metadata for this image. '
+        'Return only valid JSON '
+        'with fields: '
+        'title, description, keywords, categories, category_2, '
+        'license_type, location_metadata, editorial_date, is_editorial, '
+        'editorial_caption, has_people, people_count, '
+        'model_release_available, releases, '
+        'ai_generated_content_disclosure, is_illustration, '
+        'mature_content. '
+        'keywords, categories and releases must be arrays of strings. '
+        'has_people and model_release_available must be boolean. '
+        'people_count must be integer or null. '
+        'Apply all platform rules, limits, required flags and constraints '
+        'from this stock rules JSON exactly: '
+        f'{stock_rules_json}. '
+        'Use rules fields directly: '
+        'title/description/keywords/categories/license/editorial/location/'
+        'release/people constraints must comply with provided limits and '
+        'required flags. '
+        'categories must use only values from rules.categories with max '
+        'rules.max_categories; category_2 must follow '
+        'rules.supports_category_2; license_type must use only '
+        'rules.license_types and respect rules.license_required. '
+        'keywords must respect required/min/recommended/max and duplicate '
+        'rules. '
+        'If a field is not supported by rules, return null, false or [] as '
+        'appropriate and keep output consistent. '
+        'All textual metadata fields must be in English only '
+        '(title, description, keywords, categories, category_2, '
+        'location_metadata, editorial_caption, releases). '
+        'Do not use any other language in these fields. '
+        'Do not output any text outside JSON.'
+    )
+
+    if effective_stock_platform == StockPlatform.ADOBE_STOCK:
+        adobe_restricted_terms = load_adobe_restricted_terms()
+        restricted_terms_csv = ', '.join(adobe_restricted_terms.all_terms)
+        prompt = (
+            f'{prompt} '
+            f'Adobe restricted terms list ({adobe_restricted_terms.version}): '
+            f'{restricted_terms_csv}. '
+            'Do not use these terms in title, description, keywords, '
+            'categories, location_metadata or editorial_caption.'
+        )
+
+    if shooting_context:
+        prompt = f'{prompt} Use this shooting context: {shooting_context}'
+
+    return prompt

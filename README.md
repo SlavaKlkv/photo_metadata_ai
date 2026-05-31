@@ -109,6 +109,7 @@ uv add --dev <new_lib_name>
 
 Frontend
 ```bash
+cd ..
 cd frontend
 npm install <new_lib_name>
 ```

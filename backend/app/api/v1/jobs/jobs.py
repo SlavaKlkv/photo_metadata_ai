@@ -1,4 +1,7 @@
+from io import BytesIO
+from pathlib import Path
 from uuid import UUID
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import (
     APIRouter,
@@ -6,12 +9,20 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Query,
     UploadFile,
 )
 from fastapi.responses import Response
+from starlette.concurrency import run_in_threadpool
 
-from app.core.enums import ExportFormat, ExportStatus, JobStatus
+from app.core.enums import (
+    ExportFormat,
+    ExportStatus,
+    JobStatus,
+    StockPlatform,
+)
 from app.schemas.job import (
+    CleanupJobResult,
     FileStatus,
     ProcessingJob,
     ProcessingJobExportStatus,
@@ -20,23 +31,30 @@ from app.schemas.job import (
     ProcessingJobMetadataResult,
     ProcessingJobMetadataResults,
     ProcessingJobStatus,
+    StockFieldOptions,
     UpdateProcessingJobMetadataRequest,
     UpdateProcessingJobSettingsRequest,
-)
-from app.services.export.export import (
-    generate_job_export,
-    load_stored_job_export,
-    run_job_export,
 )
 from app.services.app_settings import (
     get_desktop_settings,
     resolve_effective_ai_settings,
     update_desktop_settings,
 )
+from app.services.cleanup import cleanup_job_temp_files
+from app.services.export.export import (
+    ensure_job_exports,
+    invalidate_job_export_cache,
+    run_job_export,
+)
 from app.services.processing import (
     cancel_job_processing,
     process_job,
     retry_failed_files,
+)
+from app.services.stock_metadata import (
+    build_stock_mapped_metadata,
+    get_stock_field_options,
+    validate_file_metadata_for_stock,
 )
 from app.services.storage import storage
 from app.services.upload import UploadValidationError, save_upload_file
@@ -45,6 +63,101 @@ router = APIRouter(
     prefix='/jobs',
     tags=['jobs'],
 )
+
+
+def _build_metadata_result(
+    file: ProcessingJobFile,
+    stock_platform: StockPlatform,
+) -> ProcessingJobMetadataResult:
+    """
+    Собирает stock-aware результат metadata для preview и PATCH-ответов.
+    """
+    mapped_metadata = build_stock_mapped_metadata(file, stock_platform)
+
+    return ProcessingJobMetadataResult(
+        file_id=file.file_id,
+        filename=file.filename,
+        original_filename=file.original_filename,
+        status=file.status,
+        title=mapped_metadata.title,
+        description=mapped_metadata.description,
+        keywords=mapped_metadata.keywords,
+        categories=mapped_metadata.categories,
+        category_2=mapped_metadata.category_2,
+        license_type=mapped_metadata.license_type,
+        location_metadata=mapped_metadata.location_metadata,
+        editorial_date=mapped_metadata.editorial_date,
+        is_editorial=mapped_metadata.is_editorial,
+        editorial_caption=mapped_metadata.editorial_caption,
+        has_people=mapped_metadata.has_people,
+        people_count=mapped_metadata.people_count,
+        model_release_available=mapped_metadata.model_release_available,
+        releases=mapped_metadata.releases,
+        ai_generated_content_disclosure=(
+            mapped_metadata.ai_generated_content_disclosure
+        ),
+        is_illustration=mapped_metadata.is_illustration,
+        mature_content=mapped_metadata.mature_content,
+        iptc_embedded_metadata=mapped_metadata.iptc_embedded_metadata,
+        error_message=file.error_message,
+        validation=validate_file_metadata_for_stock(
+            file,
+            stock_platform,
+        ),
+    )
+
+
+def _resolve_selected_export_formats(
+    *,
+    csv: bool,
+    iptc: bool,
+) -> list[ExportFormat]:
+    selected: list[ExportFormat] = []
+
+    if csv:
+        selected.append(ExportFormat.CSV)
+
+    if iptc:
+        selected.append(ExportFormat.IPTC)
+
+    return selected
+
+
+def _detect_artifact_media_type(
+    export_format: ExportFormat,
+) -> str:
+    if export_format == ExportFormat.CSV:
+        return 'text/csv; charset=utf-8'
+
+    if export_format == ExportFormat.IPTC:
+        return 'image/jpeg'
+
+    return 'application/octet-stream'
+
+
+def _build_zip_export_response(
+    job_id: UUID,
+    artifacts: list[tuple[Path, str]],
+) -> Response:
+    zip_buffer = BytesIO()
+
+    with ZipFile(zip_buffer, mode='w', compression=ZIP_DEFLATED) as zip_file:
+        for file_path, arc_name in artifacts:
+            zip_file.write(file_path, arcname=arc_name)
+
+    zip_content = zip_buffer.getvalue()
+    archive_name = f'{job_id}_exports.zip'
+
+    return Response(
+        content=zip_content,
+        media_type='application/zip',
+        headers={
+            'Content-Disposition': (
+                f'attachment; filename="{archive_name}"'
+            ),
+        },
+    )
+
 
 # --- загрузка и обработка ---
 
@@ -122,7 +235,21 @@ async def update_job_settings(
             job.effective_ai_provider = desktop_settings.effective_provider
             job.effective_ai_model = desktop_settings.effective_model
 
+    if payload.model_fields_set:
+        invalidate_job_export_cache(job)
+
     return await storage.update_job(job)
+
+
+@router.get(
+    '/stock-options/{stock_platform}',
+    response_model=StockFieldOptions,
+)
+async def get_stock_options(stock_platform: StockPlatform):
+    """
+    Возвращает допустимые значения категорий и license_type для стока.
+    """
+    return get_stock_field_options(stock_platform)
 
 
 @router.post('/{job_id}/process', response_model=ProcessingJob)
@@ -149,6 +276,12 @@ async def start_job_processing(
         raise HTTPException(
             status_code=400,
             detail='No valid JPEG files to process',
+        )
+
+    if job.ai_provider is None:
+        raise HTTPException(
+            status_code=400,
+            detail='AI provider must be selected before processing',
         )
 
     if job.status != JobStatus.QUEUED:
@@ -193,6 +326,31 @@ async def cancel_job(job_id: UUID):
         )
 
     return cancelled_job
+
+
+@router.post('/{job_id}/cleanup', response_model=CleanupJobResult)
+async def cleanup_job(job_id: UUID):
+    """
+    Очищает временные файлы задачи по запросу фронтенда.
+    """
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail='Job not found',
+        )
+
+    deleted_files, deleted_directories = await run_in_threadpool(
+        cleanup_job_temp_files,
+        job,
+    )
+
+    return CleanupJobResult(
+        job_id=job.job_id,
+        deleted_files=deleted_files,
+        deleted_directories=deleted_directories,
+    )
 
 
 @router.post('/{job_id}/retry-failed', response_model=ProcessingJob)
@@ -291,22 +449,13 @@ async def get_job_results(job_id: UUID):
             detail='Job not found',
         )
 
+    stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
+
     return ProcessingJobMetadataResults(
         job_id=job.job_id,
         status=job.status,
         results=[
-            # Ответ results сформирован как строки таблицы для фронтенда.
-            ProcessingJobMetadataResult(
-                file_id=file.file_id,
-                filename=file.filename,
-                original_filename=file.original_filename,
-                status=file.status,
-                title=file.title,
-                description=file.description,
-                keywords=file.keywords,
-                error_message=file.error_message,
-            )
-            for file in job.files
+            _build_metadata_result(file, stock_platform) for file in job.files
         ],
     )
 
@@ -335,10 +484,11 @@ async def update_file_metadata(
             detail='Job not found',
         )
 
-    job_file = next(
-        (file for file in job.files if file.file_id == file_id),
-        None,
-    )
+    job_file: ProcessingJobFile | None = None
+    for candidate in job.files:
+        if candidate.file_id == file_id:
+            job_file = candidate
+            break
 
     if job_file is None:
         raise HTTPException(
@@ -353,35 +503,70 @@ async def update_file_metadata(
         job_file.description = payload.description
     if 'keywords' in payload.model_fields_set:
         job_file.keywords = payload.keywords or []
+    if 'categories' in payload.model_fields_set:
+        job_file.categories = payload.categories or []
+    if 'releases' in payload.model_fields_set:
+        job_file.releases = payload.releases or []
+    if 'category_2' in payload.model_fields_set:
+        job_file.category_2 = payload.category_2
+    if 'license_type' in payload.model_fields_set:
+        job_file.license_type = payload.license_type
+    if 'location_metadata' in payload.model_fields_set:
+        job_file.location_metadata = payload.location_metadata
+    if 'editorial_date' in payload.model_fields_set:
+        job_file.editorial_date = payload.editorial_date
+    if 'is_editorial' in payload.model_fields_set:
+        job_file.is_editorial = bool(payload.is_editorial)
+    if 'editorial_caption' in payload.model_fields_set:
+        job_file.editorial_caption = payload.editorial_caption
+    if 'has_people' in payload.model_fields_set:
+        job_file.has_people = payload.has_people
+    if 'people_count' in payload.model_fields_set:
+        job_file.people_count = payload.people_count
+    if 'model_release_available' in payload.model_fields_set:
+        job_file.model_release_available = payload.model_release_available
+    if 'ai_generated_content_disclosure' in payload.model_fields_set:
+        job_file.ai_generated_content_disclosure = bool(
+            payload.ai_generated_content_disclosure
+        )
+    if 'is_illustration' in payload.model_fields_set:
+        job_file.is_illustration = payload.is_illustration
+    if 'mature_content' in payload.model_fields_set:
+        job_file.mature_content = payload.mature_content
+    if 'iptc_embedded_metadata' in payload.model_fields_set:
+        job_file.iptc_embedded_metadata = bool(payload.iptc_embedded_metadata)
+
+    if payload.model_fields_set:
+        invalidate_job_export_cache(job)
 
     await storage.update_job(job)
 
-    return ProcessingJobMetadataResult(
-        file_id=job_file.file_id,
-        filename=job_file.filename,
-        original_filename=job_file.original_filename,
-        status=job_file.status,
-        title=job_file.title,
-        description=job_file.description,
-        keywords=job_file.keywords,
-        error_message=job_file.error_message,
-    )
+    stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
+
+    return _build_metadata_result(job_file, stock_platform)
 
 
 # --- экспорт ---
 
 
 @router.post(
-    '/{job_id}/export/{export_format}',
+    '/{job_id}/export',
     response_model=ProcessingJobExportStatus,
 )
 async def start_job_export(
     job_id: UUID,
-    export_format: ExportFormat,
     background_tasks: BackgroundTasks,
+    csv: bool = Query(
+        default=False,
+        description='Include CSV export format',
+    ),
+    iptc: bool = Query(
+        default=False,
+        description='Include IPTC export format',
+    ),
 ):
     """
-    Запускает подготовку экспорта задачи в выбранном формате.
+    Запускает подготовку экспорта задачи в выбранных форматах.
     """
     job = await storage.get_job(job_id)
 
@@ -391,13 +576,73 @@ async def start_job_export(
             detail='Job not found',
         )
 
+    selected_export_formats = _resolve_selected_export_formats(
+        csv=csv,
+        iptc=iptc,
+    )
+
+    if not selected_export_formats:
+        raise HTTPException(
+            status_code=400,
+            detail='At least one export format must be selected',
+        )
+
+    completed_files = [
+        file for file in job.files if file.status == FileStatus.COMPLETED
+    ]
+    if not completed_files:
+        raise HTTPException(
+            status_code=400,
+            detail='No completed files available for export',
+        )
+
+    stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
+    validation_errors: list[dict[str, object]] = []
+
+    for file in completed_files:
+        validation_result = validate_file_metadata_for_stock(
+            file,
+            stock_platform,
+        )
+
+        if validation_result.errors:
+            validation_errors.append(
+                {
+                    'file_id': str(file.file_id),
+                    'filename': file.original_filename,
+                    'errors': [
+                        issue.model_dump()
+                        for issue in validation_result.errors
+                    ],
+                }
+            )
+
+    if validation_errors:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                'message': (
+                    'Export is blocked because metadata has validation errors.'
+                ),
+                'stock_platform': stock_platform.value,
+                'files': validation_errors,
+            },
+        )
+
     job.export_status = ExportStatus.QUEUED
     job.export_progress = 0
-    job.export_format = export_format
+    job.export_formats = selected_export_formats
+    trigger_export_format = selected_export_formats[0]
+    job.export_format = trigger_export_format
     job.export_error_message = None
+    job.export_artifacts = []
     await storage.update_job(job)
 
-    background_tasks.add_task(run_job_export, job.job_id, export_format)
+    background_tasks.add_task(
+        run_job_export,
+        job.job_id,
+        trigger_export_format,
+    )
 
     return ProcessingJobExportStatus(
         job_id=job.job_id,
@@ -405,6 +650,7 @@ async def start_job_export(
         export_progress=job.export_progress,
         export_format=job.export_format,
         export_error_message=job.export_error_message,
+        export_artifacts=job.export_artifacts,
     )
 
 
@@ -430,16 +676,24 @@ async def get_job_export_status(job_id: UUID):
         export_progress=job.export_progress,
         export_format=job.export_format,
         export_error_message=job.export_error_message,
+        export_artifacts=job.export_artifacts,
     )
 
 
-@router.get('/{job_id}/export/{export_format}')
+@router.get('/{job_id}/export')
 async def export_job(
     job_id: UUID,
-    export_format: ExportFormat,
+    csv: bool = Query(
+        default=False,
+        description='Download CSV export artifacts',
+    ),
+    iptc: bool = Query(
+        default=False,
+        description='Download IPTC export artifacts',
+    ),
 ):
     """
-    Возвращает экспорт задачи в выбранном формате.
+    Возвращает экспорт задачи в выбранных форматах.
     """
 
     job = await storage.get_job(job_id)
@@ -450,26 +704,78 @@ async def export_job(
             detail='Job not found',
         )
 
-    try:
-        stored_export = load_stored_job_export(job, export_format)
+    selected_export_formats = _resolve_selected_export_formats(
+        csv=csv,
+        iptc=iptc,
+    )
 
-        if stored_export is None:
-            content, filename, media_type = generate_job_export(
-                job,
-                export_format,
-            )
-        else:
-            content, filename, media_type = stored_export
+    if not selected_export_formats:
+        raise HTTPException(
+            status_code=400,
+            detail='At least one export format must be selected',
+        )
+
+    previous_export_formats = list(job.export_formats)
+    job.export_formats = selected_export_formats
+
+    try:
+        export_artifacts = await run_in_threadpool(
+            ensure_job_exports,
+            job,
+            selected_export_formats[0],
+        )
     except ValueError as error:
         raise HTTPException(
             status_code=400,
             detail=str(error),
         ) from error
+    finally:
+        job.export_formats = previous_export_formats
 
-    return Response(
-        content=content,
-        media_type=media_type,
-        headers={
-            'Content-Disposition': f'attachment; filename="{filename}"',
-        },
+    filtered_artifacts = [
+        artifact
+        for artifact in export_artifacts
+        if artifact.export_format in selected_export_formats
+    ]
+
+    if not filtered_artifacts:
+        raise HTTPException(
+            status_code=404,
+            detail='No export artifacts found',
+        )
+
+    resolved_artifacts: list[tuple[Path, str, ExportFormat]] = []
+
+    for artifact in filtered_artifacts:
+        artifact_path = Path(artifact.path)
+        if not artifact_path.is_file():
+            raise HTTPException(
+                status_code=404,
+                detail=f'Export file not found: {artifact.filename}',
+            )
+
+        resolved_artifacts.append(
+            (artifact_path, artifact.filename, artifact.export_format)
+        )
+
+    if len(resolved_artifacts) == 1:
+        file_path, filename, artifact_format = resolved_artifacts[0]
+        media_type = _detect_artifact_media_type(artifact_format)
+
+        return Response(
+            content=file_path.read_bytes(),
+            media_type=media_type,
+            headers={
+                'Content-Disposition': (
+                    f'attachment; filename="{filename}"'
+                ),
+            },
+        )
+
+    return _build_zip_export_response(
+        job_id=job_id,
+        artifacts=[
+            (artifact_path, filename)
+            for artifact_path, filename, _ in resolved_artifacts
+        ],
     )

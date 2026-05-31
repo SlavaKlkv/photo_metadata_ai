@@ -5,8 +5,11 @@ import structlog
 
 from app.core.config import settings
 from app.schemas.provider_discovery import (
+    ProviderApiKeyPrefill,
+    ProviderApiKeyValidation,
     ProviderDiscoveryItem,
     ProviderLink,
+    ProviderOnboardingState,
     ProvidersDiscoveryResponse,
 )
 
@@ -42,6 +45,13 @@ async def discover_ai_providers() -> ProvidersDiscoveryResponse:
         provider.provider for provider in providers if provider.ready
     ]
     recommended_provider = _select_recommended_provider(providers)
+    detected_cloud_api_key_providers = [
+        provider.provider
+        for provider in providers
+        if provider.onboarding is not None
+        and provider.onboarding.api_key_detected
+        and not provider.local
+    ]
 
     hints = [
         'Use a local provider for private desktop processing.'
@@ -54,6 +64,8 @@ async def discover_ai_providers() -> ProvidersDiscoveryResponse:
         ready_providers=ready_providers,
         recommended_provider=recommended_provider,
         has_ready_provider=bool(ready_providers),
+        has_detected_cloud_api_key=bool(detected_cloud_api_key_providers),
+        detected_cloud_api_key_providers=detected_cloud_api_key_providers,
         hints=hints,
     )
 
@@ -140,6 +152,7 @@ def _discover_gemini_provider() -> ProviderDiscoveryItem:
         provider='gemini',
         display_name='Gemini',
         api_key=settings.GEMINI_API_KEY,
+        api_key_env_var='GEMINI_API_KEY',
         model=None,
         api_key_link=GEMINI_API_KEY_LINK,
         missing_reason_code='gemini_api_key_missing',
@@ -154,6 +167,7 @@ def _discover_openrouter_provider() -> ProviderDiscoveryItem:
         provider='openrouter',
         display_name='OpenRouter',
         api_key=settings.OPENROUTER_API_KEY,
+        api_key_env_var='OPENROUTER_API_KEY',
         model=settings.OPENROUTER_MODEL,
         api_key_link=OPENROUTER_API_KEY_LINK,
         missing_reason_code='openrouter_api_key_missing',
@@ -168,6 +182,7 @@ def _discover_api_key_provider(
     provider: str,
     display_name: str,
     api_key: str | None,
+    api_key_env_var: str,
     model: str | None,
     api_key_link: ProviderLink,
     missing_reason_code: str,
@@ -178,6 +193,10 @@ def _discover_api_key_provider(
     configured = bool(api_key)
 
     if configured:
+        recommendation = (
+            f'Use the detected {display_name} API key from '
+            f'{api_key_env_var}.'
+        )
         return ProviderDiscoveryItem(
             provider=provider,
             display_name=display_name,
@@ -187,7 +206,36 @@ def _discover_api_key_provider(
             local=False,
             model=model,
             api_key_links=[api_key_link],
-            hints=[ready_hint],
+            hints=[ready_hint, recommendation],
+            onboarding=ProviderOnboardingState(
+                ready=True,
+                input_mode='prefill_read_only',
+                manual_input_required=False,
+                api_key_detected=True,
+                notify_detected_api_key=True,
+                detected_api_key_provider=provider,
+                detected_api_key_source='environment',
+                recommendation=recommendation,
+                prefill=ProviderApiKeyPrefill(
+                    available=True,
+                    source='environment',
+                    env_var=api_key_env_var,
+                    display_value=f'Configured {api_key_env_var}',
+                    read_only=True,
+                    editable=False,
+                    reset_required_to_edit=True,
+                ),
+                validation=ProviderApiKeyValidation(
+                    required=True,
+                    trigger='automatic',
+                    status='pending',
+                ),
+                hints=[
+                    'Show the detected key in a read-only prefill field.',
+                    'Start validation automatically after prefill.',
+                    'Allow manual editing only after explicit key reset.',
+                ],
+            ),
         )
 
     return ProviderDiscoveryItem(
@@ -202,6 +250,29 @@ def _discover_api_key_provider(
         model=model,
         api_key_links=[api_key_link],
         hints=[setup_hint],
+        onboarding=ProviderOnboardingState(
+            ready=False,
+            input_mode='manual',
+            manual_input_required=True,
+            api_key_detected=False,
+            notify_detected_api_key=False,
+            prefill=ProviderApiKeyPrefill(
+                available=False,
+                read_only=False,
+                editable=True,
+            ),
+            validation=ProviderApiKeyValidation(
+                required=True,
+                trigger='manual',
+                status='missing',
+                error_message='invalid key',
+            ),
+            hints=[
+                setup_hint,
+                'Show an editable field for pasting an API key.',
+                'Display "invalid key" when key validation fails.',
+            ],
+        ),
     )
 
 

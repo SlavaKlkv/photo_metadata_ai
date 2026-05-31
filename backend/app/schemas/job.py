@@ -1,7 +1,13 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+)
 
 from app.core.enums import (
     AIProvider,
@@ -10,8 +16,13 @@ from app.core.enums import (
     FileStatus,
     JobStatus,
     StockPlatform,
+    StockPlatformType,
 )
-from app.utils.sanitizers import sanitize_keywords, sanitize_metadata_text
+from app.utils.sanitizers import (
+    sanitize_keywords,
+    sanitize_metadata_text,
+    sanitize_string_list,
+)
 
 
 class FileProcessingMixin(BaseModel):
@@ -60,6 +71,63 @@ class MetadataMixin(BaseModel):
         return sanitize_keywords(value)
 
 
+class StockSpecificMetadataMixin(BaseModel):
+    """
+    Дополнительные metadata-поля для stock-специфичных требований.
+    """
+
+    categories: list[str] = Field(default_factory=list)
+    category_2: str | None = None
+    license_type: str | None = None
+    location_metadata: str | None = None
+    editorial_date: str | None = None
+    is_editorial: bool = False
+    editorial_caption: str | None = None
+    has_people: bool | None = None
+    people_count: int | None = Field(default=None, ge=0)
+    model_release_available: bool | None = None
+    releases: list[str] = Field(default_factory=list)
+    ai_generated_content_disclosure: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            'ai_generated_content_disclosure',
+            'created using generative AI tools',
+        ),
+        serialization_alias='created using generative AI tools',
+    )
+    is_illustration: bool | None = None
+    mature_content: bool | None = None
+    iptc_embedded_metadata: bool = False
+
+    @field_validator(
+        'category_2',
+        'license_type',
+        'location_metadata',
+        'editorial_date',
+        'editorial_caption',
+    )
+    @classmethod
+    def sanitize_stock_metadata_text(
+        cls,
+        value: str | None,
+    ) -> str | None:
+        """
+        Валидирует и очищает дополнительные текстовые metadata-поля.
+        """
+        return sanitize_metadata_text(value)
+
+    @field_validator('categories', 'releases')
+    @classmethod
+    def sanitize_string_list_values(
+        cls,
+        value: list[str] | None,
+    ) -> list[str]:
+        """
+        Валидирует списковые дополнительные metadata-поля.
+        """
+        return sanitize_string_list(value)
+
+
 class JobSettingsMixin(BaseModel):
     """
     Общие поля настроек задачи для request и job-схем.
@@ -73,6 +141,18 @@ class JobSettingsMixin(BaseModel):
     effective_ai_model: str | None = None
 
 
+class ExportArtifact(BaseModel):
+    """
+    Описание одного экспортного артефакта.
+    """
+
+    export_format: ExportFormat
+    path: str
+    filename: str
+    size_bytes: int
+    count: int = 1
+
+
 class ExportStatusMixin(BaseModel):
     """
     Общие поля статуса экспорта для response-схем.
@@ -82,12 +162,7 @@ class ExportStatusMixin(BaseModel):
     export_progress: int = 0
     export_format: ExportFormat | None = None
     export_error_message: str | None = None
-
-
-class ProcessingJobFile(FileNameMixin, MetadataMixin):
-    file_id: UUID = Field(default_factory=uuid4)
-    status: FileStatus = FileStatus.QUEUED
-    error_message: str | None = None
+    export_artifacts: list[ExportArtifact] = Field(default_factory=list)
 
 
 class CreateProcessingJobFile(BaseModel):
@@ -103,6 +178,16 @@ class UpdateProcessingJobSettingsRequest(JobSettingsMixin):
     """
     Данные для обновления настроек задачи перед запуском обработки.
     """
+
+
+class ProcessingJobFile(
+    FileNameMixin,
+    MetadataMixin,
+    StockSpecificMetadataMixin,
+):
+    file_id: UUID = Field(default_factory=uuid4)
+    status: FileStatus = FileStatus.QUEUED
+    error_message: str | None = None
 
 
 class ProcessingJob(JobSettingsMixin, ExportStatusMixin):
@@ -139,14 +224,39 @@ class ProcessingJobExportStatus(ExportStatusMixin):
     job_id: UUID
 
 
+class MetadataValidationIssue(BaseModel):
+    """
+    Нормализованная ошибка/предупреждение валидации metadata-поля.
+    """
+
+    field: str
+    code: str
+    message: str
+
+
+class MetadataValidationResult(BaseModel):
+    """
+    Результат валидации metadata с разделением на ошибки и предупреждения.
+    """
+
+    errors: list[MetadataValidationIssue] = Field(default_factory=list)
+    warnings: list[MetadataValidationIssue] = Field(default_factory=list)
+
+
 class ProcessingJobMetadataResult(
-    FileProcessingMixin, FileNameMixin, MetadataMixin
+    FileProcessingMixin,
+    FileNameMixin,
+    MetadataMixin,
+    StockSpecificMetadataMixin,
 ):
     """
     Строка preview-метаданных для таблицы результатов на фронтенде.
     """
 
     error_message: str | None = None
+    validation: MetadataValidationResult = Field(
+        default_factory=MetadataValidationResult
+    )
 
 
 class ProcessingJobMetadataResults(BaseModel):
@@ -166,6 +276,110 @@ class UpdateProcessingJobMetadataRequest(MetadataMixin):
     """
 
     keywords: list[str] | None = None
+    categories: list[str] | None = None
+    releases: list[str] | None = None
+    category_2: str | None = None
+    license_type: str | None = None
+    location_metadata: str | None = None
+    editorial_date: str | None = None
+    is_editorial: bool | None = None
+    editorial_caption: str | None = None
+    has_people: bool | None = None
+    people_count: int | None = Field(default=None, ge=0)
+    model_release_available: bool | None = None
+    ai_generated_content_disclosure: bool | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            'ai_generated_content_disclosure',
+            'created using generative AI tools',
+        ),
+        serialization_alias='created using generative AI tools',
+    )
+    is_illustration: bool | None = None
+    mature_content: bool | None = None
+    iptc_embedded_metadata: bool | None = None
+
+    @field_validator('categories', 'releases')
+    @classmethod
+    def sanitize_optional_string_list_values(
+        cls,
+        value: list[str] | None,
+    ) -> list[str] | None:
+        """
+        Валидирует необязательные списковые поля PATCH-запроса.
+        """
+        if value is None:
+            return None
+
+        return sanitize_string_list(value)
+
+    @field_validator(
+        'category_2',
+        'license_type',
+        'location_metadata',
+        'editorial_date',
+        'editorial_caption',
+    )
+    @classmethod
+    def sanitize_optional_stock_metadata_text(
+        cls,
+        value: str | None,
+    ) -> str | None:
+        """
+        Валидирует необязательные текстовые stock-поля PATCH-запроса.
+        """
+        return sanitize_metadata_text(value)
+
+
+class StockFieldOptions(BaseModel):
+    """
+    Списки допустимых значений полей для выбранной stock-платформы.
+    """
+
+    stock_platform: StockPlatform
+    platform_type: StockPlatformType
+    categories: list[str] = Field(default_factory=list)
+    license_types: list[str] = Field(default_factory=list)
+    title_required: bool = True
+    title_min_words: int = 1
+    title_recommended_min_words: int | None = None
+    title_recommended_max_words: int | None = None
+    title_max_characters: int = 0
+    title_warning_characters: int | None = None
+    description_required: bool = False
+    description_max_characters: int = 0
+    image_min_megapixels: float | None = None
+    image_max_megapixels: float | None = None
+    keywords_required: bool = True
+    keywords_min_count: int = 0
+    keywords_recommended_min: int = 0
+    keywords_recommended_max: int = 0
+    keywords_max_count: int = 0
+    keywords_order_priority: bool = False
+    keywords_duplicates_allowed: bool = True
+    top_keywords_weighted: bool = False
+    categories_required: bool = False
+    multi_category_supported: bool = False
+    max_categories: int = 1
+    location_supported: bool = False
+    location_recommended: bool = False
+    iptc_embedded_metadata: bool = False
+    release_forms_required: bool = False
+    editorial_caption_required_for_editorial: bool = False
+    validation_english_required: bool = False
+    validation_keyword_spam_forbidden: bool = False
+    validation_irrelevant_keywords_forbidden: bool = False
+    validation_duplicate_keywords_forbidden: bool = False
+    validation_restricted_terms_forbidden: bool = False
+    validation_accurate_caption_required: bool = False
+    supports_category_2: bool = False
+    license_required: bool = False
+    releases_required: bool = False
+    editorial_caption_required: bool = False
+    editorial_date_required: bool = False
+    editorial_location_required: bool = False
+    people_supported: bool = True
+    model_release_required_when_people: bool = False
 
 
 class CleanupJobResult(BaseModel):
@@ -185,3 +399,4 @@ class EmbeddedMetadataResult(FileNameMixin):
 
     file_id: UUID
     embedded: bool = True
+    iptc_embedded_metadata: bool = True

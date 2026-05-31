@@ -13,6 +13,7 @@ from app.schemas.desktop import (
     DesktopHealthResponse,
     DesktopRuntimeInfo,
     DesktopSettingsResponse,
+    DesktopStartupStatusResponse,
     UpdateDesktopSettingsRequest,
 )
 from app.schemas.provider_discovery import ProvidersDiscoveryResponse
@@ -25,6 +26,7 @@ from app.services.desktop_open import (
     get_job_results_dir,
     open_path_in_default_app,
 )
+from app.services.desktop_startup import get_desktop_startup_status
 from app.services.provider_discovery import discover_ai_providers
 
 router = APIRouter(
@@ -56,6 +58,11 @@ async def get_settings():
 @router.patch('/settings', response_model=DesktopSettingsResponse)
 async def update_settings(payload: UpdateDesktopSettingsRequest):
     return update_desktop_settings(payload.selected_provider)
+
+
+@router.get('/startup/status', response_model=DesktopStartupStatusResponse)
+async def get_desktop_startup_status_endpoint():
+    return get_desktop_startup_status()
 
 
 @router.post(

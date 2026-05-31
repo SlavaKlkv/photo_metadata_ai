@@ -6,16 +6,16 @@ from fastapi import (
 )
 from starlette.concurrency import run_in_threadpool
 
+from app.core.enums import StockPlatform
 from app.schemas.job import (
-    CleanupJobResult,
     CreateProcessingJobRequest,
     EmbeddedMetadataResult,
     ProcessingJob,
     ProcessingJobFile,
 )
-from app.services.cleanup import cleanup_job_temp_files
 from app.services.app_settings import get_desktop_settings
 from app.services.metadata_embedding import embed_metadata_into_jpg
+from app.services.stock_metadata import build_stock_iptc_payload
 from app.services.storage import storage
 
 router = APIRouter(
@@ -47,31 +47,6 @@ async def create_job(payload: CreateProcessingJobRequest):
     return await storage.create_job(job)
 
 
-@router.post('/{job_id}/cleanup', response_model=CleanupJobResult)
-async def cleanup_job(job_id: UUID):
-    """
-    Очищает временные файлы задачи по запросу фронтенда.
-    """
-    job = await storage.get_job(job_id)
-
-    if job is None:
-        raise HTTPException(
-            status_code=404,
-            detail='Job not found',
-        )
-
-    deleted_files, deleted_directories = await run_in_threadpool(
-        cleanup_job_temp_files,
-        job,
-    )
-
-    return CleanupJobResult(
-        job_id=job.job_id,
-        deleted_files=deleted_files,
-        deleted_directories=deleted_directories,
-    )
-
-
 @router.post(
     '/{job_id}/files/{file_id}/embed-metadata',
     response_model=EmbeddedMetadataResult,
@@ -81,7 +56,7 @@ async def embed_file_metadata(
     file_id: UUID,
 ):
     """
-    Записывает текущие метаданные файла в EXIF-поля JPG.
+    Записывает текущие метаданные файла в IPTC-поля JPG.
     """
     job = await storage.get_job(job_id)
 
@@ -102,12 +77,22 @@ async def embed_file_metadata(
             detail='File not found',
         )
 
-    await run_in_threadpool(embed_metadata_into_jpg, job_file)
+    stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
+    iptc_payload = build_stock_iptc_payload(job_file, stock_platform)
+
+    await run_in_threadpool(
+        embed_metadata_into_jpg,
+        job_file,
+        iptc_payload,
+    )
+    job_file.iptc_embedded_metadata = True
+    await storage.update_job(job)
 
     return EmbeddedMetadataResult(
         file_id=job_file.file_id,
         filename=job_file.filename,
         original_filename=job_file.original_filename,
+        iptc_embedded_metadata=job_file.iptc_embedded_metadata,
     )
 
 
