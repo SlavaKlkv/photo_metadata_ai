@@ -38,6 +38,12 @@ class StockPlatform(StrEnum):
     ADOBE_STOCK = 'adobe_stock'
 
 
+class MarketplaceConnectionStatus(StrEnum):
+    CONNECTED = 'connected'
+    DISCONNECTED = 'disconnected'
+    ERROR = 'error'
+
+
 class StockPlatformType(StrEnum):
     MICROSTOCK = 'microstock'
     PREMIUM_STOCK_AGENCY = 'premium_stock_agency'

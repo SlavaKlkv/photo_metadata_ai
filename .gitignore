@@ -37,3 +37,5 @@ backend/uploads/
 backend/jobs
 backend/results/
 backend/temp/
+/marketplace_credentials.json
+/backend/marketplace_credentials.json
