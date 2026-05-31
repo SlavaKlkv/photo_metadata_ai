@@ -348,9 +348,11 @@ def test_desktop_flow_upload_process_review_export():
         )
         assert settings_response.status_code == 200
         assert settings_response.json()['ai_provider'] == 'mock'
+        assert settings_response.json()['effective_ai_provider'] == 'mock'
 
         process_response = client.post(f'/api/v1/jobs/{job_id}/process')
         assert process_response.status_code == 200
+        assert process_response.json()['effective_ai_provider'] == 'mock'
 
         status_payload = _wait_for_job_status(
             client,
