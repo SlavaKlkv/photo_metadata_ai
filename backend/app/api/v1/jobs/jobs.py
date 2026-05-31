@@ -35,12 +35,15 @@ from app.schemas.job import (
     UpdateProcessingJobMetadataRequest,
     UpdateProcessingJobSettingsRequest,
 )
+from app.services.app_settings import (
+    get_desktop_settings,
+    resolve_effective_ai_settings,
+    update_desktop_settings,
+)
 from app.services.cleanup import cleanup_job_temp_files
 from app.services.export.export import (
     ensure_job_exports,
-    generate_job_export,
     invalidate_job_export_cache,
-    load_stored_job_export,
     run_job_export,
 )
 from app.services.processing import (
@@ -50,7 +53,6 @@ from app.services.processing import (
 )
 from app.services.stock_metadata import (
     build_stock_mapped_metadata,
-    get_effective_categories,
     get_stock_field_options,
     validate_file_metadata_for_stock,
 )
@@ -71,10 +73,6 @@ def _build_metadata_result(
     Собирает stock-aware результат metadata для preview и PATCH-ответов.
     """
     mapped_metadata = build_stock_mapped_metadata(file, stock_platform)
-    mapped_categories = get_effective_categories(file, stock_platform)
-    mapped_category_2 = (
-        mapped_categories[1] if len(mapped_categories) > 1 else None
-    )
 
     return ProcessingJobMetadataResult(
         file_id=file.file_id,
@@ -195,9 +193,13 @@ async def upload_photos(
                 )
             )
 
+    desktop_settings = get_desktop_settings()
     job = ProcessingJob(
         files=job_files,
         shooting_context=shooting_context,
+        ai_provider=desktop_settings.selected_provider,
+        effective_ai_provider=desktop_settings.effective_provider,
+        effective_ai_model=desktop_settings.effective_model,
     )
 
     created_job = await storage.create_job(job)
@@ -223,6 +225,15 @@ async def update_job_settings(
 
     for field_name in payload.model_fields_set:
         setattr(job, field_name, getattr(payload, field_name))
+
+    if 'ai_provider' in payload.model_fields_set:
+        if payload.ai_provider is None:
+            job.effective_ai_provider = None
+            job.effective_ai_model = None
+        else:
+            desktop_settings = update_desktop_settings(payload.ai_provider)
+            job.effective_ai_provider = desktop_settings.effective_provider
+            job.effective_ai_model = desktop_settings.effective_model
 
     if payload.model_fields_set:
         invalidate_job_export_cache(job)
@@ -279,6 +290,10 @@ async def start_job_processing(
             detail='Job processing has already been started or finished',
         )
 
+    effective_ai_settings = resolve_effective_ai_settings(job.ai_provider)
+    job.ai_provider = effective_ai_settings.provider
+    job.effective_ai_provider = effective_ai_settings.provider
+    job.effective_ai_model = effective_ai_settings.model
     job.status = JobStatus.PROCESSING
     await storage.update_job(job)
 
