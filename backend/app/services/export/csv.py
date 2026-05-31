@@ -9,7 +9,6 @@ from app.services.stock_metadata import (
     StockMappedMetadata,
     build_stock_mapped_metadata,
 )
-from app.services.stock_metadata import get_effective_categories
 
 logger = structlog.get_logger(__name__)
 

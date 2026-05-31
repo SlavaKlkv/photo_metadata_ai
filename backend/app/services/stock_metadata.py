@@ -494,8 +494,8 @@ def _build_stock_iptc_special_instructions(
         return None
 
     return '; '.join(parts)
-  
-  
+
+
 def _collect_validation_categories(file: ProcessingJobFile) -> list[str]:
     """
     Возвращает исходный набор категорий для валидации без platform-trimming.
