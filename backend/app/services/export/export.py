@@ -303,8 +303,52 @@ def _resolve_export_formats(
 def _ensure_iptc_export(job: ProcessingJob) -> list[ExportArtifact]:
     iptc_artifacts: list[ExportArtifact] = []
     stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
+  
+    for file in job.files:
+        if file.status != FileStatus.COMPLETED:
+            continue
 
-    
+        if not file.iptc_embedded_metadata:
+            iptc_payload = build_stock_iptc_payload(file, stock_platform)
+            embed_metadata_into_jpg(file, payload=iptc_payload)
+            file.iptc_embedded_metadata = True
+
+        file_path = get_upload_file_path(file.filename)
+
+        if not file_path.is_file():
+            raise ValueError(
+                f'IPTC export file not found: {file.original_filename}'
+            )
+
+        iptc_artifacts.append(
+            _build_file_export_artifact(
+                file_path,
+                export_format=ExportFormat.IPTC,
+            )
+        )
+
+    return iptc_artifacts
+
+
+def _build_file_export_artifact(
+    file_path: Path,
+    *,
+    export_format: ExportFormat,
+    count: int = 1,
+) -> ExportArtifact:
+    return ExportArtifact(
+        export_format=export_format,
+        path=str(file_path),
+        filename=file_path.name,
+        size_bytes=file_path.stat().st_size,
+        count=count,
+    )
+
+
+def _count_completed_files(job: ProcessingJob) -> int:
+    return sum(1 for file in job.files if file.status == FileStatus.COMPLETED)
+
+
 def _collect_export_validation_errors(
     job: ProcessingJob,
     stock_platform: StockPlatform,

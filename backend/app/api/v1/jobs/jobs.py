@@ -111,6 +111,14 @@ def _build_metadata_result(
         is_illustration=mapped_metadata.is_illustration,
         mature_content=mapped_metadata.mature_content,
         iptc_embedded_metadata=mapped_metadata.iptc_embedded_metadata,
+        error_message=file.error_message,
+        validation=validate_file_metadata_for_stock(
+            file,
+            stock_platform,
+        ),
+        is_illustration=mapped_metadata.is_illustration,
+        mature_content=mapped_metadata.mature_content,
+        iptc_embedded_metadata=mapped_metadata.iptc_embedded_metadata,
         selected_for_export=file.selected_for_export,
         field_sources=file.field_sources,
         edited_fields=edited_fields,
@@ -166,6 +174,58 @@ def _build_zip_export_response(
         media_type='application/zip',
         headers={
             'Content-Disposition': (f'attachment; filename="{archive_name}"'),
+        },
+    )
+
+
+def _resolve_selected_export_formats(
+    *,
+    csv: bool,
+    iptc: bool,
+) -> list[ExportFormat]:
+    selected: list[ExportFormat] = []
+
+    if csv:
+        selected.append(ExportFormat.CSV)
+
+    if iptc:
+        selected.append(ExportFormat.IPTC)
+
+    return selected
+
+
+def _detect_artifact_media_type(
+    export_format: ExportFormat,
+) -> str:
+    if export_format == ExportFormat.CSV:
+        return 'text/csv; charset=utf-8'
+
+    if export_format == ExportFormat.IPTC:
+        return 'image/jpeg'
+
+    return 'application/octet-stream'
+
+
+def _build_zip_export_response(
+    job_id: UUID,
+    artifacts: list[tuple[Path, str]],
+) -> Response:
+    zip_buffer = BytesIO()
+
+    with ZipFile(zip_buffer, mode='w', compression=ZIP_DEFLATED) as zip_file:
+        for file_path, arc_name in artifacts:
+            zip_file.write(file_path, arcname=arc_name)
+
+    zip_content = zip_buffer.getvalue()
+    archive_name = f'{job_id}_exports.zip'
+
+    return Response(
+        content=zip_content,
+        media_type='application/zip',
+        headers={
+            'Content-Disposition': (
+                f'attachment; filename="{archive_name}"'
+            ),
         },
     )
 
@@ -798,7 +858,9 @@ async def export_job(
             content=file_path.read_bytes(),
             media_type=media_type,
             headers={
-                'Content-Disposition': (f'attachment; filename="{filename}"'),
+                'Content-Disposition': (
+                    f'attachment; filename="{filename}"'
+                ),
             },
         )
 

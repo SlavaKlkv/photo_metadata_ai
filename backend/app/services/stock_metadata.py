@@ -22,6 +22,10 @@ from app.services.metadata_embedding import (
 )
     StockFieldOptions,
 )
+from app.services.metadata_embedding import (
+    IPTCEmbeddingPayload,
+    get_upload_file_path,
+)
 from app.services.stock_validation_lists import find_restricted_terms_in_text
 
 
