@@ -2,20 +2,27 @@ from dataclasses import dataclass
 
 from PIL import Image, UnidentifiedImageError
 
-from app.core.enums import FileStatus, StockPlatform
+from app.core.enums import (
+    FileStatus,
+    StockPlatform,
+    StockPlatformType,
+)
 from app.schemas.job import (
     MetadataValidationIssue,
     MetadataValidationResult,
     ProcessingJobFile,
     StockFieldOptions,
 )
-from app.services.metadata_embedding import get_upload_file_path
+from app.services.metadata_embedding import (
+    IPTCEmbeddingPayload,
+    get_upload_file_path,
+)
 from app.services.stock_validation_lists import find_restricted_terms_in_text
 
 
 @dataclass(frozen=True)
 class StockRules:
-    platform_type: str
+    platform_type: StockPlatformType
     title_required: bool
     title_max_characters: int
     title_warning_characters: int | None
@@ -56,6 +63,32 @@ class StockRules:
     model_release_required_when_people: bool
     license_types: tuple[str, ...]
     categories: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class StockMappedMetadata:
+    """
+    Stock-aware представление универсальных metadata для preview/export.
+    """
+
+    title: str | None
+    description: str | None
+    keywords: list[str]
+    categories: list[str]
+    category_2: str | None
+    license_type: str | None
+    location_metadata: str | None
+    editorial_date: str | None
+    is_editorial: bool
+    editorial_caption: str | None
+    has_people: bool | None
+    people_count: int | None
+    model_release_available: bool | None
+    releases: list[str]
+    ai_generated_content_disclosure: bool
+    is_illustration: bool | None
+    mature_content: bool | None
+    iptc_embedded_metadata: bool
 
 
 GETTY_CATEGORIES: tuple[str, ...] = (
@@ -125,7 +158,7 @@ ADOBE_CATEGORIES: tuple[str, ...] = (
 
 STOCK_RULES: dict[StockPlatform, StockRules] = {
     StockPlatform.GETTY_IMAGES: StockRules(
-        platform_type='premium_stock_agency',
+        platform_type=StockPlatformType.PREMIUM_STOCK_AGENCY,
         title_required=True,
         title_max_characters=200,
         title_warning_characters=None,
@@ -168,7 +201,7 @@ STOCK_RULES: dict[StockPlatform, StockRules] = {
         categories=GETTY_CATEGORIES,
     ),
     StockPlatform.SHUTTERSTOCK: StockRules(
-        platform_type='microstock',
+        platform_type=StockPlatformType.MICROSTOCK,
         title_required=True,
         title_max_characters=2048,
         title_warning_characters=150,
@@ -211,7 +244,7 @@ STOCK_RULES: dict[StockPlatform, StockRules] = {
         categories=SHUTTERSTOCK_CATEGORIES,
     ),
     StockPlatform.ADOBE_STOCK: StockRules(
-        platform_type='microstock',
+        platform_type=StockPlatformType.MICROSTOCK,
         title_required=True,
         title_max_characters=70,
         title_warning_characters=None,
@@ -348,6 +381,121 @@ def get_effective_categories(
     return categories[: rules.max_categories]
 
 
+def build_stock_mapped_metadata(
+    file: ProcessingJobFile,
+    stock_platform: StockPlatform,
+) -> StockMappedMetadata:
+    """
+    Преобразует универсальные metadata в представление выбранного стока.
+    """
+    mapped_categories = get_effective_categories(file, stock_platform)
+    mapped_category_2 = (
+        mapped_categories[1] if len(mapped_categories) > 1 else None
+    )
+
+    return StockMappedMetadata(
+        title=file.title,
+        description=file.description,
+        keywords=list(file.keywords),
+        categories=mapped_categories,
+        category_2=mapped_category_2,
+        license_type=file.license_type,
+        location_metadata=file.location_metadata,
+        editorial_date=file.editorial_date,
+        is_editorial=file.is_editorial,
+        editorial_caption=file.editorial_caption,
+        has_people=file.has_people,
+        people_count=file.people_count,
+        model_release_available=file.model_release_available,
+        releases=list(file.releases),
+        ai_generated_content_disclosure=(file.ai_generated_content_disclosure),
+        is_illustration=file.is_illustration,
+        mature_content=file.mature_content,
+        iptc_embedded_metadata=file.iptc_embedded_metadata,
+    )
+
+
+def build_stock_iptc_payload(
+    file: ProcessingJobFile,
+    stock_platform: StockPlatform,
+) -> IPTCEmbeddingPayload:
+    mapped_metadata = build_stock_mapped_metadata(file, stock_platform)
+    caption = mapped_metadata.description or ''
+
+    if mapped_metadata.is_editorial and mapped_metadata.editorial_caption:
+        caption = mapped_metadata.editorial_caption
+
+    return IPTCEmbeddingPayload(
+        object_name=mapped_metadata.title or '',
+        caption_abstract=caption,
+        keywords=list(mapped_metadata.keywords),
+        supplemental_category=list(mapped_metadata.categories),
+        city=mapped_metadata.location_metadata,
+        date_created=(
+            mapped_metadata.editorial_date
+            if mapped_metadata.is_editorial
+            else None
+        ),
+        special_instructions=_build_stock_iptc_special_instructions(
+            mapped_metadata,
+            stock_platform,
+        ),
+    )
+
+
+def _build_stock_iptc_special_instructions(
+    mapped_metadata: StockMappedMetadata,
+    stock_platform: StockPlatform,
+) -> str | None:
+    parts: list[str] = []
+
+    if mapped_metadata.license_type:
+        parts.append(f'license={mapped_metadata.license_type}')
+
+    if mapped_metadata.releases:
+        parts.append(f'releases={", ".join(mapped_metadata.releases)}')
+    elif mapped_metadata.model_release_available is not None:
+        release_value = (
+            'yes' if mapped_metadata.model_release_available else 'no'
+        )
+        parts.append(f'model_release={release_value}')
+
+    if stock_platform == StockPlatform.SHUTTERSTOCK:
+        if mapped_metadata.is_illustration is not None:
+            illustration_value = (
+                'yes' if mapped_metadata.is_illustration else 'no'
+            )
+            parts.append(f'illustration={illustration_value}')
+        if mapped_metadata.mature_content is not None:
+            mature_value = 'yes' if mapped_metadata.mature_content else 'no'
+            parts.append(f'mature_content={mature_value}')
+
+    if stock_platform == StockPlatform.GETTY_IMAGES:
+        if mapped_metadata.is_editorial:
+            parts.append('editorial=yes')
+        if mapped_metadata.editorial_date:
+            parts.append(f'editorial_date={mapped_metadata.editorial_date}')
+        if mapped_metadata.location_metadata:
+            parts.append(f'location={mapped_metadata.location_metadata}')
+
+    if stock_platform == StockPlatform.ADOBE_STOCK:
+        if mapped_metadata.ai_generated_content_disclosure:
+            parts.append('ai_generated=yes')
+        if mapped_metadata.is_illustration is not None:
+            illustration_value = (
+                'yes' if mapped_metadata.is_illustration else 'no'
+            )
+            parts.append(f'illustration={illustration_value}')
+        if mapped_metadata.mature_content is not None:
+            mature_value = 'yes' if mapped_metadata.mature_content else 'no'
+            parts.append(f'mature_content={mature_value}')
+
+    if not parts:
+        return None
+
+    return '; '.join(parts)
+  
+  
 def _collect_validation_categories(file: ProcessingJobFile) -> list[str]:
     """
     Возвращает исходный набор категорий для валидации без platform-trimming.
