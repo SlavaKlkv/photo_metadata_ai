@@ -365,7 +365,8 @@ def test_desktop_flow_upload_process_review_export():
         assert len(results_payload['results']) == 1
 
         start_export_response = client.post(
-            f'/api/v1/jobs/{job_id}/export/csv'
+            f'/api/v1/jobs/{job_id}/export',
+            params={'csv': 'true'},
         )
         assert start_export_response.status_code == 200
 
@@ -376,7 +377,10 @@ def test_desktop_flow_upload_process_review_export():
         )
         assert export_status_payload['export_status'] == 'completed'
 
-        download_response = client.get(f'/api/v1/jobs/{job_id}/export/csv')
+        download_response = client.get(
+            f'/api/v1/jobs/{job_id}/export',
+            params={'csv': 'true'},
+        )
         assert download_response.status_code == 200
         assert 'text/csv' in download_response.headers.get('content-type', '')
 

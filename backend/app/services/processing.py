@@ -8,6 +8,7 @@ from app.core.constants import (
     DEFAULT_AI_RESIZE_LONG_SIDE_PX,
     MAX_CONCURRENT_AI_REQUESTS,
 )
+from app.core.enums import StockPlatform
 from app.schemas.job import (
     FileStatus,
     JobStatus,
@@ -31,6 +32,7 @@ async def _process_file(
     ai_provider: BaseAIProvider,
     job_id: UUID,
     shooting_context: str | None,
+    stock_platform: StockPlatform | None,
     file_number: int | None = None,
 ) -> None:
     """
@@ -64,6 +66,7 @@ async def _process_file(
                 job_id,
                 shooting_context,
                 file_number=file_number,
+                stock_platform=stock_platform,
             )
 
             if await _is_job_cancelled(job_id):
@@ -193,6 +196,7 @@ async def process_job(job_id: UUID) -> None:
                 ai_provider,
                 job.job_id,
                 job.shooting_context,
+                job.stock_platform,
                 file_number=index,
             )
             for index, file in enumerate(queued_files, start=1)
@@ -266,6 +270,7 @@ async def retry_failed_files(job_id: UUID) -> None:
                 ai_provider,
                 job.job_id,
                 job.shooting_context,
+                job.stock_platform,
                 file_number=file_number,
             )
             for file_number, file in failed_indexed_files
