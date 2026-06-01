@@ -42,8 +42,7 @@ from app.services.app_settings import (
 )
 from app.services.cleanup import cleanup_job_temp_files
 from app.services.export.export import (
-    generate_job_export,
-    load_stored_job_export,
+    ensure_job_exports,
     run_job_export,
 )
 from app.services.processing import (
@@ -152,9 +151,7 @@ def _build_zip_export_response(
         content=zip_content,
         media_type='application/zip',
         headers={
-            'Content-Disposition': (
-                f'attachment; filename="{archive_name}"'
-            ),
+            'Content-Disposition': (f'attachment; filename="{archive_name}"'),
         },
     )
 
@@ -234,9 +231,6 @@ async def update_job_settings(
             desktop_settings = update_desktop_settings(payload.ai_provider)
             job.effective_ai_provider = desktop_settings.effective_provider
             job.effective_ai_model = desktop_settings.effective_model
-
-    if payload.model_fields_set:
-        invalidate_job_export_cache(job)
 
     return await storage.update_job(job)
 
@@ -763,9 +757,7 @@ async def export_job(
             content=file_path.read_bytes(),
             media_type=media_type,
             headers={
-                'Content-Disposition': (
-                    f'attachment; filename="{filename}"'
-                ),
+                'Content-Disposition': (f'attachment; filename="{filename}"'),
             },
         )
 
