@@ -7,11 +7,12 @@ import aiofiles
 import httpx
 import structlog
 from fastapi import HTTPException
-from openai import AsyncOpenAI
 
 from app.core.config import settings
 from app.core.constants import AI_PROVIDER_TIMEOUT
-from app.core.enums import AIProvider
+from app.core.enums import AIProvider, StockPlatform
+from app.services.stock_metadata import get_stock_field_options
+from app.services.stock_validation_lists import load_adobe_restricted_terms
 
 logger = structlog.get_logger(__name__)
 
@@ -65,12 +66,16 @@ class BaseAIProvider(ABC):
     Базовый интерфейс AI-провайдера для анализа изображений.
     """
 
+    def __init__(self, model: str | None = None):
+        self.model = model
+
     @abstractmethod
     async def generate_metadata(
         self,
         image_path: Path,
         shooting_context: str | None = None,
         file_number: int | None = None,
+        stock_platform: StockPlatform | None = None,
     ) -> AIMetadataResponse:
         """
         Генерирует метаданные для изображения.
@@ -87,6 +92,7 @@ class MockImageMetadataProvider(BaseAIProvider):
         image_path: Path,
         shooting_context: str | None = None,
         file_number: int | None = None,
+        stock_platform: StockPlatform | None = None,
     ) -> AIMetadataResponse:
         """
         Возвращает тестовые метаданные для изображения.
@@ -143,6 +149,7 @@ class OllamaImageMetadataProvider(BaseAIProvider):
         image_path: Path,
         shooting_context: str | None = None,
         file_number: int | None = None,
+        stock_platform: StockPlatform | None = None,
     ) -> AIMetadataResponse:
         """
         Отправляет изображение в локальную Ollama model и возвращает metadata.
@@ -151,41 +158,28 @@ class OllamaImageMetadataProvider(BaseAIProvider):
             'ollama_metadata_generation_started',
             file_number=file_number,
             image_path=str(image_path),
-            model=settings.OLLAMA_MODEL,
+            model=self.model,
         )
 
         image_base64 = await _encode_image_to_base64(image_path)
 
-        prompt = (
-            'Generate stock photo metadata for this image. '
-            'Return only valid JSON '
-            'with fields: '
-            'title, description, keywords, categories, category_2, '
-            'license_type, location_metadata, editorial_date, is_editorial, '
-            'editorial_caption, has_people, people_count, '
-            'model_release_available, releases, '
-            'ai_generated_content_disclosure, is_illustration, '
-            'mature_content. '
-            'keywords, categories and releases must be arrays of strings. '
-            'has_people and model_release_available must be boolean. '
-            'people_count must be integer or null.'
+        prompt = _build_metadata_generation_prompt(
+            shooting_context=shooting_context,
+            stock_platform=stock_platform,
         )
-
-        if shooting_context:
-            prompt = f'{prompt} Use this shooting context: {shooting_context}'
 
         async with httpx.AsyncClient(timeout=AI_PROVIDER_TIMEOUT) as client:
             logger.info(
                 'ollama_request_started',
                 file_number=file_number,
                 base_url=settings.OLLAMA_BASE_URL,
-                model=settings.OLLAMA_MODEL,
+                model=self.model,
             )
 
             response = await client.post(
                 f'{settings.OLLAMA_BASE_URL}/api/generate',
                 json={
-                    'model': settings.OLLAMA_MODEL,
+                    'model': self.model,
                     'prompt': prompt,
                     'images': [image_base64],
                     'stream': False,
@@ -268,19 +262,53 @@ class OllamaImageMetadataProvider(BaseAIProvider):
         return metadata_response
 
 
-class OpenAIImageMetadataProvider(BaseAIProvider):
+class GeminiImageMetadataProvider(BaseAIProvider):
     """
-    AI-провайдер на базе OpenAI для генерации metadata по изображению.
+    AI-провайдер на базе Gemini для генерации metadata по изображению.
     """
 
-    def __init__(self):
-        if settings.OPENAI_API_KEY is None:
+    def __init__(self, model: str | None = None):
+        super().__init__(model=model)
+        if settings.GEMINI_API_KEY is None:
             raise HTTPException(
                 status_code=500,
-                detail='OPENAI_API_KEY is not configured',
+                detail='GEMINI_API_KEY is not configured',
             )
 
-        self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    async def generate_metadata(
+        self,
+        image_path: Path,
+        shooting_context: str | None = None,
+        file_number: int | None = None,
+        stock_platform: StockPlatform | None = None,
+    ) -> AIMetadataResponse:
+        """
+        Генерирует метаданные через Gemini.
+        """
+        logger.info(
+            'gemini_metadata_generation_started',
+            file_number=file_number,
+            image_path=str(image_path),
+            model=self.model,
+        )
+        raise HTTPException(
+            status_code=501,
+            detail='Gemini provider is not implemented yet',
+        )
+
+
+class OpenRouterImageMetadataProvider(BaseAIProvider):
+    """
+    AI-провайдер на базе OpenRouter для генерации metadata по изображению.
+    """
+
+    def __init__(self, model: str | None = None):
+        super().__init__(model=model)
+        if settings.OPENROUTER_API_KEY is None:
+            raise HTTPException(
+                status_code=500,
+                detail='OPENROUTER_API_KEY is not configured',
+            )
 
     async def generate_metadata(
         self,
@@ -289,47 +317,53 @@ class OpenAIImageMetadataProvider(BaseAIProvider):
         file_number: int | None = None,
     ) -> AIMetadataResponse:
         """
-        Генерирует метаданные через OpenAI.
+        Генерирует метаданные через OpenRouter.
         """
         logger.info(
-            'openai_metadata_generation_started',
+            'openrouter_metadata_generation_started',
             file_number=file_number,
             image_path=str(image_path),
+            model=self.model,
         )
         raise HTTPException(
             status_code=501,
-            detail='OpenAI provider is not implemented yet',
+            detail='OpenRouter provider is not implemented yet',
         )
 
 
-def get_ai_provider(provider_name: str | AIProvider) -> BaseAIProvider:
+def get_ai_provider(
+    provider_name: str | AIProvider,
+    model: str | None = None,
+) -> BaseAIProvider:
     """Возвращает AI-провайдер по имени."""
-    provider_key = str(provider_name)
+    provider = AIProvider(provider_name)
 
-    provider_classes: dict[str, type[BaseAIProvider]] = {
-        'mock': MockImageMetadataProvider,
-        'ollama': OllamaImageMetadataProvider,
-        'openai': OpenAIImageMetadataProvider,
+    provider_classes: dict[AIProvider, type[BaseAIProvider]] = {
+        AIProvider.MOCK: MockImageMetadataProvider,
+        AIProvider.OLLAMA: OllamaImageMetadataProvider,
+        AIProvider.GEMINI: GeminiImageMetadataProvider,
+        AIProvider.OPENROUTER: OpenRouterImageMetadataProvider,
     }
 
-    provider_class = provider_classes.get(provider_key)
+    provider_class = provider_classes.get(provider)
 
     if provider_class is None:
         logger.error(
             'unsupported_ai_provider_configured',
-            provider=provider_key,
+            provider=provider,
         )
 
         raise HTTPException(
             status_code=500,
-            detail=f'Unsupported AI provider: {provider_key}',
+            detail=f'Unsupported AI provider: {provider}',
         )
 
     logger.info(
         'ai_provider_selected',
-        provider=provider_key,
+        provider=provider,
+        model=model,
     )
-    return provider_class()
+    return provider_class(model=model)
 
 
 async def _encode_image_to_base64(image_path: Path) -> str:
@@ -395,3 +429,67 @@ def _extract_optional_int(value: object) -> int | None:
         return None
 
     return parsed if parsed >= 0 else None
+
+
+def _build_metadata_generation_prompt(
+    shooting_context: str | None,
+    stock_platform: StockPlatform | None,
+) -> str:
+    effective_stock_platform = stock_platform or StockPlatform.SHUTTERSTOCK
+    stock_options = get_stock_field_options(effective_stock_platform)
+    stock_rules_json = json.dumps(
+        stock_options.model_dump(mode='json'),
+        ensure_ascii=False,
+        separators=(',', ':'),
+    )
+
+    prompt = (
+        'Generate stock photo metadata for this image. '
+        'Return only valid JSON '
+        'with fields: '
+        'title, description, keywords, categories, category_2, '
+        'license_type, location_metadata, editorial_date, is_editorial, '
+        'editorial_caption, has_people, people_count, '
+        'model_release_available, releases, '
+        'ai_generated_content_disclosure, is_illustration, '
+        'mature_content. '
+        'keywords, categories and releases must be arrays of strings. '
+        'has_people and model_release_available must be boolean. '
+        'people_count must be integer or null. '
+        'Apply all platform rules, limits, required flags and constraints '
+        'from this stock rules JSON exactly: '
+        f'{stock_rules_json}. '
+        'Use rules fields directly: '
+        'title/description/keywords/categories/license/editorial/location/'
+        'release/people constraints must comply with provided limits and '
+        'required flags. '
+        'categories must use only values from rules.categories with max '
+        'rules.max_categories; category_2 must follow '
+        'rules.supports_category_2; license_type must use only '
+        'rules.license_types and respect rules.license_required. '
+        'keywords must respect required/min/recommended/max and duplicate '
+        'rules. '
+        'If a field is not supported by rules, return null, false or [] as '
+        'appropriate and keep output consistent. '
+        'All textual metadata fields must be in English only '
+        '(title, description, keywords, categories, category_2, '
+        'location_metadata, editorial_caption, releases). '
+        'Do not use any other language in these fields. '
+        'Do not output any text outside JSON.'
+    )
+
+    if effective_stock_platform == StockPlatform.ADOBE_STOCK:
+        adobe_restricted_terms = load_adobe_restricted_terms()
+        restricted_terms_csv = ', '.join(adobe_restricted_terms.all_terms)
+        prompt = (
+            f'{prompt} '
+            f'Adobe restricted terms list ({adobe_restricted_terms.version}): '
+            f'{restricted_terms_csv}. '
+            'Do not use these terms in title, description, keywords, '
+            'categories, location_metadata or editorial_caption.'
+        )
+
+    if shooting_context:
+        prompt = f'{prompt} Use this shooting context: {shooting_context}'
+
+    return prompt

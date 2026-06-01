@@ -28,14 +28,19 @@ class ExportStatus(StrEnum):
 class AIProvider(StrEnum):
     MOCK = 'mock'
     OLLAMA = 'ollama'
-    CLAUDE = 'claude'
-    OPENAI = 'openai'
+    GEMINI = 'gemini'
+    OPENROUTER = 'openrouter'
 
 
 class StockPlatform(StrEnum):
     SHUTTERSTOCK = 'shutterstock'
     GETTY_IMAGES = 'getty_images'
     ADOBE_STOCK = 'adobe_stock'
+
+
+class StockPlatformType(StrEnum):
+    MICROSTOCK = 'microstock'
+    PREMIUM_STOCK_AGENCY = 'premium_stock_agency'
 
 
 class ExportFormat(StrEnum):

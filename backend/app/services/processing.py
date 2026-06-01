@@ -8,6 +8,7 @@ from app.core.constants import (
     DEFAULT_AI_RESIZE_LONG_SIDE_PX,
     MAX_CONCURRENT_AI_REQUESTS,
 )
+from app.core.enums import StockPlatform
 from app.schemas.job import (
     FileStatus,
     JobStatus,
@@ -17,6 +18,7 @@ from app.services.ai_provider import (
     BaseAIProvider,
     get_ai_provider,
 )
+from app.services.app_settings import resolve_effective_ai_settings
 from app.services.image_preprocessing import resize_image_for_ai
 from app.services.metadata_embedding import get_upload_file_path
 from app.services.storage import storage
@@ -30,6 +32,7 @@ async def _process_file(
     ai_provider: BaseAIProvider,
     job_id: UUID,
     shooting_context: str | None,
+    stock_platform: StockPlatform | None,
     file_number: int | None = None,
 ) -> None:
     """
@@ -70,6 +73,7 @@ async def _process_file(
                 preprocessed_image_path,
                 shooting_context=shooting_context,
                 file_number=file_number,
+                stock_platform=stock_platform,
             )
 
             if await _is_job_cancelled(job_id):
@@ -150,7 +154,14 @@ async def process_job(job_id: UUID) -> None:
     await storage.update_job(job)
 
     try:
-        ai_provider = get_ai_provider(job.ai_provider)
+        effective_ai_settings = resolve_effective_ai_settings(job.ai_provider)
+        job.effective_ai_provider = effective_ai_settings.provider
+        job.effective_ai_model = effective_ai_settings.model
+        await storage.update_job(job)
+        ai_provider = get_ai_provider(
+            effective_ai_settings.provider,
+            model=effective_ai_settings.model,
+        )
     except Exception as error:
         logger.exception(
             'ai_provider_initialization_failed',
@@ -167,6 +178,7 @@ async def process_job(job_id: UUID) -> None:
                 ai_provider,
                 job.job_id,
                 job.shooting_context,
+                job.stock_platform,
                 file_number=index,
             )
             for index, file in enumerate(queued_files, start=1)
@@ -223,7 +235,14 @@ async def retry_failed_files(job_id: UUID) -> None:
     await storage.update_job(job)
 
     try:
-        ai_provider = get_ai_provider(job.ai_provider)
+        effective_ai_settings = resolve_effective_ai_settings(job.ai_provider)
+        job.effective_ai_provider = effective_ai_settings.provider
+        job.effective_ai_model = effective_ai_settings.model
+        await storage.update_job(job)
+        ai_provider = get_ai_provider(
+            effective_ai_settings.provider,
+            model=effective_ai_settings.model,
+        )
     except Exception as error:
         logger.exception(
             'ai_provider_initialization_failed_on_retry',
@@ -240,6 +259,7 @@ async def retry_failed_files(job_id: UUID) -> None:
                 ai_provider,
                 job.job_id,
                 job.shooting_context,
+                job.stock_platform,
                 file_number=file_number,
             )
             for file_number, file in failed_indexed_files
