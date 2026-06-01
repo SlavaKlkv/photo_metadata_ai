@@ -17,6 +17,24 @@ from app.services.stock_validation_lists import load_adobe_restricted_terms
 logger = structlog.get_logger(__name__)
 
 
+class AIProviderError(Exception):
+    def __init__(self, reason_code: str, message: str):
+        super().__init__(message)
+        self.reason_code = reason_code
+
+
+class AIProviderConfigurationError(AIProviderError):
+    """
+    Provider cannot be used because required configuration is missing/invalid.
+    """
+
+
+class AIProviderRuntimeError(AIProviderError):
+    """
+    Provider failed while handling a metadata generation request.
+    """
+
+
 class AIMetadataResponse:
     """
     Нормализованный ответ AI-провайдера с метаданными изображения.
@@ -270,9 +288,9 @@ class GeminiImageMetadataProvider(BaseAIProvider):
     def __init__(self, model: str | None = None):
         super().__init__(model=model)
         if settings.GEMINI_API_KEY is None:
-            raise HTTPException(
-                status_code=500,
-                detail='GEMINI_API_KEY is not configured',
+            raise AIProviderConfigurationError(
+                reason_code='gemini_api_key_missing',
+                message='GEMINI_API_KEY is not configured',
             )
 
     async def generate_metadata(
@@ -305,9 +323,9 @@ class OpenRouterImageMetadataProvider(BaseAIProvider):
     def __init__(self, model: str | None = None):
         super().__init__(model=model)
         if settings.OPENROUTER_API_KEY is None:
-            raise HTTPException(
-                status_code=500,
-                detail='OPENROUTER_API_KEY is not configured',
+            raise AIProviderConfigurationError(
+                reason_code='openrouter_api_key_missing',
+                message='OPENROUTER_API_KEY is not configured',
             )
 
     async def generate_metadata(
@@ -315,6 +333,7 @@ class OpenRouterImageMetadataProvider(BaseAIProvider):
         image_path: Path,
         shooting_context: str | None = None,
         file_number: int | None = None,
+        stock_platform: StockPlatform | None = None,
     ) -> AIMetadataResponse:
         """
         Генерирует метаданные через OpenRouter.
@@ -353,9 +372,9 @@ def get_ai_provider(
             provider=provider,
         )
 
-        raise HTTPException(
-            status_code=500,
-            detail=f'Unsupported AI provider: {provider}',
+        raise AIProviderConfigurationError(
+            reason_code='unsupported_ai_provider',
+            message=f'Unsupported AI provider: {provider}',
         )
 
     logger.info(

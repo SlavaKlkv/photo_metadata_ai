@@ -8,7 +8,7 @@ from app.core.constants import (
     DEFAULT_AI_RESIZE_LONG_SIDE_PX,
     MAX_CONCURRENT_AI_REQUESTS,
 )
-from app.core.enums import StockPlatform
+from app.core.enums import AIProvider, StockPlatform
 from app.schemas.job import (
     FileStatus,
     JobStatus,
@@ -30,7 +30,7 @@ logger = structlog.get_logger(__name__)
 
 async def regenerate_metadata_for_file(
     file: ProcessingJobFile,
-    ai_provider: BaseAIProvider,
+    selected_provider: AIProvider,
     job_id: UUID,
     shooting_context: str | None,
     stock_platform: StockPlatform | None,
@@ -49,6 +49,57 @@ async def regenerate_metadata_for_file(
             stock_platform=stock_platform,
             file_number=file_number,
         )
+        try:
+            if await _is_job_cancelled(job_id):
+                file.status = FileStatus.CANCELLED
+                logger.info(
+                    'file_processing_cancelled',
+                    job_id=str(job_id),
+                    file_id=str(file.file_id),
+                    file_number=file_number,
+                    filename=file.original_filename,
+                )
+                return
+
+            file.status = FileStatus.PROCESSING
+
+            source_image_path = get_upload_file_path(file.filename)
+            preprocessed_image_path = await run_in_threadpool(
+                resize_image_for_ai,
+                source_image_path,
+                job_id=job_id,
+                file_id=file.file_id,
+                max_long_side_px=DEFAULT_AI_RESIZE_LONG_SIDE_PX,
+            )
+
+            fallback_result = await generate_metadata_with_fallback(
+                selected_provider=selected_provider,
+                image_path=preprocessed_image_path,
+                shooting_context=shooting_context,
+                file_number=file_number,
+                stock_platform=stock_platform,
+            )
+            metadata = fallback_result.metadata
+
+            logger.info(
+                'file_metadata_provider_resolved',
+                job_id=str(job_id),
+                file_id=str(file.file_id),
+                file_number=file_number,
+                provider=fallback_result.provider,
+                model=fallback_result.model,
+            )
+
+            if await _is_job_cancelled(job_id):
+                file.status = FileStatus.CANCELLED
+                logger.info(
+                    'file_processing_cancelled',
+                    job_id=str(job_id),
+                    file_id=str(file.file_id),
+                    file_number=file_number,
+                    filename=file.original_filename,
+                )
+                return
 
 
 def apply_generated_metadata_to_file(
@@ -109,9 +160,8 @@ async def process_job(job_id: UUID) -> None:
         job.effective_ai_provider = effective_ai_settings.provider
         job.effective_ai_model = effective_ai_settings.model
         await storage.update_job(job)
-        ai_provider = get_ai_provider(
+        validate_primary_provider_configuration(
             effective_ai_settings.provider,
-            model=effective_ai_settings.model,
         )
     except Exception as error:
         logger.exception(
@@ -126,7 +176,7 @@ async def process_job(job_id: UUID) -> None:
         *[
             _process_file(
                 file,
-                ai_provider,
+                effective_ai_settings.provider,
                 job.job_id,
                 job.shooting_context,
                 job.stock_platform,
@@ -190,9 +240,8 @@ async def retry_failed_files(job_id: UUID) -> None:
         job.effective_ai_provider = effective_ai_settings.provider
         job.effective_ai_model = effective_ai_settings.model
         await storage.update_job(job)
-        ai_provider = get_ai_provider(
+        validate_primary_provider_configuration(
             effective_ai_settings.provider,
-            model=effective_ai_settings.model,
         )
     except Exception as error:
         logger.exception(
@@ -207,7 +256,7 @@ async def retry_failed_files(job_id: UUID) -> None:
         *[
             _process_file(
                 file,
-                ai_provider,
+                effective_ai_settings.provider,
                 job.job_id,
                 job.shooting_context,
                 job.stock_platform,
