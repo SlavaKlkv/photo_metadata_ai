@@ -39,7 +39,11 @@ from app.schemas.job import (
     UpdateProcessingJobMetadataRequest,
     UpdateProcessingJobSettingsRequest,
 )
-from app.services.ai_provider import get_ai_provider
+from app.services.app_settings import (
+    get_desktop_settings,
+    resolve_effective_ai_settings,
+    update_desktop_settings,
+)
 from app.services.cleanup import cleanup_job_temp_files
 from app.services.export.export import (
     ensure_job_exports,
@@ -154,9 +158,7 @@ def _build_zip_export_response(
         content=zip_content,
         media_type='application/zip',
         headers={
-            'Content-Disposition': (
-                f'attachment; filename="{archive_name}"'
-            ),
+            'Content-Disposition': (f'attachment; filename="{archive_name}"'),
         },
     )
 
@@ -421,10 +423,9 @@ async def regenerate_file_metadata(
         )
 
     previous_metadata = _build_metadata_snapshot(job_file)
-    ai_provider = get_ai_provider(resolved_ai_provider)
     regenerated_metadata = await regenerate_metadata_for_file(
         job_file,
-        ai_provider,
+        resolved_ai_provider,
         job.job_id,
         resolved_shooting_context,
         resolved_stock_platform,
