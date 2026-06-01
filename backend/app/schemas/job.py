@@ -15,6 +15,7 @@ from app.core.enums import (
     ExportStatus,
     FileStatus,
     JobStatus,
+    MetadataFieldSource,
     StockPlatform,
     StockPlatformType,
 )
@@ -188,6 +189,8 @@ class ProcessingJobFile(
     file_id: UUID = Field(default_factory=uuid4)
     status: FileStatus = FileStatus.QUEUED
     error_message: str | None = None
+    selected_for_export: bool = True
+    field_sources: dict[str, MetadataFieldSource] = Field(default_factory=dict)
 
 
 class ProcessingJob(JobSettingsMixin, ExportStatusMixin):
@@ -243,6 +246,40 @@ class MetadataValidationResult(BaseModel):
     warnings: list[MetadataValidationIssue] = Field(default_factory=list)
 
 
+MetadataPreviewValue = str | bool | int | float | list[str] | None
+
+
+class StockPreviewField(BaseModel):
+    """
+    Одно поле stock-aware preview.
+    """
+
+    key: str
+    label: str
+    value: MetadataPreviewValue
+
+
+class StockSpecificPreviewBlock(BaseModel):
+    """
+    Platform-specific блок preview-полей.
+    """
+
+    title: str
+    fields: list[StockPreviewField] = Field(default_factory=list)
+
+
+class StockAwareMetadataPreview(BaseModel):
+    """
+    Preview в формате выбранной платформы.
+    """
+
+    stock_platform: StockPlatform
+    common_fields: list[StockPreviewField] = Field(default_factory=list)
+    stock_specific: StockSpecificPreviewBlock
+    errors: list[MetadataValidationIssue] = Field(default_factory=list)
+    warnings: list[MetadataValidationIssue] = Field(default_factory=list)
+
+
 class ProcessingJobMetadataResult(
     FileProcessingMixin,
     FileNameMixin,
@@ -254,6 +291,10 @@ class ProcessingJobMetadataResult(
     """
 
     error_message: str | None = None
+    selected_for_export: bool = True
+    field_sources: dict[str, MetadataFieldSource] = Field(default_factory=dict)
+    edited_fields: list[str] = Field(default_factory=list)
+    preview: StockAwareMetadataPreview | None = None
     validation: MetadataValidationResult = Field(
         default_factory=MetadataValidationResult
     )
@@ -276,6 +317,7 @@ class UpdateProcessingJobMetadataRequest(MetadataMixin):
     """
 
     keywords: list[str] | None = None
+    selected_for_export: bool | None = None
     categories: list[str] | None = None
     releases: list[str] | None = None
     category_2: str | None = None
