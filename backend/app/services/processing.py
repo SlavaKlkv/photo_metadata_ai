@@ -14,9 +14,9 @@ from app.schemas.job import (
     JobStatus,
     ProcessingJobFile,
 )
-from app.services.ai_provider import (
-    BaseAIProvider,
-    get_ai_provider,
+from app.services.ai_fallback import (
+    generate_metadata_with_fallback,
+    validate_primary_provider_configuration,
 )
 from app.services.app_settings import resolve_effective_ai_settings
 from app.services.image_preprocessing import resize_image_for_ai
@@ -29,7 +29,7 @@ logger = structlog.get_logger(__name__)
 
 async def _process_file(
     file: ProcessingJobFile,
-    ai_provider: BaseAIProvider,
+    selected_provider: AIProvider,
     job_id: UUID,
     shooting_context: str | None,
     stock_platform: StockPlatform | None,
@@ -69,11 +69,22 @@ async def _process_file(
                 max_long_side_px=DEFAULT_AI_RESIZE_LONG_SIDE_PX,
             )
 
-            metadata = await ai_provider.generate_metadata(
-                preprocessed_image_path,
+            fallback_result = await generate_metadata_with_fallback(
+                selected_provider=selected_provider,
+                image_path=preprocessed_image_path,
                 shooting_context=shooting_context,
                 file_number=file_number,
                 stock_platform=stock_platform,
+            )
+            metadata = fallback_result.metadata
+
+            logger.info(
+                'file_metadata_provider_resolved',
+                job_id=str(job_id),
+                file_id=str(file.file_id),
+                file_number=file_number,
+                provider=fallback_result.provider,
+                model=fallback_result.model,
             )
 
             if await _is_job_cancelled(job_id):
@@ -159,9 +170,8 @@ async def process_job(job_id: UUID) -> None:
         job.effective_ai_provider = effective_ai_settings.provider
         job.effective_ai_model = effective_ai_settings.model
         await storage.update_job(job)
-        ai_provider = get_ai_provider(
+        validate_primary_provider_configuration(
             effective_ai_settings.provider,
-            model=effective_ai_settings.model,
         )
     except Exception as error:
         logger.exception(
@@ -176,7 +186,7 @@ async def process_job(job_id: UUID) -> None:
         *[
             _process_file(
                 file,
-                ai_provider,
+                effective_ai_settings.provider,
                 job.job_id,
                 job.shooting_context,
                 job.stock_platform,
@@ -265,9 +275,8 @@ async def retry_failed_files(job_id: UUID) -> None:
         job.effective_ai_provider = effective_ai_settings.provider
         job.effective_ai_model = effective_ai_settings.model
         await storage.update_job(job)
-        ai_provider = get_ai_provider(
+        validate_primary_provider_configuration(
             effective_ai_settings.provider,
-            model=effective_ai_settings.model,
         )
     except Exception as error:
         logger.exception(
@@ -282,7 +291,7 @@ async def retry_failed_files(job_id: UUID) -> None:
         *[
             _process_file(
                 file,
-                ai_provider,
+                effective_ai_settings.provider,
                 job.job_id,
                 job.shooting_context,
                 job.stock_platform,
