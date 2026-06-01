@@ -8,7 +8,7 @@ from app.core.constants import (
     DEFAULT_AI_RESIZE_LONG_SIDE_PX,
     MAX_CONCURRENT_AI_REQUESTS,
 )
-from app.core.enums import MetadataFieldSource, StockPlatform
+from app.core.enums import AIProvider, MetadataFieldSource, StockPlatform
 from app.schemas.job import (
     FileStatus,
     JobStatus,
