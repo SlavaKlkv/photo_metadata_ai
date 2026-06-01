@@ -346,6 +346,10 @@ async def get_job_status(job_id: UUID):
 @router.get('/{job_id}/results', response_model=ProcessingJobMetadataResults)
 async def get_job_results(
     job_id: UUID,
+    stock_platform: StockPlatform | None = Query(
+        default=None,
+        description='Preview metadata mapped to selected stock platform',
+    ),
 ):
     """
     Возвращает preview-результаты метаданных для задачи.
@@ -359,13 +363,16 @@ async def get_job_results(
             detail='Job not found',
         )
 
-    stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
+    preview_stock_platform = (
+        stock_platform or job.stock_platform or StockPlatform.SHUTTERSTOCK
+    )
 
     return ProcessingJobMetadataResults(
         job_id=job.job_id,
         status=job.status,
         results=[
-            _build_metadata_result(file, stock_platform) for file in job.files
+            _build_metadata_result(file, preview_stock_platform)
+            for file in job.files
         ],
     )
 

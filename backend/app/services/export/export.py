@@ -311,7 +311,7 @@ def _ensure_iptc_export(job: ProcessingJob) -> list[ExportArtifact]:
     stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
 
     for file in job.files:
-        if file.status != FileStatus.COMPLETED:
+        if file.status != FileStatus.COMPLETED or not file.selected_for_export:
             continue
 
         if not file.iptc_embedded_metadata:
