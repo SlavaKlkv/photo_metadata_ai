@@ -44,7 +44,6 @@ from app.services.app_settings import (
 from app.services.cleanup import cleanup_job_temp_files
 from app.services.export.export import (
     ensure_job_exports,
-    invalidate_job_export_cache,
     run_job_export,
 )
 from app.services.processing import (
@@ -142,9 +141,6 @@ async def update_job_settings(
             desktop_settings = update_desktop_settings(payload.ai_provider)
             job.effective_ai_provider = desktop_settings.effective_provider
             job.effective_ai_model = desktop_settings.effective_model
-
-    if payload.model_fields_set:
-        invalidate_job_export_cache(job)
 
     return await storage.update_job(job)
 
