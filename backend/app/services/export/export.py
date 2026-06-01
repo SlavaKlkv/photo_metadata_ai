@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import TypedDict
 from uuid import UUID
 
 import structlog
@@ -31,6 +32,11 @@ SUPPORTED_EXPORT_FORMATS = (
     ExportFormat.CSV,
     ExportFormat.IPTC,
 )
+
+
+class ExportValidationError(TypedDict):
+    filename: str
+    errors: list[str]
 
 
 def generate_job_export(
@@ -303,7 +309,7 @@ def _resolve_export_formats(
 def _ensure_iptc_export(job: ProcessingJob) -> list[ExportArtifact]:
     iptc_artifacts: list[ExportArtifact] = []
     stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
-  
+
     for file in job.files:
         if file.status != FileStatus.COMPLETED:
             continue
@@ -350,66 +356,11 @@ def _count_completed_files(job: ProcessingJob) -> int:
 
 
 def _collect_export_validation_errors(
-    job: ProcessingJob,
-    stock_platform: StockPlatform,
-) -> list[dict[str, object]]:
-    validation_errors: list[dict[str, object]] = []
-
-    for file in job.files:
-        if file.status != FileStatus.COMPLETED:
-            continue
-        if not file.selected_for_export:
-            continue
-
-        iptc_payload = build_stock_iptc_payload(file, stock_platform)
-        embed_metadata_into_jpg(file, payload=iptc_payload)
-        file.iptc_embedded_metadata = True
-
-        file_path = get_upload_file_path(file.filename)
-
-        if not file_path.is_file():
-            raise ValueError(
-                f'IPTC export file not found: {file.original_filename}'
-            )
-
-        iptc_artifacts.append(
-            _build_file_export_artifact(
-                file_path,
-                export_format=ExportFormat.IPTC,
-            )
-        )
-
-    return iptc_artifacts
-
-
-def _build_file_export_artifact(
-    file_path: Path,
-    *,
-    export_format: ExportFormat,
-    count: int = 1,
-) -> ExportArtifact:
-    return ExportArtifact(
-        export_format=export_format,
-        path=str(file_path),
-        filename=file_path.name,
-        size_bytes=file_path.stat().st_size,
-        count=count,
-    )
-
-
-def _count_selected_completed_files(job: ProcessingJob) -> int:
-    return sum(
-        1
-        for file in job.files
-        if file.status == FileStatus.COMPLETED and file.selected_for_export
-    )
-
-
-def _collect_export_validation_errors(
     files: list[ProcessingJobFile],
     stock_platform: StockPlatform,
-) -> list[dict[str, object]]:
-    validation_errors: list[dict[str, object]] = []
+) -> list[ExportValidationError]:
+
+    validation_errors: list[ExportValidationError] = []
 
     for file in files:
         validation_result = validate_file_metadata_for_stock(
@@ -432,15 +383,23 @@ def _collect_export_validation_errors(
     return validation_errors
 
 
+def _count_selected_completed_files(job: ProcessingJob) -> int:
+    return sum(
+        1
+        for file in job.files
+        if file.status == FileStatus.COMPLETED and file.selected_for_export
+    )
+
+
 def _format_export_validation_error(
-    validation_errors: list[dict[str, object]],
+    validation_errors: list[ExportValidationError],
 ) -> str:
     preview_messages: list[str] = []
 
     for file_error in validation_errors[:3]:
-        filename = str(file_error.get('filename', 'unknown'))
-        errors = file_error.get('errors') or []
-        first_error = str(errors[0]) if errors else 'unknown validation error'
+        filename = file_error['filename']
+        errors = file_error['errors']
+        first_error = errors[0] if errors else 'unknown validation error'
         preview_messages.append(f'{filename}: {first_error}')
 
     preview = '; '.join(preview_messages)
@@ -458,8 +417,9 @@ def _extract_export_error_message(
     error: ValueError | OSError | HTTPException,
 ) -> str:
     if isinstance(error, HTTPException):
-        if isinstance(error.detail, str):
-            return error.detail
+        detail = getattr(error, 'detail', None)
+        if isinstance(detail, str):
+            return detail
         return 'Export failed'
 
     return str(error)

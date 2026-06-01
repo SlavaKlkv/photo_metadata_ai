@@ -20,12 +20,6 @@ from app.services.metadata_embedding import (
     IPTCEmbeddingPayload,
     get_upload_file_path,
 )
-    StockFieldOptions,
-)
-from app.services.metadata_embedding import (
-    IPTCEmbeddingPayload,
-    get_upload_file_path,
-)
 from app.services.stock_validation_lists import find_restricted_terms_in_text
 
 
@@ -417,7 +411,7 @@ def build_stock_mapped_metadata(
         people_count=file.people_count,
         model_release_available=file.model_release_available,
         releases=list(file.releases),
-        ai_generated_content_disclosure=(file.ai_generated_content_disclosure),
+        ai_generated_content_disclosure=file.ai_generated_content_disclosure,
         is_illustration=file.is_illustration,
         mature_content=file.mature_content,
         iptc_embedded_metadata=file.iptc_embedded_metadata,
@@ -679,7 +673,7 @@ def _build_stock_iptc_special_instructions(
         return None
 
     return '; '.join(parts)
-  
+
 
 def _collect_validation_categories(file: ProcessingJobFile) -> list[str]:
     """
