@@ -19,6 +19,7 @@ from app.services.ai_provider import (
     BaseAIProvider,
     get_ai_provider,
 )
+from app.services.app_settings import resolve_effective_ai_settings
 from app.services.image_preprocessing import resize_image_for_ai
 from app.services.metadata_embedding import get_upload_file_path
 from app.services.storage import storage
@@ -104,7 +105,14 @@ async def process_job(job_id: UUID) -> None:
     await storage.update_job(job)
 
     try:
-        ai_provider = get_ai_provider(job.ai_provider)
+        effective_ai_settings = resolve_effective_ai_settings(job.ai_provider)
+        job.effective_ai_provider = effective_ai_settings.provider
+        job.effective_ai_model = effective_ai_settings.model
+        await storage.update_job(job)
+        ai_provider = get_ai_provider(
+            effective_ai_settings.provider,
+            model=effective_ai_settings.model,
+        )
     except Exception as error:
         logger.exception(
             'ai_provider_initialization_failed',
@@ -178,7 +186,14 @@ async def retry_failed_files(job_id: UUID) -> None:
     await storage.update_job(job)
 
     try:
-        ai_provider = get_ai_provider(job.ai_provider)
+        effective_ai_settings = resolve_effective_ai_settings(job.ai_provider)
+        job.effective_ai_provider = effective_ai_settings.provider
+        job.effective_ai_model = effective_ai_settings.model
+        await storage.update_job(job)
+        ai_provider = get_ai_provider(
+            effective_ai_settings.provider,
+            model=effective_ai_settings.model,
+        )
     except Exception as error:
         logger.exception(
             'ai_provider_initialization_failed_on_retry',

@@ -67,6 +67,100 @@ router = APIRouter(
 )
 
 
+def _build_metadata_result(
+    file: ProcessingJobFile,
+    stock_platform: StockPlatform,
+) -> ProcessingJobMetadataResult:
+    """
+    Собирает stock-aware результат metadata для preview и PATCH-ответов.
+    """
+    mapped_metadata = build_stock_mapped_metadata(file, stock_platform)
+
+    return ProcessingJobMetadataResult(
+        file_id=file.file_id,
+        filename=file.filename,
+        original_filename=file.original_filename,
+        status=file.status,
+        title=mapped_metadata.title,
+        description=mapped_metadata.description,
+        keywords=mapped_metadata.keywords,
+        categories=mapped_metadata.categories,
+        category_2=mapped_metadata.category_2,
+        license_type=mapped_metadata.license_type,
+        location_metadata=mapped_metadata.location_metadata,
+        editorial_date=mapped_metadata.editorial_date,
+        is_editorial=mapped_metadata.is_editorial,
+        editorial_caption=mapped_metadata.editorial_caption,
+        has_people=mapped_metadata.has_people,
+        people_count=mapped_metadata.people_count,
+        model_release_available=mapped_metadata.model_release_available,
+        releases=mapped_metadata.releases,
+        ai_generated_content_disclosure=(
+            mapped_metadata.ai_generated_content_disclosure
+        ),
+        is_illustration=mapped_metadata.is_illustration,
+        mature_content=mapped_metadata.mature_content,
+        iptc_embedded_metadata=mapped_metadata.iptc_embedded_metadata,
+        error_message=file.error_message,
+        validation=validate_file_metadata_for_stock(
+            file,
+            stock_platform,
+        ),
+    )
+
+
+def _resolve_selected_export_formats(
+    *,
+    csv: bool,
+    iptc: bool,
+) -> list[ExportFormat]:
+    selected: list[ExportFormat] = []
+
+    if csv:
+        selected.append(ExportFormat.CSV)
+
+    if iptc:
+        selected.append(ExportFormat.IPTC)
+
+    return selected
+
+
+def _detect_artifact_media_type(
+    export_format: ExportFormat,
+) -> str:
+    if export_format == ExportFormat.CSV:
+        return 'text/csv; charset=utf-8'
+
+    if export_format == ExportFormat.IPTC:
+        return 'image/jpeg'
+
+    return 'application/octet-stream'
+
+
+def _build_zip_export_response(
+    job_id: UUID,
+    artifacts: list[tuple[Path, str]],
+) -> Response:
+    zip_buffer = BytesIO()
+
+    with ZipFile(zip_buffer, mode='w', compression=ZIP_DEFLATED) as zip_file:
+        for file_path, arc_name in artifacts:
+            zip_file.write(file_path, arcname=arc_name)
+
+    zip_content = zip_buffer.getvalue()
+    archive_name = f'{job_id}_exports.zip'
+
+    return Response(
+        content=zip_content,
+        media_type='application/zip',
+        headers={
+            'Content-Disposition': (
+                f'attachment; filename="{archive_name}"'
+            ),
+        },
+    )
+
+
 # --- загрузка и обработка ---
 
 
@@ -101,9 +195,13 @@ async def upload_photos(
                 )
             )
 
+    desktop_settings = get_desktop_settings()
     job = ProcessingJob(
         files=job_files,
         shooting_context=shooting_context,
+        ai_provider=desktop_settings.selected_provider,
+        effective_ai_provider=desktop_settings.effective_provider,
+        effective_ai_model=desktop_settings.effective_model,
     )
 
     created_job = await storage.create_job(job)
@@ -129,6 +227,15 @@ async def update_job_settings(
 
     for field_name in payload.model_fields_set:
         setattr(job, field_name, getattr(payload, field_name))
+
+    if 'ai_provider' in payload.model_fields_set:
+        if payload.ai_provider is None:
+            job.effective_ai_provider = None
+            job.effective_ai_model = None
+        else:
+            desktop_settings = update_desktop_settings(payload.ai_provider)
+            job.effective_ai_provider = desktop_settings.effective_provider
+            job.effective_ai_model = desktop_settings.effective_model
 
     if payload.model_fields_set:
         invalidate_job_export_cache(job)
@@ -185,6 +292,10 @@ async def start_job_processing(
             detail='Job processing has already been started or finished',
         )
 
+    effective_ai_settings = resolve_effective_ai_settings(job.ai_provider)
+    job.ai_provider = effective_ai_settings.provider
+    job.effective_ai_provider = effective_ai_settings.provider
+    job.effective_ai_model = effective_ai_settings.model
     job.status = JobStatus.PROCESSING
     await storage.update_job(job)
 

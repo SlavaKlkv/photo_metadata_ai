@@ -3,6 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.core.enums import AIProvider
 from app.schemas.provider_discovery import ProvidersDiscoveryResponse
 
 
@@ -26,6 +27,16 @@ class DesktopActionResponse(BaseModel):
     message: str
     code: str | None = None
     path: str | None = None
+
+
+class DesktopSettingsResponse(BaseModel):
+    selected_provider: AIProvider
+    effective_provider: AIProvider
+    effective_model: str | None = None
+
+
+class UpdateDesktopSettingsRequest(BaseModel):
+    selected_provider: AIProvider
 
 
 class DesktopStartupStatusResponse(BaseModel):

@@ -137,6 +137,8 @@ class JobSettingsMixin(BaseModel):
     stock_platform: StockPlatform | None = None
     export_formats: list[ExportFormat] = Field(default_factory=list)
     ai_provider: AIProvider | None = None
+    effective_ai_provider: AIProvider | None = None
+    effective_ai_model: str | None = None
 
 
 class ExportArtifact(BaseModel):

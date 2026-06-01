@@ -13,6 +13,7 @@ from app.schemas.job import (
     ProcessingJob,
     ProcessingJobFile,
 )
+from app.services.app_settings import get_desktop_settings
 from app.services.metadata_embedding import embed_metadata_into_jpg
 from app.services.stock_metadata import build_stock_iptc_payload
 from app.services.storage import storage
@@ -28,6 +29,7 @@ async def create_job(payload: CreateProcessingJobRequest):
     """
     Создает новую задачу обработки файлов.
     """
+    desktop_settings = get_desktop_settings()
     job = ProcessingJob(
         files=[
             ProcessingJobFile(
@@ -37,6 +39,9 @@ async def create_job(payload: CreateProcessingJobRequest):
             for file in payload.files
         ],
         shooting_context=payload.shooting_context,
+        ai_provider=desktop_settings.selected_provider,
+        effective_ai_provider=desktop_settings.effective_provider,
+        effective_ai_model=desktop_settings.effective_model,
     )
 
     return await storage.create_job(job)
