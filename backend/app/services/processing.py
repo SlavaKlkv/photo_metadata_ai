@@ -118,6 +118,8 @@ async def _process_file(
             file.is_illustration = metadata.is_illustration
             file.mature_content = metadata.mature_content
             file.iptc_embedded_metadata = False
+            file.prompt_version = metadata.prompt_version
+            file.prompt_language = metadata.prompt_language
 
             file.status = FileStatus.COMPLETED
             logger.info(

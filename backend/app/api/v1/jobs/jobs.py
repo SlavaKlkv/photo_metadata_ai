@@ -99,6 +99,8 @@ def _build_metadata_result(
         is_illustration=mapped_metadata.is_illustration,
         mature_content=mapped_metadata.mature_content,
         iptc_embedded_metadata=mapped_metadata.iptc_embedded_metadata,
+        prompt_version=file.prompt_version,
+        prompt_language=file.prompt_language,
         error_message=file.error_message,
         validation=validate_file_metadata_for_stock(
             file,

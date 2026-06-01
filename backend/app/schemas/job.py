@@ -128,6 +128,15 @@ class StockSpecificMetadataMixin(BaseModel):
         return sanitize_string_list(value)
 
 
+class PromptMetadataMixin(BaseModel):
+    """
+    Сведения о prompt template, который использовался при генерации.
+    """
+
+    prompt_version: str | None = None
+    prompt_language: str | None = None
+
+
 class JobSettingsMixin(BaseModel):
     """
     Общие поля настроек задачи для request и job-схем.
@@ -184,6 +193,7 @@ class ProcessingJobFile(
     FileNameMixin,
     MetadataMixin,
     StockSpecificMetadataMixin,
+    PromptMetadataMixin,
 ):
     file_id: UUID = Field(default_factory=uuid4)
     status: FileStatus = FileStatus.QUEUED
@@ -248,6 +258,7 @@ class ProcessingJobMetadataResult(
     FileNameMixin,
     MetadataMixin,
     StockSpecificMetadataMixin,
+    PromptMetadataMixin,
 ):
     """
     Строка preview-метаданных для таблицы результатов на фронтенде.
