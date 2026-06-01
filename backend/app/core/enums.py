@@ -53,3 +53,8 @@ class ExportFormat(StrEnum):
     CSV = 'csv'
     IPTC = 'iptc'
     JSON = 'json'
+
+
+class MetadataFieldSource(StrEnum):
+    GENERATED = 'generated'
+    EDITED = 'edited'

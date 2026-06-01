@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import TypedDict
 from uuid import UUID
 
 import structlog
@@ -13,7 +14,7 @@ from app.core.enums import (
     StockPlatform,
 )
 from app.core.runtime import resolve_path_in_base
-from app.schemas.job import ExportArtifact, ProcessingJob
+from app.schemas.job import ExportArtifact, ProcessingJob, ProcessingJobFile
 from app.services.export.csv import generate_metadata_csv
 from app.services.metadata_embedding import (
     embed_metadata_into_jpg,
@@ -33,6 +34,11 @@ SUPPORTED_EXPORT_FORMATS = (
 )
 
 
+class ExportValidationError(TypedDict):
+    filename: str
+    errors: list[str]
+
+
 def generate_job_export(
     job: ProcessingJob,
     export_format: ExportFormat,
@@ -41,15 +47,14 @@ def generate_job_export(
     Генерирует экспорт задачи в выбранном формате.
     """
     if export_format == ExportFormat.CSV:
-        has_completed_files = any(
-            file.status == FileStatus.COMPLETED for file in job.files
-        )
-        if not has_completed_files:
-            raise ValueError('No completed files available for export')
-
         stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
+        selected_completed_files = [
+            file
+            for file in job.files
+            if file.status == FileStatus.COMPLETED and file.selected_for_export
+        ]
         validation_errors = _collect_export_validation_errors(
-            job,
+            selected_completed_files,
             stock_platform,
         )
 
@@ -122,48 +127,9 @@ def ensure_job_export(
     export_format: ExportFormat,
 ) -> Path:
     """
-    Возвращает существующий экспорт задачи или создает новый,
-    если файла еще нет.
+    Всегда пересобирает export на основе актуального состояния metadata.
     """
-    export_path = get_job_export_path(job, export_format)
-
-    if export_path.is_file():
-        logger.info(
-            'job_export_reused',
-            job_id=str(job.job_id),
-            export_format=export_format,
-            export_path=str(export_path),
-        )
-        return export_path
-
     return store_job_export(job, export_format)
-
-
-def invalidate_job_export_cache(job: ProcessingJob) -> None:
-    """
-    Инвалидирует сохраненные export-файлы задачи.
-    Вызывается после изменения metadata/settings.
-    """
-    job_result_dir = resolve_path_in_base(RESULTS_DIR, str(job.job_id))
-    removed_files = 0
-
-    if job_result_dir.is_dir():
-        for path in job_result_dir.glob(f'{job.job_id}_*'):
-            if not path.is_file():
-                continue
-            path.unlink(missing_ok=True)
-            removed_files += 1
-
-    job.export_status = None
-    job.export_progress = 0
-    job.export_format = None
-    job.export_error_message = None
-
-    logger.info(
-        'job_export_cache_invalidated',
-        job_id=str(job.job_id),
-        removed_files=removed_files,
-    )
 
 
 def load_stored_job_export(
@@ -247,13 +213,18 @@ def ensure_job_exports(
     """
     Обеспечивает экспорт всех форматов, выбранных в настройках задачи.
     """
-    completed_files_count = _count_completed_files(job)
+    completed_files_count = _count_selected_completed_files(job)
     if completed_files_count == 0:
-        raise ValueError('No completed files available for export')
+        raise ValueError('No selected completed files available for export')
 
     stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
+    selected_completed_files = [
+        file
+        for file in job.files
+        if file.status == FileStatus.COMPLETED and file.selected_for_export
+    ]
     validation_errors = _collect_export_validation_errors(
-        job,
+        selected_completed_files,
         stock_platform,
     )
 
@@ -313,7 +284,7 @@ def _ensure_iptc_export(job: ProcessingJob) -> list[ExportArtifact]:
     stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
 
     for file in job.files:
-        if file.status != FileStatus.COMPLETED:
+        if file.status != FileStatus.COMPLETED or not file.selected_for_export:
             continue
 
         if not file.iptc_embedded_metadata:
@@ -358,15 +329,13 @@ def _count_completed_files(job: ProcessingJob) -> int:
 
 
 def _collect_export_validation_errors(
-    job: ProcessingJob,
+    files: list[ProcessingJobFile],
     stock_platform: StockPlatform,
-) -> list[dict[str, object]]:
-    validation_errors: list[dict[str, object]] = []
+) -> list[ExportValidationError]:
 
-    for file in job.files:
-        if file.status != FileStatus.COMPLETED:
-            continue
+    validation_errors: list[ExportValidationError] = []
 
+    for file in files:
         validation_result = validate_file_metadata_for_stock(
             file,
             stock_platform,
@@ -387,15 +356,23 @@ def _collect_export_validation_errors(
     return validation_errors
 
 
+def _count_selected_completed_files(job: ProcessingJob) -> int:
+    return sum(
+        1
+        for file in job.files
+        if file.status == FileStatus.COMPLETED and file.selected_for_export
+    )
+
+
 def _format_export_validation_error(
-    validation_errors: list[dict[str, object]],
+    validation_errors: list[ExportValidationError],
 ) -> str:
     preview_messages: list[str] = []
 
     for file_error in validation_errors[:3]:
-        filename = str(file_error.get('filename', 'unknown'))
-        errors = file_error.get('errors') or []
-        first_error = str(errors[0]) if errors else 'unknown validation error'
+        filename = file_error['filename']
+        errors = file_error['errors']
+        first_error = errors[0] if errors else 'unknown validation error'
         preview_messages.append(f'{filename}: {first_error}')
 
     preview = '; '.join(preview_messages)
@@ -413,8 +390,9 @@ def _extract_export_error_message(
     error: ValueError | OSError | HTTPException,
 ) -> str:
     if isinstance(error, HTTPException):
-        if isinstance(error.detail, str):
-            return error.detail
+        detail = getattr(error, 'detail', None)
+        if isinstance(detail, str):
+            return detail
         return 'Export failed'
 
     return str(error)

@@ -8,15 +8,15 @@ from app.core.constants import (
     DEFAULT_AI_RESIZE_LONG_SIDE_PX,
     MAX_CONCURRENT_AI_REQUESTS,
 )
-from app.core.enums import StockPlatform
+from app.core.enums import AIProvider, MetadataFieldSource, StockPlatform
 from app.schemas.job import (
     FileStatus,
     JobStatus,
     ProcessingJobFile,
 )
-from app.services.ai_provider import (
-    BaseAIProvider,
-    get_ai_provider,
+from app.services.ai_fallback import (
+    generate_metadata_with_fallback,
+    validate_primary_provider_configuration,
 )
 from app.services.app_settings import resolve_effective_ai_settings
 from app.services.image_preprocessing import resize_image_for_ai
@@ -29,7 +29,7 @@ logger = structlog.get_logger(__name__)
 
 async def _process_file(
     file: ProcessingJobFile,
-    ai_provider: BaseAIProvider,
+    selected_provider: AIProvider,
     job_id: UUID,
     shooting_context: str | None,
     stock_platform: StockPlatform | None,
@@ -69,11 +69,22 @@ async def _process_file(
                 max_long_side_px=DEFAULT_AI_RESIZE_LONG_SIDE_PX,
             )
 
-            metadata = await ai_provider.generate_metadata(
-                preprocessed_image_path,
+            fallback_result = await generate_metadata_with_fallback(
+                selected_provider=selected_provider,
+                image_path=preprocessed_image_path,
                 shooting_context=shooting_context,
                 file_number=file_number,
                 stock_platform=stock_platform,
+            )
+            metadata = fallback_result.metadata
+
+            logger.info(
+                'file_metadata_provider_resolved',
+                job_id=str(job_id),
+                file_id=str(file.file_id),
+                file_number=file_number,
+                provider=fallback_result.provider,
+                model=fallback_result.model,
             )
 
             if await _is_job_cancelled(job_id):
@@ -107,6 +118,7 @@ async def _process_file(
             file.is_illustration = metadata.is_illustration
             file.mature_content = metadata.mature_content
             file.iptc_embedded_metadata = False
+            _mark_generated_field_sources(file)
 
             file.status = FileStatus.COMPLETED
             logger.info(
@@ -158,9 +170,8 @@ async def process_job(job_id: UUID) -> None:
         job.effective_ai_provider = effective_ai_settings.provider
         job.effective_ai_model = effective_ai_settings.model
         await storage.update_job(job)
-        ai_provider = get_ai_provider(
+        validate_primary_provider_configuration(
             effective_ai_settings.provider,
-            model=effective_ai_settings.model,
         )
     except Exception as error:
         logger.exception(
@@ -175,7 +186,7 @@ async def process_job(job_id: UUID) -> None:
         *[
             _process_file(
                 file,
-                ai_provider,
+                effective_ai_settings.provider,
                 job.job_id,
                 job.shooting_context,
                 job.stock_platform,
@@ -201,6 +212,31 @@ async def process_job(job_id: UUID) -> None:
         status=job.status,
     )
     await storage.update_job(job)
+
+
+def _mark_generated_field_sources(file: ProcessingJobFile) -> None:
+    generated_fields = [
+        'title',
+        'description',
+        'keywords',
+        'categories',
+        'category_2',
+        'license_type',
+        'location_metadata',
+        'editorial_date',
+        'is_editorial',
+        'editorial_caption',
+        'has_people',
+        'people_count',
+        'model_release_available',
+        'releases',
+        'ai_generated_content_disclosure',
+        'is_illustration',
+        'mature_content',
+    ]
+
+    for field_name in generated_fields:
+        file.field_sources[field_name] = MetadataFieldSource.GENERATED
 
 
 async def retry_failed_files(job_id: UUID) -> None:
@@ -239,9 +275,8 @@ async def retry_failed_files(job_id: UUID) -> None:
         job.effective_ai_provider = effective_ai_settings.provider
         job.effective_ai_model = effective_ai_settings.model
         await storage.update_job(job)
-        ai_provider = get_ai_provider(
+        validate_primary_provider_configuration(
             effective_ai_settings.provider,
-            model=effective_ai_settings.model,
         )
     except Exception as error:
         logger.exception(
@@ -256,7 +291,7 @@ async def retry_failed_files(job_id: UUID) -> None:
         *[
             _process_file(
                 file,
-                ai_provider,
+                effective_ai_settings.provider,
                 job.job_id,
                 job.shooting_context,
                 job.stock_platform,

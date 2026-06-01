@@ -194,8 +194,7 @@ def _discover_api_key_provider(
 
     if configured:
         recommendation = (
-            f'Use the detected {display_name} API key from '
-            f'{api_key_env_var}.'
+            f'Use the detected {display_name} API key from {api_key_env_var}.'
         )
         return ProviderDiscoveryItem(
             provider=provider,
