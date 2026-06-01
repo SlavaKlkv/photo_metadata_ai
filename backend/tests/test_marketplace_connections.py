@@ -105,6 +105,59 @@ def test_marketplace_invalid_credentials_return_normalized_error(
         reset_runtime_directories_cache()
 
 
+def test_invalid_marketplace_update_preserves_existing_credentials(
+    monkeypatch,
+    tmp_path: Path,
+):
+    monkeypatch.setattr(settings, 'WORKSPACE_DIR', tmp_path)
+    monkeypatch.setattr(settings, 'DESKTOP_WORKSPACE_DIR', None)
+    reset_runtime_directories_cache()
+
+    try:
+        with TestClient(app) as client:
+            save_response = client.put(
+                '/api/v1/marketplaces/shutterstock/credentials',
+                json={
+                    'api_key': 'shutterstock-secret-123',
+                    'account_id': 'seller-1',
+                },
+            )
+            assert save_response.status_code == 200
+
+            invalid_update_response = client.put(
+                '/api/v1/marketplaces/shutterstock/credentials',
+                json={
+                    'api_key': 'invalid-token-value',
+                    'account_id': 'seller-2',
+                },
+            )
+            assert invalid_update_response.status_code == 400
+            assert invalid_update_response.json()['detail']['error'] == {
+                'code': 'credential_rejected',
+                'message': 'Marketplace rejected the provided credentials.',
+            }
+            assert 'invalid-token-value' not in invalid_update_response.text
+
+            state_response = client.get(
+                '/api/v1/marketplaces/shutterstock/connection'
+            )
+            assert state_response.status_code == 200
+            state_payload = state_response.json()
+            assert state_payload['status'] == 'connected'
+            assert state_payload['connected'] is True
+            assert state_payload['account_id'] == 'seller-1'
+            assert state_payload['secret_hint'] == '***-123'
+
+            stored_payload = (
+                tmp_path / 'marketplace_credentials.json'
+            ).read_text(encoding='utf-8')
+            assert 'shutterstock-secret-123' in stored_payload
+            assert 'invalid-token-value' not in stored_payload
+            assert 'seller-2' not in stored_payload
+    finally:
+        reset_runtime_directories_cache()
+
+
 def test_marketplace_credentials_can_be_deleted(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(settings, 'WORKSPACE_DIR', tmp_path)
     monkeypatch.setattr(settings, 'DESKTOP_WORKSPACE_DIR', None)

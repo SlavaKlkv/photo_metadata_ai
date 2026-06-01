@@ -54,6 +54,7 @@ async def save_marketplace_credentials(
     )
     material = extract_credential_material(credentials)
     records = _load_credentials()
+    existing_record = records.get(marketplace.value)
     now = datetime.now(UTC)
 
     record = {
@@ -68,6 +69,13 @@ async def save_marketplace_credentials(
 
     if validation.valid:
         record['secret'] = material.secret
+    elif existing_record is not None:
+        logger.info(
+            'marketplace_credentials_update_rejected_existing_preserved',
+            marketplace=marketplace.value,
+            status=validation.status.value,
+        )
+        return _build_connection_state(marketplace, record)
 
     records[marketplace.value] = record
     _write_credentials(records)
