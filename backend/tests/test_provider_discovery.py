@@ -28,14 +28,6 @@ def reset_provider_settings(monkeypatch):
     desktop_startup_orchestrator.reset_for_tests()
 
 
-def _provider_by_name(payload: dict, provider_name: str) -> dict:
-    return next(
-        provider
-        for provider in payload['providers']
-        if provider['provider'] == provider_name
-    )
-
-
 def test_provider_discovery_reports_unavailable_ollama(monkeypatch):
     async_client = httpx.AsyncClient
 
@@ -230,3 +222,11 @@ def test_provider_discovery_returns_manual_key_state_when_key_missing(
     assert validation['trigger'] == 'manual'
     assert validation['status'] == 'missing'
     assert validation['error_message'] == 'invalid key'
+
+
+def _provider_by_name(payload: dict, provider_name: str) -> dict:
+    return next(
+        provider
+        for provider in payload['providers']
+        if provider['provider'] == provider_name
+    )

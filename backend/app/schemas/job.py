@@ -23,11 +23,6 @@ from app.utils.sanitizers import (
     sanitize_metadata_text,
     sanitize_string_list,
 )
-from app.utils.sanitizers import (
-    sanitize_keywords,
-    sanitize_metadata_text,
-    sanitize_string_list,
-)
 
 
 class FileProcessingMixin(BaseModel):

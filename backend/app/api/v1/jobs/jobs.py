@@ -43,9 +43,7 @@ from app.services.ai_provider import get_ai_provider
 from app.services.cleanup import cleanup_job_temp_files
 from app.services.export.export import (
     ensure_job_exports,
-    generate_job_export,
     invalidate_job_export_cache,
-    load_stored_job_export,
     run_job_export,
 )
 from app.services.processing import (
@@ -57,7 +55,6 @@ from app.services.processing import (
 )
 from app.services.stock_metadata import (
     build_stock_mapped_metadata,
-    get_effective_categories,
     get_stock_field_options,
     validate_file_metadata_for_stock,
 )
@@ -68,127 +65,6 @@ router = APIRouter(
     prefix='/jobs',
     tags=['jobs'],
 )
-
-
-def _build_metadata_result(
-    file: ProcessingJobFile,
-    stock_platform: StockPlatform,
-) -> ProcessingJobMetadataResult:
-    """
-    Собирает stock-aware результат metadata для preview и PATCH-ответов.
-    """
-    mapped_metadata = build_stock_mapped_metadata(file, stock_platform)
-    mapped_categories = get_effective_categories(file, stock_platform)
-    mapped_category_2 = (
-        mapped_categories[1] if len(mapped_categories) > 1 else None
-    )
-
-    return ProcessingJobMetadataResult(
-        file_id=file.file_id,
-        filename=file.filename,
-        original_filename=file.original_filename,
-        status=file.status,
-        title=mapped_metadata.title,
-        description=mapped_metadata.description,
-        keywords=mapped_metadata.keywords,
-        categories=mapped_metadata.categories,
-        category_2=mapped_metadata.category_2,
-        license_type=mapped_metadata.license_type,
-        location_metadata=mapped_metadata.location_metadata,
-        editorial_date=mapped_metadata.editorial_date,
-        is_editorial=mapped_metadata.is_editorial,
-        editorial_caption=mapped_metadata.editorial_caption,
-        has_people=mapped_metadata.has_people,
-        people_count=mapped_metadata.people_count,
-        model_release_available=mapped_metadata.model_release_available,
-        releases=mapped_metadata.releases,
-        ai_generated_content_disclosure=(
-            mapped_metadata.ai_generated_content_disclosure
-        ),
-        is_illustration=mapped_metadata.is_illustration,
-        mature_content=mapped_metadata.mature_content,
-        iptc_embedded_metadata=mapped_metadata.iptc_embedded_metadata,
-        error_message=file.error_message,
-        validation=validate_file_metadata_for_stock(
-            file,
-            stock_platform,
-        ),
-    )
-
-
-def _build_metadata_snapshot(file: ProcessingJobFile) -> MetadataSnapshot:
-    """
-    Собирает snapshot текущих metadata для истории regenerate attempts.
-    """
-    return MetadataSnapshot(
-        title=file.title,
-        description=file.description,
-        keywords=list(file.keywords),
-        categories=list(file.categories),
-        category_2=file.category_2,
-        license_type=file.license_type,
-        location_metadata=file.location_metadata,
-        editorial_date=file.editorial_date,
-        is_editorial=file.is_editorial,
-        editorial_caption=file.editorial_caption,
-        has_people=file.has_people,
-        people_count=file.people_count,
-        model_release_available=file.model_release_available,
-        releases=list(file.releases),
-        ai_generated_content_disclosure=(file.ai_generated_content_disclosure),
-        is_illustration=file.is_illustration,
-        mature_content=file.mature_content,
-        iptc_embedded_metadata=file.iptc_embedded_metadata,
-def _resolve_selected_export_formats(
-    *,
-    csv: bool,
-    iptc: bool,
-) -> list[ExportFormat]:
-    selected: list[ExportFormat] = []
-
-    if csv:
-        selected.append(ExportFormat.CSV)
-
-    if iptc:
-        selected.append(ExportFormat.IPTC)
-
-    return selected
-
-
-def _detect_artifact_media_type(
-    export_format: ExportFormat,
-) -> str:
-    if export_format == ExportFormat.CSV:
-        return 'text/csv; charset=utf-8'
-
-    if export_format == ExportFormat.IPTC:
-        return 'image/jpeg'
-
-    return 'application/octet-stream'
-
-
-def _build_zip_export_response(
-    job_id: UUID,
-    artifacts: list[tuple[Path, str]],
-) -> Response:
-    zip_buffer = BytesIO()
-
-    with ZipFile(zip_buffer, mode='w', compression=ZIP_DEFLATED) as zip_file:
-        for file_path, arc_name in artifacts:
-            zip_file.write(file_path, arcname=arc_name)
-
-    zip_content = zip_buffer.getvalue()
-    archive_name = f'{job_id}_exports.zip'
-
-    return Response(
-        content=zip_content,
-        media_type='application/zip',
-        headers={
-            'Content-Disposition': (
-                f'attachment; filename="{archive_name}"'
-            ),
-        },
-    )
 
 
 # --- загрузка и обработка ---
@@ -440,6 +316,7 @@ async def regenerate_file_metadata(
         ai_provider,
         job.job_id,
         resolved_shooting_context,
+        resolved_stock_platform,
     )
     apply_generated_metadata_to_file(job_file, regenerated_metadata)
     job_file.status = FileStatus.COMPLETED
@@ -878,9 +755,7 @@ async def export_job(
             content=file_path.read_bytes(),
             media_type=media_type,
             headers={
-                'Content-Disposition': (
-                    f'attachment; filename="{filename}"'
-                ),
+                'Content-Disposition': (f'attachment; filename="{filename}"'),
             },
         )
 
@@ -890,4 +765,122 @@ async def export_job(
             (artifact_path, filename)
             for artifact_path, filename, _ in resolved_artifacts
         ],
+    )
+
+
+def _build_metadata_result(
+    file: ProcessingJobFile,
+    stock_platform: StockPlatform,
+) -> ProcessingJobMetadataResult:
+    """
+    Собирает stock-aware результат metadata для preview и PATCH-ответов.
+    """
+    mapped_metadata = build_stock_mapped_metadata(file, stock_platform)
+
+    return ProcessingJobMetadataResult(
+        file_id=file.file_id,
+        filename=file.filename,
+        original_filename=file.original_filename,
+        status=file.status,
+        title=mapped_metadata.title,
+        description=mapped_metadata.description,
+        keywords=mapped_metadata.keywords,
+        categories=mapped_metadata.categories,
+        category_2=mapped_metadata.category_2,
+        license_type=mapped_metadata.license_type,
+        location_metadata=mapped_metadata.location_metadata,
+        editorial_date=mapped_metadata.editorial_date,
+        is_editorial=mapped_metadata.is_editorial,
+        editorial_caption=mapped_metadata.editorial_caption,
+        has_people=mapped_metadata.has_people,
+        people_count=mapped_metadata.people_count,
+        model_release_available=mapped_metadata.model_release_available,
+        releases=mapped_metadata.releases,
+        ai_generated_content_disclosure=(
+            mapped_metadata.ai_generated_content_disclosure
+        ),
+        is_illustration=mapped_metadata.is_illustration,
+        mature_content=mapped_metadata.mature_content,
+        iptc_embedded_metadata=mapped_metadata.iptc_embedded_metadata,
+        error_message=file.error_message,
+        validation=validate_file_metadata_for_stock(
+            file,
+            stock_platform,
+        ),
+    )
+
+
+def _build_metadata_snapshot(file: ProcessingJobFile) -> MetadataSnapshot:
+    """
+    Собирает snapshot текущих metadata для истории regenerate attempts.
+    """
+    return MetadataSnapshot(
+        title=file.title,
+        description=file.description,
+        keywords=list(file.keywords),
+        categories=list(file.categories),
+        category_2=file.category_2,
+        license_type=file.license_type,
+        location_metadata=file.location_metadata,
+        editorial_date=file.editorial_date,
+        is_editorial=file.is_editorial,
+        editorial_caption=file.editorial_caption,
+        has_people=file.has_people,
+        people_count=file.people_count,
+        model_release_available=file.model_release_available,
+        releases=list(file.releases),
+        ai_generated_content_disclosure=file.ai_generated_content_disclosure,
+        is_illustration=file.is_illustration,
+        mature_content=file.mature_content,
+        iptc_embedded_metadata=file.iptc_embedded_metadata,
+    )
+
+
+def _resolve_selected_export_formats(
+    *,
+    csv: bool,
+    iptc: bool,
+) -> list[ExportFormat]:
+    selected: list[ExportFormat] = []
+
+    if csv:
+        selected.append(ExportFormat.CSV)
+
+    if iptc:
+        selected.append(ExportFormat.IPTC)
+
+    return selected
+
+
+def _detect_artifact_media_type(
+    export_format: ExportFormat,
+) -> str:
+    if export_format == ExportFormat.CSV:
+        return 'text/csv; charset=utf-8'
+
+    if export_format == ExportFormat.IPTC:
+        return 'image/jpeg'
+
+    return 'application/octet-stream'
+
+
+def _build_zip_export_response(
+    job_id: UUID,
+    artifacts: list[tuple[Path, str]],
+) -> Response:
+    zip_buffer = BytesIO()
+
+    with ZipFile(zip_buffer, mode='w', compression=ZIP_DEFLATED) as zip_file:
+        for file_path, arc_name in artifacts:
+            zip_file.write(file_path, arcname=arc_name)
+
+    zip_content = zip_buffer.getvalue()
+    archive_name = f'{job_id}_exports.zip'
+
+    return Response(
+        content=zip_content,
+        media_type='application/zip',
+        headers={
+            'Content-Disposition': (f'attachment; filename="{archive_name}"'),
+        },
     )

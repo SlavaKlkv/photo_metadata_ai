@@ -65,6 +65,59 @@ def embed_metadata_into_jpg(
         ) from error
 
 
+def get_upload_file_path(filename: str) -> Path:
+    """
+    Формирует путь к файлу внутри директории uploads.
+    """
+    try:
+        file_path = resolve_path_in_base(UPLOAD_DIR, Path(filename).name)
+    except ValueError as error:
+        logger.warning(
+            'upload_file_path_rejected',
+            filename=filename,
+            error=str(error),
+        )
+        raise HTTPException(
+            status_code=400,
+            detail='Unsafe file path',
+        ) from error
+
+    logger.debug(
+        'upload_file_path_resolved',
+        filename=filename,
+        resolved_path=str(file_path),
+    )
+
+    return file_path
+
+
+def _validate_jpg_file_path(file_path: Path) -> None:
+    """
+    Проверяет, что файл существует и является JPG/JPEG.
+    """
+
+    if file_path.suffix.lower() not in ALLOWED_IMAGE_SUFFIXES:
+        logger.warning(
+            'metadata_embedding_invalid_file_type',
+            file_path=str(file_path),
+            file_extension=file_path.suffix.lower(),
+        )
+        raise HTTPException(
+            status_code=400,
+            detail='Metadata embedding is supported only for JPG files',
+        )
+
+    if not file_path.exists():
+        logger.warning(
+            'metadata_embedding_file_not_found',
+            file_path=str(file_path),
+        )
+        raise HTTPException(
+            status_code=404,
+            detail='Uploaded file not found',
+        )
+
+
 def _embed_iptc_metadata(
     file_path: Path,
     payload: IPTCEmbeddingPayload,
@@ -180,57 +233,4 @@ def _set_iptc_optional_text(
         logger.warning(
             'iptc_field_write_skipped',
             field=field,
-        )
-
-
-def get_upload_file_path(filename: str) -> Path:
-    """
-    Формирует путь к файлу внутри директории uploads.
-    """
-    try:
-        file_path = resolve_path_in_base(UPLOAD_DIR, Path(filename).name)
-    except ValueError as error:
-        logger.warning(
-            'upload_file_path_rejected',
-            filename=filename,
-            error=str(error),
-        )
-        raise HTTPException(
-            status_code=400,
-            detail='Unsafe file path',
-        ) from error
-
-    logger.debug(
-        'upload_file_path_resolved',
-        filename=filename,
-        resolved_path=str(file_path),
-    )
-
-    return file_path
-
-
-def _validate_jpg_file_path(file_path: Path) -> None:
-    """
-    Проверяет, что файл существует и является JPG/JPEG.
-    """
-
-    if file_path.suffix.lower() not in ALLOWED_IMAGE_SUFFIXES:
-        logger.warning(
-            'metadata_embedding_invalid_file_type',
-            file_path=str(file_path),
-            file_extension=file_path.suffix.lower(),
-        )
-        raise HTTPException(
-            status_code=400,
-            detail='Metadata embedding is supported only for JPG files',
-        )
-
-    if not file_path.exists():
-        logger.warning(
-            'metadata_embedding_file_not_found',
-            file_path=str(file_path),
-        )
-        raise HTTPException(
-            status_code=404,
-            detail='Uploaded file not found',
         )

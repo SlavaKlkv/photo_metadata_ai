@@ -27,88 +27,12 @@ ai_requests_semaphore = asyncio.Semaphore(MAX_CONCURRENT_AI_REQUESTS)
 logger = structlog.get_logger(__name__)
 
 
-async def _process_file(
-    file: ProcessingJobFile,
-    ai_provider: BaseAIProvider,
-    job_id: UUID,
-    shooting_context: str | None,
-    stock_platform: StockPlatform | None,
-    file_number: int | None = None,
-) -> None:
-    """
-    Обрабатывает один файл с ограничением числа одновременных AI-запросов.
-    """
-    async with ai_requests_semaphore:
-        logger.info(
-            'file_processing_started',
-            job_id=str(job_id),
-            file_id=str(file.file_id),
-            file_number=file_number,
-            filename=file.original_filename,
-        )
-        try:
-            if await _is_job_cancelled(job_id):
-                file.status = FileStatus.CANCELLED
-                logger.info(
-                    'file_processing_cancelled',
-                    job_id=str(job_id),
-                    file_id=str(file.file_id),
-                    file_number=file_number,
-                    filename=file.original_filename,
-                )
-                return
-
-            file.status = FileStatus.PROCESSING
-
-            metadata = await _generate_metadata_for_file(
-                file,
-                ai_provider,
-                job_id,
-                shooting_context,
-                file_number=file_number,
-                stock_platform=stock_platform,
-            )
-
-            if await _is_job_cancelled(job_id):
-                file.status = FileStatus.CANCELLED
-                logger.info(
-                    'file_processing_cancelled',
-                    job_id=str(job_id),
-                    file_id=str(file.file_id),
-                    file_number=file_number,
-                    filename=file.original_filename,
-                )
-                return
-
-            apply_generated_metadata_to_file(file, metadata)
-
-            file.status = FileStatus.COMPLETED
-            logger.info(
-                'file_processing_completed',
-                job_id=str(job_id),
-                file_id=str(file.file_id),
-                file_number=file_number,
-                filename=file.original_filename,
-            )
-
-        except Exception as error:
-            file.status = FileStatus.FAILED
-            file.error_message = str(error)
-            logger.exception(
-                'file_processing_failed',
-                job_id=str(job_id),
-                file_id=str(file.file_id),
-                file_number=file_number,
-                filename=file.original_filename,
-                error=str(error),
-            )
-
-
 async def regenerate_metadata_for_file(
     file: ProcessingJobFile,
     ai_provider: BaseAIProvider,
     job_id: UUID,
     shooting_context: str | None,
+    stock_platform: StockPlatform | None,
     file_number: int | None = None,
 ) -> AIMetadataResponse:
     """
@@ -121,6 +45,7 @@ async def regenerate_metadata_for_file(
             ai_provider,
             job_id,
             shooting_context,
+            stock_platform=stock_platform,
             file_number=file_number,
         )
 
@@ -319,6 +244,83 @@ async def cancel_job_processing(job_id: UUID) -> None:
     await storage.update_job(job)
 
 
+async def _process_file(
+    file: ProcessingJobFile,
+    ai_provider: BaseAIProvider,
+    job_id: UUID,
+    shooting_context: str | None,
+    stock_platform: StockPlatform | None,
+    file_number: int | None = None,
+) -> None:
+    """
+    Обрабатывает один файл с ограничением числа одновременных AI-запросов.
+    """
+    async with ai_requests_semaphore:
+        logger.info(
+            'file_processing_started',
+            job_id=str(job_id),
+            file_id=str(file.file_id),
+            file_number=file_number,
+            filename=file.original_filename,
+        )
+        try:
+            if await _is_job_cancelled(job_id):
+                file.status = FileStatus.CANCELLED
+                logger.info(
+                    'file_processing_cancelled',
+                    job_id=str(job_id),
+                    file_id=str(file.file_id),
+                    file_number=file_number,
+                    filename=file.original_filename,
+                )
+                return
+
+            file.status = FileStatus.PROCESSING
+
+            metadata = await _generate_metadata_for_file(
+                file,
+                ai_provider,
+                job_id,
+                shooting_context,
+                stock_platform=stock_platform,
+                file_number=file_number,
+            )
+
+            if await _is_job_cancelled(job_id):
+                file.status = FileStatus.CANCELLED
+                logger.info(
+                    'file_processing_cancelled',
+                    job_id=str(job_id),
+                    file_id=str(file.file_id),
+                    file_number=file_number,
+                    filename=file.original_filename,
+                )
+                return
+
+            apply_generated_metadata_to_file(file, metadata)
+
+            file.status = FileStatus.COMPLETED
+            logger.info(
+                'file_processing_completed',
+                job_id=str(job_id),
+                file_id=str(file.file_id),
+                file_number=file_number,
+                filename=file.original_filename,
+            )
+
+        except Exception as error:
+            file.status = FileStatus.FAILED
+            file.error_message = str(error)
+            logger.exception(
+                'file_processing_failed',
+                job_id=str(job_id),
+                file_id=str(file.file_id),
+                file_number=file_number,
+                filename=file.original_filename,
+                error=str(error),
+            )
+
+
 async def _is_job_cancelled(job_id: UUID) -> bool:
     """
     Проверяет, была ли задача отменена во время фоновой обработки.
@@ -360,6 +362,7 @@ async def _generate_metadata_for_file(
     ai_provider: BaseAIProvider,
     job_id: UUID,
     shooting_context: str | None,
+    stock_platform: StockPlatform | None,
     file_number: int | None = None,
 ) -> AIMetadataResponse:
     source_image_path = get_upload_file_path(file.filename)
@@ -375,4 +378,5 @@ async def _generate_metadata_for_file(
         preprocessed_image_path,
         shooting_context=shooting_context,
         file_number=file_number,
+        stock_platform=stock_platform,
     )
