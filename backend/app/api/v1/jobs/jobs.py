@@ -870,6 +870,8 @@ def _build_metadata_result(
         is_illustration=mapped_metadata.is_illustration,
         mature_content=mapped_metadata.mature_content,
         iptc_embedded_metadata=mapped_metadata.iptc_embedded_metadata,
+        prompt_version=file.prompt_version,
+        prompt_language=file.prompt_language,
         selected_for_export=file.selected_for_export,
         field_sources=file.field_sources,
         edited_fields=edited_fields,
