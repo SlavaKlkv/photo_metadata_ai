@@ -23,32 +23,6 @@ class AdobeRestrictedTerms:
     all_term_patterns: tuple[tuple[str, re.Pattern[str]], ...]
 
 
-def _normalize_text(value: str) -> str:
-    normalized = value.lower().replace('_', ' ').replace('-', ' ')
-    return ' '.join(normalized.split())
-
-
-def _dedupe_terms(terms: list[str]) -> tuple[str, ...]:
-    unique_terms: list[str] = []
-    seen_terms: set[str] = set()
-
-    for term in terms:
-        normalized_term = _normalize_text(term)
-        if not normalized_term or normalized_term in seen_terms:
-            continue
-        unique_terms.append(normalized_term)
-        seen_terms.add(normalized_term)
-
-    return tuple(unique_terms)
-
-
-def _compile_term_pattern(term: str) -> re.Pattern[str]:
-    return re.compile(
-        rf'(?<![a-z0-9]){re.escape(term)}(?![a-z0-9])',
-        flags=re.IGNORECASE,
-    )
-
-
 @lru_cache(maxsize=1)
 def load_adobe_restricted_terms() -> AdobeRestrictedTerms:
     payload = json.loads(ADOBE_RESTRICTED_TERMS_FILE.read_text('utf-8'))
@@ -92,3 +66,29 @@ def find_restricted_terms_in_text(text: str) -> list[str]:
             matched_terms.append(term)
 
     return matched_terms
+
+
+def _normalize_text(value: str) -> str:
+    normalized = value.lower().replace('_', ' ').replace('-', ' ')
+    return ' '.join(normalized.split())
+
+
+def _dedupe_terms(terms: list[str]) -> tuple[str, ...]:
+    unique_terms: list[str] = []
+    seen_terms: set[str] = set()
+
+    for term in terms:
+        normalized_term = _normalize_text(term)
+        if not normalized_term or normalized_term in seen_terms:
+            continue
+        unique_terms.append(normalized_term)
+        seen_terms.add(normalized_term)
+
+    return tuple(unique_terms)
+
+
+def _compile_term_pattern(term: str) -> re.Pattern[str]:
+    return re.compile(
+        rf'(?<![a-z0-9]){re.escape(term)}(?![a-z0-9])',
+        flags=re.IGNORECASE,
+    )

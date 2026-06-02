@@ -190,6 +190,26 @@ class UpdateProcessingJobSettingsRequest(JobSettingsMixin):
     """
 
 
+class MetadataSnapshot(MetadataMixin, StockSpecificMetadataMixin):
+    """
+    Снимок metadata для истории regenerate attempts.
+    """
+
+
+class RegenerateAttempt(BaseModel):
+    """
+    История одной попытки regenerate metadata.
+    """
+
+    attempt_id: UUID = Field(default_factory=uuid4)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    shooting_context: str | None = None
+    stock_platform: StockPlatform
+    ai_provider: AIProvider
+    previous_metadata: MetadataSnapshot
+    regenerated_metadata: MetadataSnapshot
+
+
 class ProcessingJobFile(
     FileNameMixin,
     MetadataMixin,
@@ -199,6 +219,7 @@ class ProcessingJobFile(
     file_id: UUID = Field(default_factory=uuid4)
     status: FileStatus = FileStatus.QUEUED
     error_message: str | None = None
+    regenerate_attempts: list[RegenerateAttempt] = Field(default_factory=list)
     selected_for_export: bool = True
     field_sources: dict[str, MetadataFieldSource] = Field(default_factory=dict)
 
@@ -382,6 +403,28 @@ class UpdateProcessingJobMetadataRequest(MetadataMixin):
         Валидирует необязательные текстовые stock-поля PATCH-запроса.
         """
         return sanitize_metadata_text(value)
+
+
+class RegenerateFileMetadataRequest(BaseModel):
+    """
+    Параметры regenerate metadata для одного файла.
+    """
+
+    shooting_context: str | None = None
+    stock_platform: StockPlatform | None = None
+    ai_provider: AIProvider | None = None
+
+
+class RegenerateFileMetadataResponse(BaseModel):
+    """
+    Ответ endpoint regenerate metadata per file.
+    """
+
+    job_id: UUID
+    file_id: UUID
+    attempt_id: UUID
+    metadata: ProcessingJobMetadataResult
+    previous_metadata: MetadataSnapshot
 
 
 class StockFieldOptions(BaseModel):
