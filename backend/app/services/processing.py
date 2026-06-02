@@ -14,13 +14,13 @@ from app.schemas.job import (
     JobStatus,
     ProcessingJobFile,
 )
-from app.services.ai_fallback import (
+from app.services.ai.ai_fallback import (
     generate_metadata_with_fallback,
     validate_primary_provider_configuration,
 )
-from app.services.app_settings import resolve_effective_ai_settings
+from app.services.desktop.app_settings import resolve_effective_ai_settings
 from app.services.image_preprocessing import resize_image_for_ai
-from app.services.metadata_embedding import get_upload_file_path
+from app.services.metadata.metadata_embedding import get_upload_file_path
 from app.services.storage import storage
 
 ai_requests_semaphore = asyncio.Semaphore(MAX_CONCURRENT_AI_REQUESTS)

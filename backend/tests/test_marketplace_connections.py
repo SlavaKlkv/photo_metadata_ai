@@ -82,9 +82,7 @@ def test_marketplace_invalid_credentials_return_normalized_error(
             assert save_response.status_code == 400
             assert save_response.json()['detail']['error'] == {
                 'code': 'credential_rejected',
-                'message': (
-                    'Marketplace rejected the provided credentials.'
-                ),
+                'message': ('Marketplace rejected the provided credentials.'),
             }
             assert 'invalid-token-value' not in save_response.text
 
