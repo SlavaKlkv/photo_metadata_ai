@@ -17,7 +17,7 @@
 
 ## 1. App initialization
 При запуске приложение сканирует окружение на доступные AI-провайдеры:
-- локальный QWEN 2.5 VL через Ollama
+- локальный QWEN 2.5 VL (на этапе разработки можно через Ollama или mock)
 - Open Router
 - Gemini
 
@@ -90,60 +90,250 @@ Generated filename реально участвует в rename/export pipeline, 
 При выборе файла в Results справа обновляется Metadata Preview.
 
 ## 7. Metadata Preview
+
 Показывает metadata выбранного файла.
+
 Поля зависят от выбранной Stock platform.
 Все видимые поля редактируемые.
+
 Нужны counters/validation по правилам выбранного stock:
-- character limits
-- keywords count
-- required fields
-- platform-specific fields
+
+* character limits
+* keywords count
+* required fields
+* platform-specific fields
 
 Regenerate использует исходные settings batch-а, а не текущие измененные settings.
 
 Бэк генерирует metadata один раз (universal model) и хранит ее как source of truth.
-При смене стока AI повторно не запускается: пересчитываются только stock-specific правила.
 
-Что делать на фронте после job completed:
+При смене стока AI повторно не запускается: пересчитываются только stock-specific правила и preview.
 
-##### 1. Забрать текущее превью:
+### Структура results[]
+
+В results[] приходят:
+
+* selected_for_export
+* field_sources (`generated` / `edited`)
+* edited_fields
+* preview:
+
+  * common_fields
+  * stock_specific.fields
+  * errors[]
+  * warnings[]
+
+Ошибки и предупреждения отображаются в UI до export.
+
+### Что делать на фронте после job completed
+
+#### 1. Забрать текущее превью
+
+```http
 GET /api/v1/jobs/{job_id}/results
+```
 
-##### 2. Забрать правила/опции для выбранного стока:
+#### 2. Забрать правила и опции выбранного стока
+
+```http
 GET /api/v1/jobs/stock-options/{stock_platform}
+```
 
-##### 3. Переключить сток без регенерации:
-PATCH /api/v1/jobs/{job_id}/settings
-{ "stock_platform": "getty_images" }
-##### 4. После переключения обязательно повторно запросить:
-- GET /api/v1/jobs/{job_id}/results
-- GET /api/v1/jobs/stock-options/getty_images
+#### 3. Переключить preview под другой stock без регенерации
 
-###### 5. В UI строить поля только по stock-options:
-- показывать/скрывать поля по флагам (`supports_category_2`, license_required, releases_required, `editorial_*`)
-- лимиты и required брать из этого же ответа
+```http
+GET /api/v1/jobs/{job_id}/results?stock_platform=getty_images
+```
 
-###### 6. Ошибки и предупреждения по текущему стоку брать из:
-- results[].validation.errors[]
-- results[].validation.warnings[]
+Поддерживаемые платформы:
 
-###### 7. Редактирование строки:
+* shutterstock
+* getty_images
+* adobe_stock
+
+Этот запрос меняет только отображение preview.
+AI повторно не запускается.
+
+#### 4. После смены preview повторно запросить stock options
+
+```http
+GET /api/v1/jobs/stock-options/getty_images
+```
+
+#### 5. В UI строить поля только по stock-options
+
+* показывать/скрывать поля по флагам (`supports_category_2`, `license_required`, `releases_required`, `editorial_*`)
+* лимиты и required брать из stock-options
+* common_fields отображать всегда
+* stock_specific.fields отображать согласно выбранному stock
+
+#### 6. Ошибки и предупреждения
+
+Брать из:
+
+```text
+results[].preview.errors[]
+results[].preview.warnings[]
+```
+
+#### 7. Редактирование metadata
+
+```http
 PATCH /api/v1/jobs/{job_id}/files/{file_id}/metadata
-Ответ сразу возвращает обновленную строку и повторную валидацию для активного стока.
+```
 
-Ключевое: при смене стока не вызывать /process. Нужен только PATCH settings(stock_platform) + повторный GET results и GET stock-options.
+Отправлять только измененные поля.
+
+Включая:
+
+```json
+{
+  "selected_for_export": true
+}
+```
+
+или любые измененные metadata fields.
+
+Использовать field_sources и edited_fields для отображения измененных пользователем полей.
+
+#### 8. Включение/исключение файла из export
+
+Использовать:
+
+```http
+PATCH /api/v1/jobs/{job_id}/files/{file_id}/metadata
+```
+
+с изменением:
+
+```json
+{
+  "selected_for_export": false
+}
+```
+
+В export попадают только файлы:
+
+* selected_for_export = true
+* status = completed
+
+### Важно
+
+Переключение stock через:
+
+```http
+GET /api/v1/jobs/{job_id}/results?stock_platform=...
+```
+
+меняет только preview.
+
+Чтобы реально сменить stock platform для export, необходимо:
+
+```http
+PATCH /api/v1/jobs/{job_id}/settings
+```
+
+```json
+{
+  "stock_platform": "adobe_stock"
+}
+```
+
+После этого запускать export.
+
+Ключевое: при смене stock platform не вызывать повторный processing. Используется уже существующий universal metadata set, а backend строит новый stock-specific preview и export projection.
 
 ## 8. Export
-Поддерживаем только CSV и IPTC.
-JSON нужно убрать/не показывать.
-Export выбранных файлов:
-- перезаписывает IPTC metadata в JPEG
-- генерирует CSV под выбранную stock platform
-- использует generated filename в export/rename pipeline
 
-Partial re-export под другой stock — ключевая фича.
-После первого export пользователь может поменять Stock platform в Settings и сделать re-export без новой AI generation.
-Backend/frontend должны использовать уже сгенерированный полный metadata set и только поменять projection/export format.
+Поддерживаем только CSV и IPTC.
+
+JSON нужно убрать и не показывать в UI.
+
+Export использует уже существующий universal metadata set.
+Новая AI generation для export или re-export не требуется.
+
+В export попадают только файлы, которые одновременно соответствуют условиям:
+
+* selected_for_export = true
+* status = completed
+
+### Перед export
+
+Текущий stock platform для export должен быть сохранен через:
+
+```http
+PATCH /api/v1/jobs/{job_id}/settings
+```
+
+```json
+{
+  "stock_platform": "adobe_stock"
+}
+```
+
+или другую поддерживаемую платформу.
+
+Важно:
+
+```http
+GET /api/v1/jobs/{job_id}/results?stock_platform=...
+```
+
+влияет только на preview и не меняет платформу экспорта.
+
+### Запуск export
+
+CSV:
+
+```http
+POST /api/v1/jobs/{job_id}/export?csv=true
+```
+
+IPTC:
+
+```http
+POST /api/v1/jobs/{job_id}/export?iptc=true
+```
+
+CSV + IPTC одновременно:
+
+```http
+POST /api/v1/jobs/{job_id}/export?csv=true&iptc=true
+```
+
+### Что делает export
+
+Для выбранных файлов export:
+
+* перезаписывает IPTC metadata в JPEG (если включен `iptc=true`)
+* генерирует CSV под активную stock platform (если включен `csv=true`)
+* использует generated filename в export/rename pipeline
+* использует только файлы с `selected_for_export=true`
+
+### Re-export под другой stock
+
+Partial re-export под другой stock является ключевой функцией продукта.
+
+После первого export пользователь может:
+
+1. Изменить Stock platform.
+2. Сохранить новый stock через:
+
+```http
+PATCH /api/v1/jobs/{job_id}/settings
+```
+
+3. Выполнить export повторно.
+
+При этом:
+
+* AI не запускается повторно
+* metadata не генерируется заново
+* backend использует существующий universal metadata set
+* меняются только stock-specific projection, validation и export format
+
+Frontend не должен вызывать processing или regenerate для сценария re-export.
+
 
 ## 9. Post-export / Success Modal
 Для desktop после export нужно четыре кнопки:

@@ -5,8 +5,10 @@ import { Panel } from '../../atoms/Panel/Panel';
 import { Input } from '../../atoms/Input/Input';
 import { Select } from '../../atoms/Select/Select';
 import { Checkbox } from '../../atoms/Checkbox/Checkbox';
+import { Radio } from '../../atoms/Radio/Radio';
 import styles from './SettingsPanel.module.scss';
 import { SectionHeader } from '../../molecules/SectionHeader/SectionHeader';
+import { AIProvider, ProviderDiscoveryItem } from '../../../types';
 
 const platformOptions = [
   { value: 'getty_images', label: 'Getty Images' },
@@ -14,17 +16,24 @@ const platformOptions = [
   { value: 'adobe_stock', label: 'Adobe Stock' },
 ];
 
-// TODO: заменить на ['QWEN 2.5 VL', 'gemini', 'openrouter'] после onboarding scan
-// Mock оставлен только для dev/testing
-const providerOptions = [
-  { value: 'mock', label: 'Mock' },
-  { value: 'ollama', label: 'Ollama' },
+const providerOptions: { value: AIProvider; label: string }[] = [
+  { value: 'ollama', label: 'QWEN 2.5 VL' },
   { value: 'gemini', label: 'Gemini' },
   { value: 'openrouter', label: 'OpenRouter' },
 ];
 
 export const SettingsPanel: React.FC = () => {
   const sessionSettings = useAppStore((state) => state.sessionSettings);
+  const availableProviders = useAppStore((state) => state.availableProviders);
+  const providerDiscoveryItems = useAppStore(
+    (state) => state.providerDiscoveryItems,
+  );
+  const providerDiscoveryStatus = useAppStore(
+    (state) => state.providerDiscoveryStatus,
+  );
+  const providerDiscoveryError = useAppStore(
+    (state) => state.providerDiscoveryError,
+  );
   const draftBatchSettings = useAppStore((state) => state.draftBatchSettings);
   const lockedBatchSettings = useAppStore((state) => state.lockedBatchSettings);
 
@@ -36,6 +45,13 @@ export const SettingsPanel: React.FC = () => {
     (state) => state.updateDraftBatchSetting,
   );
   const updateExportFormat = useAppStore((state) => state.updateExportFormat);
+
+  const selectedProvider = sessionSettings.selectedProvider;
+
+  const handleProviderChange = (provider: AIProvider) => {
+    updateSessionSetting('selectedProvider', provider);
+    saveSessionSettings();
+  };
 
   const displayedShootingContext =
     lockedBatchSettings?.shootingContext ?? draftBatchSettings.shootingContext;
@@ -112,33 +128,68 @@ export const SettingsPanel: React.FC = () => {
           )}
         </div>
 
-        <div className={styles.checkboxRow}>
-          <Checkbox
-            id="csv"
-            label="CSV"
-            checked={draftBatchSettings.exportFormats.csv}
-            onChange={handleFormatChange('csv')}
-          />
-          <Checkbox
-            id="iptc"
-            label="IPTC"
-            checked={draftBatchSettings.exportFormats.iptc}
-            onChange={handleFormatChange('iptc')}
-          />
+        <div className={styles.rowGroup}>
+          <div className={styles.rowLabel}>Export Format</div>
+          <div className={styles.checkboxRow}>
+            <Checkbox
+              id="csv"
+              label="CSV"
+              checked={draftBatchSettings.exportFormats.csv}
+              onChange={handleFormatChange('csv')}
+            />
+            <Checkbox
+              id="iptc"
+              label="IPTC"
+              checked={draftBatchSettings.exportFormats.iptc}
+              onChange={handleFormatChange('iptc')}
+            />
+          </div>
         </div>
 
-        <Select
-          label="AI Provider"
-          options={providerOptions}
-          value={sessionSettings.aiProvider}
-          onChange={(e) => {
-            updateSessionSetting(
-              'aiProvider',
-              e.target.value as typeof sessionSettings.aiProvider,
-            );
-            saveSessionSettings();
-          }}
-        />
+        <div className={styles.rowGroup}>
+          <div className={styles.rowLabel}>AI Provider</div>
+          <div className={styles.providerOptions}>
+            {providerOptions.map((option) => {
+              const isAvailable =
+                providerDiscoveryStatus !== 'ready' ||
+                availableProviders.includes(option.value);
+
+              return (
+                <Radio
+                  key={option.value}
+                  id={`ai-provider-${option.value}`}
+                  label={option.label}
+                  checked={selectedProvider === option.value}
+                  disabled={!isAvailable}
+                  onChange={() => handleProviderChange(option.value)}
+                  className={`${styles.providerOption} ${
+                    selectedProvider === option.value ? styles.selectedOption : ''
+                  } ${
+                    !isAvailable ? styles.disabledOption : ''
+                  }`}
+                />
+              );
+            })}
+          </div>
+
+          {providerDiscoveryStatus === 'loading' && (
+            <small className={styles.hintText}>
+              Detecting available AI providers…
+            </small>
+          )}
+
+          {providerDiscoveryStatus === 'ready' && availableProviders.length === 0 && (
+            <small className={styles.errorText}>
+              No AI providers were detected. Provider onboarding will be added later.
+            </small>
+          )}
+
+          {providerDiscoveryStatus === 'error' && (
+            <small className={styles.errorText}>
+              {providerDiscoveryError ?? 'Failed to detect AI providers.'}
+            </small>
+          )}
+        </div>
       </div>
     </Panel>
   );

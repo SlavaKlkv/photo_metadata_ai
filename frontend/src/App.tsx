@@ -19,10 +19,16 @@ function App() {
   const isExportReady = useUIStore((state) => state.isExportReady);
   const isPollingActive = useUIStore((state) => state.isPollingActive);
   const loadSessionSettings = useAppStore((state) => state.loadSessionSettings);
+  const discoverProviders = useAppStore((state) => state.discoverProviders);
 
   useEffect(() => {
-    loadSessionSettings();
-  }, [loadSessionSettings]);
+    const initializeApp = async () => {
+      loadSessionSettings();
+      await discoverProviders();
+    };
+
+    initializeApp();
+  }, []);
 
   usePolling(isPollingActive ? currentJobId : null);
 
