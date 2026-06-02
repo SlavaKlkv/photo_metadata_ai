@@ -16,11 +16,11 @@ from app.core.enums import (
 from app.core.runtime import resolve_path_in_base
 from app.schemas.job import ExportArtifact, ProcessingJob, ProcessingJobFile
 from app.services.export.csv import generate_metadata_csv
-from app.services.metadata_embedding import (
+from app.services.metadata.metadata_embedding import (
     embed_metadata_into_jpg,
     get_upload_file_path,
 )
-from app.services.stock_metadata import (
+from app.services.metadata.stock_metadata import (
     build_stock_iptc_payload,
     validate_file_metadata_for_stock,
 )

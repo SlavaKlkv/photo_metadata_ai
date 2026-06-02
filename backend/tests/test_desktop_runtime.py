@@ -17,7 +17,7 @@ from app.schemas.provider_discovery import (
     ProviderDiscoveryItem,
     ProvidersDiscoveryResponse,
 )
-from app.services.desktop_startup import (
+from app.services.desktop.desktop_startup import (
     desktop_startup_orchestrator,
     run_desktop_startup_checks,
 )
@@ -135,7 +135,7 @@ async def test_desktop_startup_reports_ready_when_all_providers_ready(
         )
 
     monkeypatch.setattr(
-        'app.services.desktop_startup.discover_ai_providers',
+        'app.services.desktop.desktop_startup.discover_ai_providers',
         _fake_discovery,
     )
     monkeypatch.setattr(
@@ -189,7 +189,7 @@ async def test_desktop_startup_reports_degraded_with_partial_readiness(
         )
 
     monkeypatch.setattr(
-        'app.services.desktop_startup.discover_ai_providers',
+        'app.services.desktop.desktop_startup.discover_ai_providers',
         _fake_discovery,
     )
     monkeypatch.setattr(
@@ -236,7 +236,7 @@ async def test_desktop_startup_reports_not_ready_without_ready_providers(
         )
 
     monkeypatch.setattr(
-        'app.services.desktop_startup.discover_ai_providers',
+        'app.services.desktop.desktop_startup.discover_ai_providers',
         _fake_discovery,
     )
     monkeypatch.setattr(
@@ -268,7 +268,7 @@ async def test_desktop_startup_retries_and_fails_on_timeout(monkeypatch):
         return ProvidersDiscoveryResponse()
 
     monkeypatch.setattr(
-        'app.services.desktop_startup.discover_ai_providers',
+        'app.services.desktop.desktop_startup.discover_ai_providers',
         _slow_discovery,
     )
     monkeypatch.setattr(

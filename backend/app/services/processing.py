@@ -14,15 +14,15 @@ from app.schemas.job import (
     JobStatus,
     ProcessingJobFile,
 )
-from app.services.ai_fallback import (
+from app.services.ai.ai_fallback import (
     FallbackMetadataResult,
     generate_metadata_with_fallback,
     validate_primary_provider_configuration,
 )
-from app.services.ai_provider import AIMetadataResponse
-from app.services.app_settings import resolve_effective_ai_settings
+from app.services.ai.ai_provider import AIMetadataResponse
+from app.services.desktop.app_settings import resolve_effective_ai_settings
 from app.services.image_preprocessing import resize_image_for_ai
-from app.services.metadata_embedding import get_upload_file_path
+from app.services.metadata.metadata_embedding import get_upload_file_path
 from app.services.storage import storage
 
 ai_requests_semaphore = asyncio.Semaphore(MAX_CONCURRENT_AI_REQUESTS)
@@ -88,6 +88,8 @@ def apply_generated_metadata_to_file(
     file.is_illustration = metadata.is_illustration
     file.mature_content = metadata.mature_content
     file.iptc_embedded_metadata = False
+    file.prompt_version = metadata.prompt_version
+    file.prompt_language = metadata.prompt_language
     file.error_message = None
     _mark_generated_field_sources(file)
 

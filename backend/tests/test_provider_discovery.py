@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 from app.core.config import settings
 from app.main import app
-from app.services.desktop_startup import desktop_startup_orchestrator
+from app.services.desktop.desktop_startup import desktop_startup_orchestrator
 
 
 @pytest.fixture(autouse=True)

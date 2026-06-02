@@ -8,10 +8,10 @@ from app.schemas.marketplace import (
     MarketplaceCredentialsStoredResponse,
     MarketplaceValidationResponse,
 )
-from app.services.marketplace_connection import (
+from app.services.marketplace.marketplace_connection import (
     validate_marketplace_credentials,
 )
-from app.services.marketplace_credentials import (
+from app.services.marketplace.marketplace_credentials import (
     delete_marketplace_credentials,
     get_marketplace_connection,
     list_marketplace_connections,

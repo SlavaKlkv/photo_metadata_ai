@@ -14,16 +14,11 @@ from app.core.constants import (
     MAX_FILE_SIZE_BYTES,
     UPLOAD_DIR,
 )
+from app.core.exceptions import UploadValidationError
 from app.core.runtime import resolve_path_in_base
 from app.utils.sanitizers import sanitize_filename
 
 logger = structlog.get_logger(__name__)
-
-
-class UploadValidationError(ValueError):
-    """
-    Ошибка валидации загружаемого файла.
-    """
 
 
 def verify_image(content: bytes) -> None:
