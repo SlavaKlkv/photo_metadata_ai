@@ -34,8 +34,10 @@ Thumbs.db
 backend/uploads/
 
 # Runtime Artifacts
-/jobs/
-/results/
-/temp/
-/desktop_settings.json
-/marketplace_credentials.json
+desktop_settings.json
+backend/desktop_settings.json
+backend/jobs/
+backend/results/
+backend/temp/
+marketplace_credentials.json
+backend/marketplace_credentials.json
