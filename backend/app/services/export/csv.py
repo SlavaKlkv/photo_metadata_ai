@@ -63,7 +63,9 @@ def generate_metadata_csv(
     writer.writerow(CSV_HEADERS[export_platform])
 
     export_files = [
-        file for file in job.files if file.status == FileStatus.COMPLETED
+        file
+        for file in job.files
+        if file.status == FileStatus.COMPLETED and file.selected_for_export
     ]
 
     for file in export_files:

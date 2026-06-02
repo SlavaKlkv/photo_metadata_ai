@@ -8,7 +8,7 @@ from app.core.constants import (
     DEFAULT_AI_RESIZE_LONG_SIDE_PX,
     MAX_CONCURRENT_AI_REQUESTS,
 )
-from app.core.enums import AIProvider, StockPlatform
+from app.core.enums import AIProvider, MetadataFieldSource, StockPlatform
 from app.schemas.job import (
     FileStatus,
     JobStatus,
@@ -89,6 +89,68 @@ def apply_generated_metadata_to_file(
     file.mature_content = metadata.mature_content
     file.iptc_embedded_metadata = False
     file.error_message = None
+            logger.info(
+                'file_metadata_provider_resolved',
+                job_id=str(job_id),
+                file_id=str(file.file_id),
+                file_number=file_number,
+                provider=fallback_result.provider,
+                model=fallback_result.model,
+            )
+
+            if await _is_job_cancelled(job_id):
+                file.status = FileStatus.CANCELLED
+                logger.info(
+                    'file_processing_cancelled',
+                    job_id=str(job_id),
+                    file_id=str(file.file_id),
+                    file_number=file_number,
+                    filename=file.original_filename,
+                )
+                return
+
+            file.title = metadata.title
+            file.description = metadata.description
+            file.keywords = metadata.keywords
+            file.categories = metadata.categories
+            file.category_2 = metadata.category_2
+            file.license_type = metadata.license_type
+            file.location_metadata = metadata.location_metadata
+            file.editorial_date = metadata.editorial_date
+            file.is_editorial = metadata.is_editorial
+            file.editorial_caption = metadata.editorial_caption
+            file.has_people = metadata.has_people
+            file.people_count = metadata.people_count
+            file.model_release_available = metadata.model_release_available
+            file.releases = metadata.releases
+            file.ai_generated_content_disclosure = (
+                metadata.ai_generated_content_disclosure
+            )
+            file.is_illustration = metadata.is_illustration
+            file.mature_content = metadata.mature_content
+            file.iptc_embedded_metadata = False
+            _mark_generated_field_sources(file)
+
+            file.status = FileStatus.COMPLETED
+            logger.info(
+                'file_processing_completed',
+                job_id=str(job_id),
+                file_id=str(file.file_id),
+                file_number=file_number,
+                filename=file.original_filename,
+            )
+
+        except Exception as error:
+            file.status = FileStatus.FAILED
+            file.error_message = str(error)
+            logger.exception(
+                'file_processing_failed',
+                job_id=str(job_id),
+                file_id=str(file.file_id),
+                file_number=file_number,
+                filename=file.original_filename,
+                error=str(error),
+            )
 
 
 async def process_job(job_id: UUID) -> None:
@@ -161,6 +223,31 @@ async def process_job(job_id: UUID) -> None:
         status=job.status,
     )
     await storage.update_job(job)
+
+
+def _mark_generated_field_sources(file: ProcessingJobFile) -> None:
+    generated_fields = [
+        'title',
+        'description',
+        'keywords',
+        'categories',
+        'category_2',
+        'license_type',
+        'location_metadata',
+        'editorial_date',
+        'is_editorial',
+        'editorial_caption',
+        'has_people',
+        'people_count',
+        'model_release_available',
+        'releases',
+        'ai_generated_content_disclosure',
+        'is_illustration',
+        'mature_content',
+    ]
+
+    for field_name in generated_fields:
+        file.field_sources[field_name] = MetadataFieldSource.GENERATED
 
 
 async def retry_failed_files(job_id: UUID) -> None:
