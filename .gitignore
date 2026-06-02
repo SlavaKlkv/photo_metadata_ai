@@ -36,6 +36,9 @@ backend/uploads/
 # Runtime Artifacts
 desktop_settings.json
 backend/desktop_settings.json
+/jobs/
+/results/
+/temp/
 backend/jobs/
 backend/results/
 backend/temp/

@@ -80,7 +80,7 @@ export const BottomActionBar: React.FC = () => {
       await jobsApi.updateSettings(currentJobId, {
         shooting_context: batchSnapshot.shootingContext,
         stock_platform: batchSnapshot.stockPlatform,
-        ai_provider: sessionSettings.aiProvider,
+        ai_provider: sessionSettings.selectedProvider || 'ollama',
         export_formats: selectedExportFormats,
       });
 
@@ -136,12 +136,15 @@ export const BottomActionBar: React.FC = () => {
           disabled={
             !isUploaded ||
             isProcessing ||
-            !draftBatchSettings.shootingContext.trim()
+            !draftBatchSettings.shootingContext.trim() ||
+            !sessionSettings.selectedProvider
           }
           title={
             !draftBatchSettings.shootingContext.trim()
               ? 'Add shoot notes to start processing'
-              : undefined
+              : !sessionSettings.selectedProvider
+                ? 'Select an available AI provider to start processing'
+                : undefined
           }
           onClick={handleStartProcessing}
         >
