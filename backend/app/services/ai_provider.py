@@ -11,8 +11,11 @@ from fastapi import HTTPException
 from app.core.config import settings
 from app.core.constants import AI_PROVIDER_TIMEOUT
 from app.core.enums import AIProvider, StockPlatform
-from app.services.stock_metadata import get_stock_field_options
-from app.services.stock_validation_lists import load_adobe_restricted_terms
+from app.services.prompt_templates import (
+    DEFAULT_PROMPT_LANGUAGE,
+    METADATA_PROMPT_TEMPLATE_VERSION,
+    render_metadata_generation_prompt,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -59,6 +62,8 @@ class AIMetadataResponse:
         ai_generated_content_disclosure: bool = False,
         is_illustration: bool | None = None,
         mature_content: bool | None = None,
+        prompt_version: str | None = None,
+        prompt_language: str = DEFAULT_PROMPT_LANGUAGE,
     ):
         self.title = title
         self.description = description
@@ -77,6 +82,8 @@ class AIMetadataResponse:
         self.ai_generated_content_disclosure = ai_generated_content_disclosure
         self.is_illustration = is_illustration
         self.mature_content = mature_content
+        self.prompt_version = prompt_version
+        self.prompt_language = prompt_language
 
 
 class BaseAIProvider(ABC):
@@ -144,6 +151,8 @@ class MockImageMetadataProvider(BaseAIProvider):
             people_count=0,
             model_release_available=False,
             ai_generated_content_disclosure=False,
+            prompt_version=METADATA_PROMPT_TEMPLATE_VERSION,
+            prompt_language=DEFAULT_PROMPT_LANGUAGE,
         )
 
         logger.info(
@@ -181,7 +190,7 @@ class OllamaImageMetadataProvider(BaseAIProvider):
 
         image_base64 = await _encode_image_to_base64(image_path)
 
-        prompt = _build_metadata_generation_prompt(
+        prompt_render = render_metadata_generation_prompt(
             shooting_context=shooting_context,
             stock_platform=stock_platform,
         )
@@ -198,7 +207,7 @@ class OllamaImageMetadataProvider(BaseAIProvider):
                 f'{settings.OLLAMA_BASE_URL}/api/generate',
                 json={
                     'model': self.model,
-                    'prompt': prompt,
+                    'prompt': prompt_render.prompt,
                     'images': [image_base64],
                     'stream': False,
                     'format': 'json',
@@ -268,6 +277,8 @@ class OllamaImageMetadataProvider(BaseAIProvider):
             mature_content=_extract_optional_bool(
                 metadata.get('mature_content')
             ),
+            prompt_version=prompt_render.version,
+            prompt_language=prompt_render.language,
         )
 
         logger.info(
@@ -448,67 +459,3 @@ def _extract_optional_int(value: object) -> int | None:
         return None
 
     return parsed if parsed >= 0 else None
-
-
-def _build_metadata_generation_prompt(
-    shooting_context: str | None,
-    stock_platform: StockPlatform | None,
-) -> str:
-    effective_stock_platform = stock_platform or StockPlatform.SHUTTERSTOCK
-    stock_options = get_stock_field_options(effective_stock_platform)
-    stock_rules_json = json.dumps(
-        stock_options.model_dump(mode='json'),
-        ensure_ascii=False,
-        separators=(',', ':'),
-    )
-
-    prompt = (
-        'Generate stock photo metadata for this image. '
-        'Return only valid JSON '
-        'with fields: '
-        'title, description, keywords, categories, category_2, '
-        'license_type, location_metadata, editorial_date, is_editorial, '
-        'editorial_caption, has_people, people_count, '
-        'model_release_available, releases, '
-        'ai_generated_content_disclosure, is_illustration, '
-        'mature_content. '
-        'keywords, categories and releases must be arrays of strings. '
-        'has_people and model_release_available must be boolean. '
-        'people_count must be integer or null. '
-        'Apply all platform rules, limits, required flags and constraints '
-        'from this stock rules JSON exactly: '
-        f'{stock_rules_json}. '
-        'Use rules fields directly: '
-        'title/description/keywords/categories/license/editorial/location/'
-        'release/people constraints must comply with provided limits and '
-        'required flags. '
-        'categories must use only values from rules.categories with max '
-        'rules.max_categories; category_2 must follow '
-        'rules.supports_category_2; license_type must use only '
-        'rules.license_types and respect rules.license_required. '
-        'keywords must respect required/min/recommended/max and duplicate '
-        'rules. '
-        'If a field is not supported by rules, return null, false or [] as '
-        'appropriate and keep output consistent. '
-        'All textual metadata fields must be in English only '
-        '(title, description, keywords, categories, category_2, '
-        'location_metadata, editorial_caption, releases). '
-        'Do not use any other language in these fields. '
-        'Do not output any text outside JSON.'
-    )
-
-    if effective_stock_platform == StockPlatform.ADOBE_STOCK:
-        adobe_restricted_terms = load_adobe_restricted_terms()
-        restricted_terms_csv = ', '.join(adobe_restricted_terms.all_terms)
-        prompt = (
-            f'{prompt} '
-            f'Adobe restricted terms list ({adobe_restricted_terms.version}): '
-            f'{restricted_terms_csv}. '
-            'Do not use these terms in title, description, keywords, '
-            'categories, location_metadata or editorial_caption.'
-        )
-
-    if shooting_context:
-        prompt = f'{prompt} Use this shooting context: {shooting_context}'
-
-    return prompt

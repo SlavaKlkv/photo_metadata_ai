@@ -21,6 +21,10 @@ from app.services.desktop_startup import (
     desktop_startup_orchestrator,
     run_desktop_startup_checks,
 )
+from app.services.prompt_templates import (
+    DEFAULT_PROMPT_LANGUAGE,
+    METADATA_PROMPT_TEMPLATE_VERSION,
+)
 
 
 def _build_tiny_jpeg_bytes() -> bytes:
@@ -365,6 +369,9 @@ def test_desktop_flow_upload_process_review_export():
         assert results_response.status_code == 200
         results_payload = results_response.json()
         assert len(results_payload['results']) == 1
+        result = results_payload['results'][0]
+        assert result['prompt_version'] == METADATA_PROMPT_TEMPLATE_VERSION
+        assert result['prompt_language'] == DEFAULT_PROMPT_LANGUAGE
 
         start_export_response = client.post(
             f'/api/v1/jobs/{job_id}/export',
