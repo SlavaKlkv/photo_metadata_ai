@@ -38,3 +38,4 @@ backend/jobs/
 backend/results/
 backend/temp/
 backend/desktop_settings.json
+backend/marketplace_credentials.json
