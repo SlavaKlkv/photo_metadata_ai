@@ -14,7 +14,8 @@ from app.core.enums import (
     StockPlatform,
 )
 from app.core.runtime import resolve_path_in_base
-from app.schemas.job import ExportArtifact, ProcessingJob, ProcessingJobFile
+from app.schemas.export import ExportArtifact
+from app.schemas.job import ProcessingJob, ProcessingJobFile
 from app.services.export.csv import generate_metadata_csv
 from app.services.metadata.metadata_embedding import (
     embed_metadata_into_jpg,

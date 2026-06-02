@@ -319,9 +319,12 @@ def test_regenerate_saves_attempt_history_and_keeps_other_files_unchanged(
     assert stored_first_file['regenerate_attempts'][0]['ai_provider'] == (
         'gemini'
     )
-    assert stored_first_file['regenerate_attempts'][0]['previous_metadata'][
-        'title'
-    ] == 'Edited title before regenerate'
+    assert (
+        stored_first_file['regenerate_attempts'][0]['previous_metadata'][
+            'title'
+        ]
+        == 'Edited title before regenerate'
+    )
     assert stored_second_file['title'] == second_original_title
 
 
