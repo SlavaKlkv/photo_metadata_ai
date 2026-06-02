@@ -36,7 +36,7 @@ async def regenerate_metadata_for_file(
     shooting_context: str | None,
     stock_platform: StockPlatform | None,
     file_number: int | None = None,
-) -> AIMetadataResponse:
+) -> FallbackMetadataResult:
     """
     Генерирует новые metadata для одного файла (без запуска batch processing)
     с общим лимитом параллельных AI-запросов.
@@ -58,7 +58,7 @@ async def regenerate_metadata_for_file(
             provider=fallback_result.provider,
             model=fallback_result.model,
         )
-        return fallback_result.metadata
+        return fallback_result
 
 
 def apply_generated_metadata_to_file(

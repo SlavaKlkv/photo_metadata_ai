@@ -217,7 +217,7 @@ def _format_releases(mapped_metadata: StockMappedMetadata) -> str:
     if mapped_metadata.releases:
         return _format_list(mapped_metadata.releases)
 
-    if mapped_metadata.model_release_available is True:
+    if mapped_metadata.model_release_available:
         return 'Yes'
 
     if mapped_metadata.model_release_available is False:
