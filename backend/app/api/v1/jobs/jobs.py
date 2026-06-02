@@ -870,11 +870,12 @@ def _build_metadata_result(
         is_illustration=mapped_metadata.is_illustration,
         mature_content=mapped_metadata.mature_content,
         iptc_embedded_metadata=mapped_metadata.iptc_embedded_metadata,
+        selected_for_export=file.selected_for_export,
+        field_sources=file.field_sources,
+        edited_fields=edited_fields,
+        preview=build_stock_aware_preview(file, stock_platform),
         error_message=file.error_message,
-        validation=validate_file_metadata_for_stock(
-            file,
-            stock_platform,
-        ),
+        validation=validation,
     )
 
 
@@ -901,12 +902,6 @@ def _build_metadata_snapshot(file: ProcessingJobFile) -> MetadataSnapshot:
         is_illustration=file.is_illustration,
         mature_content=file.mature_content,
         iptc_embedded_metadata=file.iptc_embedded_metadata,
-        selected_for_export=file.selected_for_export,
-        field_sources=file.field_sources,
-        edited_fields=edited_fields,
-        preview=build_stock_aware_preview(file, stock_platform),
-        error_message=file.error_message,
-        validation=validation,
     )
 
 
