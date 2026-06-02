@@ -13,9 +13,9 @@ from app.schemas.job import (
     ProcessingJob,
     ProcessingJobFile,
 )
-from app.services.app_settings import get_desktop_settings
-from app.services.metadata_embedding import embed_metadata_into_jpg
-from app.services.stock_metadata import build_stock_iptc_payload
+from app.services.desktop.app_settings import get_desktop_settings
+from app.services.metadata.metadata_embedding import embed_metadata_into_jpg
+from app.services.metadata.stock_metadata import build_stock_iptc_payload
 from app.services.storage import storage
 
 router = APIRouter(

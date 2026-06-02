@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from app.core.enums import MarketplaceConnectionStatus, StockPlatform
 from app.schemas.marketplace import (
     MarketplaceCredentialsRequest,
-    MarketplaceValidationError,
+    MarketplaceValidationIssue,
     MarketplaceValidationResponse,
 )
 
@@ -114,7 +114,7 @@ def _build_invalid_response(
         valid=False,
         status=MarketplaceConnectionStatus.ERROR,
         account_id=account_id,
-        error=MarketplaceValidationError(
+        error=MarketplaceValidationIssue(
             code=code,
             message=message,
         ),

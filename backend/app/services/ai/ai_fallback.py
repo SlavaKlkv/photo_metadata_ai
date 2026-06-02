@@ -8,10 +8,12 @@ from fastapi import HTTPException
 
 from app.core.config import settings
 from app.core.enums import AIProvider, StockPlatform
-from app.services.ai_provider import (
-    AIMetadataResponse,
+from app.core.exceptions import (
     AIProviderConfigurationError,
     AIProviderRuntimeError,
+)
+from app.services.ai.ai_provider import (
+    AIMetadataResponse,
     BaseAIProvider,
     get_ai_provider,
 )
@@ -80,7 +82,7 @@ def resolve_provider_model(provider: AIProvider) -> str | None:
     provider_models: dict[AIProvider, str | None] = {
         AIProvider.MOCK: None,
         AIProvider.OLLAMA: settings.OLLAMA_REQUIRED_MODEL,
-        AIProvider.GEMINI: None,
+        AIProvider.GEMINI: settings.GEMINI_MODEL,
         AIProvider.OPENROUTER: settings.OPENROUTER_MODEL,
     }
     return provider_models[provider]

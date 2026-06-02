@@ -5,7 +5,7 @@ from functools import lru_cache
 from pathlib import Path
 
 ADOBE_RESTRICTED_TERMS_FILE = (
-    Path(__file__).resolve().parents[1]
+    Path(__file__).resolve().parents[2]
     / 'data'
     / 'stock_validation'
     / 'adobe'

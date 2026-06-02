@@ -22,7 +22,7 @@ class MarketplaceCredentialsRequest(BaseModel):
         return self
 
 
-class MarketplaceValidationError(BaseModel):
+class MarketplaceValidationIssue(BaseModel):
     code: str
     message: str
 
@@ -36,7 +36,7 @@ class MarketplaceConnectionState(BaseModel):
     secret_hint: str | None = None
     last_validated_at: datetime | None = None
     updated_at: datetime | None = None
-    error: MarketplaceValidationError | None = None
+    error: MarketplaceValidationIssue | None = None
 
 
 class MarketplaceConnectionsResponse(BaseModel):
@@ -48,7 +48,7 @@ class MarketplaceValidationResponse(BaseModel):
     valid: bool
     status: MarketplaceConnectionStatus
     account_id: str | None = None
-    error: MarketplaceValidationError | None = None
+    error: MarketplaceValidationIssue | None = None
     validated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
