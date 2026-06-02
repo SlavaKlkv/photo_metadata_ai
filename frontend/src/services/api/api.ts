@@ -70,6 +70,8 @@ export const jobsApi = {
     ai_provider: string;
   }) =>
     apiClient.post(`/api/v1/jobs/${jobId}/files/${fileId}/regenerate`, settings),
+
+  providerDiscovery: () => apiClient.get('/api/v1/desktop/providers/discovery'),
 };
 
 export default apiClient;

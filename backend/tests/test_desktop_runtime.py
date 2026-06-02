@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from app.core.config import Settings, settings
+from app.core.config import PROJECT_ROOT, ROOT_ENV_FILE, Settings, settings
 from app.core.constants import RESULTS_DIR
 from app.core.runtime import resolve_path_in_base
 from app.main import app
@@ -50,6 +50,21 @@ def test_settings_use_desktop_workspace_when_profile_is_desktop(
     assert test_settings.workspace_root == desktop_workspace_dir.resolve(
         strict=False
     )
+
+
+def test_settings_read_env_from_project_root():
+    assert ROOT_ENV_FILE == PROJECT_ROOT / '.env'
+
+
+def test_server_profile_resolves_relative_workspace_from_project_root():
+    test_settings = Settings(
+        BACKEND_RUNTIME_PROFILE='server',
+        WORKSPACE_DIR='.',
+        DESKTOP_WORKSPACE_DIR=None,
+        _env_file=None,
+    )
+
+    assert test_settings.workspace_root == PROJECT_ROOT.resolve(strict=False)
 
 
 def test_path_policy_rejects_escape_from_base_directory(tmp_path: Path):
