@@ -153,7 +153,7 @@ def _discover_gemini_provider() -> ProviderDiscoveryItem:
         display_name='Gemini',
         api_key=settings.GEMINI_API_KEY,
         api_key_env_var='GEMINI_API_KEY',
-        model=settings.GEMINI_MODEL,
+        model=None,
         api_key_link=GEMINI_API_KEY_LINK,
         missing_reason_code='gemini_api_key_missing',
         missing_reason='Gemini API key is not configured.',

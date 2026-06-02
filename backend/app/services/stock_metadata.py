@@ -16,13 +16,11 @@ from app.schemas.job import (
     StockPreviewField,
     StockSpecificPreviewBlock,
 )
-from app.services.metadata.metadata_embedding import (
+from app.services.metadata_embedding import (
     IPTCEmbeddingPayload,
     get_upload_file_path,
 )
-from app.services.metadata.stock_validation_lists import (
-    find_restricted_terms_in_text,
-)
+from app.services.stock_validation_lists import find_restricted_terms_in_text
 
 
 @dataclass(frozen=True)

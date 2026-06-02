@@ -5,7 +5,7 @@ import structlog
 
 from app.core.enums import FileStatus, StockPlatform
 from app.schemas.job import ProcessingJob, ProcessingJobFile
-from app.services.metadata.stock_metadata import (
+from app.services.stock_metadata import (
     StockMappedMetadata,
     build_stock_mapped_metadata,
 )

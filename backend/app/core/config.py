@@ -17,17 +17,16 @@ class Settings(BaseSettings):
 
     DEFAULT_AI_PROVIDER: AIProvider = AIProvider.OLLAMA
 
+    CLAUDE_API_KEY: str | None = None
+    GEMINI_API_KEY: str | None = None
+    OPENROUTER_API_KEY: str | None = None
+    OPENROUTER_MODEL: str = 'openrouter/auto'
+
+    OPENAI_API_KEY: str | None = None
+
     OLLAMA_BASE_URL: str = 'http://localhost:11434'
     OLLAMA_MODEL: str = 'llava'
     OLLAMA_REQUIRED_MODEL: str = 'qwen2.5vl'
-
-    GEMINI_API_KEY: str | None = None
-    GEMINI_BASE_URL: str = 'https://generativelanguage.googleapis.com/v1beta'
-    GEMINI_MODEL: str = 'gemini-2.5-flash'
-
-    OPENROUTER_API_KEY: str | None = None
-    OPENROUTER_BASE_URL: str = 'https://openrouter.ai/api/v1'
-    OPENROUTER_MODEL: str = 'openrouter/auto'
 
     DESKTOP_STARTUP_AI_CHECK_TIMEOUT_SECONDS: float = 8.0
     DESKTOP_STARTUP_AI_CHECK_RETRY_ATTEMPTS: int = 2

@@ -3,10 +3,8 @@ from dataclasses import dataclass
 from typing import Callable
 
 from app.core.enums import StockPlatform
-from app.services.metadata.stock_metadata import get_stock_field_options
-from app.services.metadata.stock_validation_lists import (
-    load_adobe_restricted_terms,
-)
+from app.services.stock_metadata import get_stock_field_options
+from app.services.stock_validation_lists import load_adobe_restricted_terms
 
 DEFAULT_PROMPT_LANGUAGE = 'en'
 METADATA_PROMPT_TEMPLATE_ID = 'stock_metadata'

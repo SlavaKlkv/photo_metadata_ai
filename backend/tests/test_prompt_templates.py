@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from app.core.enums import StockPlatform
-from app.services.ai.ai_provider import MockImageMetadataProvider
+from app.services.ai_provider import MockImageMetadataProvider
 from app.services.prompt_templates import (
     DEFAULT_PROMPT_LANGUAGE,
     METADATA_PROMPT_TEMPLATE_VERSION,

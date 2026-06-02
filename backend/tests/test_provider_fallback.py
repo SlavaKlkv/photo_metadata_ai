@@ -3,14 +3,14 @@ from pathlib import Path
 import pytest
 
 from app.core.enums import AIProvider
-from app.core.exceptions import AIProviderConfigurationError
-from app.services.ai.ai_fallback import (
+from app.services.ai_fallback import (
     build_provider_fallback_chain,
     generate_metadata_with_fallback,
     validate_primary_provider_configuration,
 )
-from app.services.ai.ai_provider import (
+from app.services.ai_provider import (
     AIMetadataResponse,
+    AIProviderConfigurationError,
     BaseAIProvider,
 )
 

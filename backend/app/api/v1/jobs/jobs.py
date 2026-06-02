@@ -22,7 +22,6 @@ from app.core.enums import (
     MetadataFieldSource,
     StockPlatform,
 )
-from app.core.exceptions import UploadValidationError
 from app.schemas.job import (
     CleanupJobResult,
     FileStatus,
@@ -37,29 +36,29 @@ from app.schemas.job import (
     UpdateProcessingJobMetadataRequest,
     UpdateProcessingJobSettingsRequest,
 )
-from app.services.cleanup import cleanup_job_temp_files
-from app.services.desktop.app_settings import (
+from app.services.app_settings import (
     get_desktop_settings,
     resolve_effective_ai_settings,
     update_desktop_settings,
 )
+from app.services.cleanup import cleanup_job_temp_files
 from app.services.export.export import (
     ensure_job_exports,
     run_job_export,
-)
-from app.services.metadata.stock_metadata import (
-    build_stock_aware_preview,
-    build_stock_mapped_metadata,
-    get_stock_field_options,
-    validate_file_metadata_for_stock,
 )
 from app.services.processing import (
     cancel_job_processing,
     process_job,
     retry_failed_files,
 )
+from app.services.stock_metadata import (
+    build_stock_aware_preview,
+    build_stock_mapped_metadata,
+    get_stock_field_options,
+    validate_file_metadata_for_stock,
+)
 from app.services.storage import storage
-from app.services.upload import save_upload_file
+from app.services.upload import UploadValidationError, save_upload_file
 
 router = APIRouter(
     prefix='/jobs',

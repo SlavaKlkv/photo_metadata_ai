@@ -11,15 +11,31 @@ from fastapi import HTTPException
 from app.core.config import settings
 from app.core.constants import AI_PROVIDER_TIMEOUT
 from app.core.enums import AIProvider, StockPlatform
-from app.core.exceptions import AIProviderConfigurationError
 from app.services.prompt_templates import (
     DEFAULT_PROMPT_LANGUAGE,
     METADATA_PROMPT_TEMPLATE_VERSION,
-    PromptTemplateRender,
     render_metadata_generation_prompt,
 )
 
 logger = structlog.get_logger(__name__)
+
+
+class AIProviderError(Exception):
+    def __init__(self, reason_code: str, message: str):
+        super().__init__(message)
+        self.reason_code = reason_code
+
+
+class AIProviderConfigurationError(AIProviderError):
+    """
+    Provider cannot be used because required configuration is missing/invalid.
+    """
+
+
+class AIProviderRuntimeError(AIProviderError):
+    """
+    Provider failed while handling a metadata generation request.
+    """
 
 
 class AIMetadataResponse:
@@ -213,13 +229,56 @@ class OllamaImageMetadataProvider(BaseAIProvider):
             response_length=len(raw_response),
         )
 
-        metadata_response = _build_metadata_response(
-            metadata=_parse_provider_metadata_json(
-                raw_response,
-                provider_name='ollama',
+        try:
+            metadata = json.loads(raw_response)
+        except json.JSONDecodeError as error:
+            logger.exception(
+                'ollama_response_json_parse_failed',
                 file_number=file_number,
+                raw_response=raw_response,
+                error=str(error),
+            )
+            raise HTTPException(
+                status_code=502,
+                detail='Ollama provider returned invalid JSON',
+            ) from error
+
+        metadata_response = AIMetadataResponse(
+            title=metadata.get('title') or '',
+            description=metadata.get('description') or '',
+            keywords=_extract_string_list(metadata.get('keywords')),
+            categories=_extract_string_list(metadata.get('categories')),
+            category_2=_extract_optional_string(metadata.get('category_2')),
+            license_type=_extract_optional_string(
+                metadata.get('license_type')
             ),
-            prompt_render=prompt_render,
+            location_metadata=_extract_optional_string(
+                metadata.get('location_metadata')
+            ),
+            editorial_date=_extract_optional_string(
+                metadata.get('editorial_date')
+            ),
+            is_editorial=bool(metadata.get('is_editorial') or False),
+            editorial_caption=_extract_optional_string(
+                metadata.get('editorial_caption')
+            ),
+            has_people=_extract_optional_bool(metadata.get('has_people')),
+            people_count=_extract_optional_int(metadata.get('people_count')),
+            model_release_available=_extract_optional_bool(
+                metadata.get('model_release_available')
+            ),
+            releases=_extract_string_list(metadata.get('releases')),
+            ai_generated_content_disclosure=bool(
+                metadata.get('ai_generated_content_disclosure') or False
+            ),
+            is_illustration=_extract_optional_bool(
+                metadata.get('is_illustration')
+            ),
+            mature_content=_extract_optional_bool(
+                metadata.get('mature_content')
+            ),
+            prompt_version=prompt_render.version,
+            prompt_language=prompt_render.language,
         )
 
         logger.info(
@@ -239,7 +298,7 @@ class GeminiImageMetadataProvider(BaseAIProvider):
 
     def __init__(self, model: str | None = None):
         super().__init__(model=model)
-        if not settings.GEMINI_API_KEY:
+        if settings.GEMINI_API_KEY is None:
             raise AIProviderConfigurationError(
                 reason_code='gemini_api_key_missing',
                 message='GEMINI_API_KEY is not configured',
@@ -255,83 +314,16 @@ class GeminiImageMetadataProvider(BaseAIProvider):
         """
         Генерирует метаданные через Gemini.
         """
-        model = self.model or settings.GEMINI_MODEL
         logger.info(
             'gemini_metadata_generation_started',
             file_number=file_number,
             image_path=str(image_path),
-            model=model,
+            model=self.model,
         )
-
-        image_base64 = await _encode_image_to_base64(image_path)
-        prompt_render = render_metadata_generation_prompt(
-            shooting_context=shooting_context,
-            stock_platform=stock_platform,
+        raise HTTPException(
+            status_code=501,
+            detail='Gemini provider is not implemented yet',
         )
-
-        async with httpx.AsyncClient(timeout=AI_PROVIDER_TIMEOUT) as client:
-            logger.info(
-                'gemini_request_started',
-                file_number=file_number,
-                base_url=settings.GEMINI_BASE_URL,
-                model=model,
-            )
-
-            response = await client.post(
-                f'{settings.GEMINI_BASE_URL}/models/{model}:generateContent',
-                headers={'x-goog-api-key': settings.GEMINI_API_KEY or ''},
-                json={
-                    'contents': [
-                        {
-                            'parts': [
-                                {'text': prompt_render.prompt},
-                                {
-                                    'inline_data': {
-                                        'mime_type': 'image/jpeg',
-                                        'data': image_base64,
-                                    }
-                                },
-                            ]
-                        }
-                    ],
-                    'generationConfig': {
-                        'response_mime_type': 'application/json',
-                    },
-                },
-            )
-
-        response.raise_for_status()
-        logger.info(
-            'gemini_response_received',
-            file_number=file_number,
-            status_code=response.status_code,
-        )
-
-        payload = response.json()
-        raw_response = _extract_gemini_text(payload)
-        logger.info(
-            'gemini_raw_response_received',
-            file_number=file_number,
-            response_length=len(raw_response),
-        )
-
-        metadata_response = _build_metadata_response(
-            metadata=_parse_provider_metadata_json(
-                raw_response,
-                provider_name='gemini',
-                file_number=file_number,
-            ),
-            prompt_render=prompt_render,
-        )
-
-        logger.info(
-            'gemini_metadata_generation_completed',
-            file_number=file_number,
-            title=metadata_response.title,
-            keywords_count=len(metadata_response.keywords),
-        )
-
-        return metadata_response
 
 
 class OpenRouterImageMetadataProvider(BaseAIProvider):
@@ -341,7 +333,7 @@ class OpenRouterImageMetadataProvider(BaseAIProvider):
 
     def __init__(self, model: str | None = None):
         super().__init__(model=model)
-        if not settings.OPENROUTER_API_KEY:
+        if settings.OPENROUTER_API_KEY is None:
             raise AIProviderConfigurationError(
                 reason_code='openrouter_api_key_missing',
                 message='OPENROUTER_API_KEY is not configured',
@@ -357,94 +349,16 @@ class OpenRouterImageMetadataProvider(BaseAIProvider):
         """
         Генерирует метаданные через OpenRouter.
         """
-        model = self.model or settings.OPENROUTER_MODEL
         logger.info(
             'openrouter_metadata_generation_started',
             file_number=file_number,
             image_path=str(image_path),
-            model=model,
+            model=self.model,
         )
-
-        image_base64 = await _encode_image_to_base64(image_path)
-        prompt_render = render_metadata_generation_prompt(
-            shooting_context=shooting_context,
-            stock_platform=stock_platform,
+        raise HTTPException(
+            status_code=501,
+            detail='OpenRouter provider is not implemented yet',
         )
-
-        async with httpx.AsyncClient(timeout=AI_PROVIDER_TIMEOUT) as client:
-            logger.info(
-                'openrouter_request_started',
-                file_number=file_number,
-                base_url=settings.OPENROUTER_BASE_URL,
-                model=model,
-            )
-
-            response = await client.post(
-                f'{settings.OPENROUTER_BASE_URL}/chat/completions',
-                headers={
-                    'Authorization': (
-                        f'Bearer {settings.OPENROUTER_API_KEY or ""}'
-                    ),
-                    'Content-Type': 'application/json',
-                },
-                json={
-                    'model': model,
-                    'messages': [
-                        {
-                            'role': 'user',
-                            'content': [
-                                {
-                                    'type': 'text',
-                                    'text': prompt_render.prompt,
-                                },
-                                {
-                                    'type': 'image_url',
-                                    'image_url': {
-                                        'url': (
-                                            'data:image/jpeg;base64,'
-                                            f'{image_base64}'
-                                        ),
-                                    },
-                                },
-                            ],
-                        }
-                    ],
-                    'response_format': {'type': 'json_object'},
-                },
-            )
-
-        response.raise_for_status()
-        logger.info(
-            'openrouter_response_received',
-            file_number=file_number,
-            status_code=response.status_code,
-        )
-
-        payload = response.json()
-        raw_response = _extract_openrouter_text(payload)
-        logger.info(
-            'openrouter_raw_response_received',
-            file_number=file_number,
-            response_length=len(raw_response),
-        )
-
-        metadata_response = _build_metadata_response(
-            metadata=_parse_provider_metadata_json(
-                raw_response,
-                provider_name='openrouter',
-                file_number=file_number,
-            ),
-            prompt_render=prompt_render,
-        )
-
-        logger.info(
-            'openrouter_metadata_generation_completed',
-            file_number=file_number,
-            title=metadata_response.title,
-            keywords_count=len(metadata_response.keywords),
-        )
-
-        return metadata_response
 
 
 def get_ai_provider(
@@ -490,140 +404,6 @@ async def _encode_image_to_base64(image_path: Path) -> str:
         image_bytes = await image_file.read()
 
     return base64.b64encode(image_bytes).decode('utf-8')
-
-
-def _parse_provider_metadata_json(
-    raw_response: str,
-    *,
-    provider_name: str,
-    file_number: int | None,
-) -> dict:
-    try:
-        metadata = json.loads(raw_response)
-    except json.JSONDecodeError as error:
-        logger.exception(
-            f'{provider_name}_response_json_parse_failed',
-            file_number=file_number,
-            raw_response=raw_response,
-            error=str(error),
-        )
-        raise HTTPException(
-            status_code=502,
-            detail=f'{provider_name.title()} provider returned invalid JSON',
-        ) from error
-
-    if not isinstance(metadata, dict):
-        logger.warning(
-            f'{provider_name}_response_json_shape_invalid',
-            file_number=file_number,
-            raw_response=raw_response,
-        )
-        raise HTTPException(
-            status_code=502,
-            detail=(
-                f'{provider_name.title()} provider returned non-object JSON'
-            ),
-        )
-
-    return metadata
-
-
-def _build_metadata_response(
-    *,
-    metadata: dict,
-    prompt_render: PromptTemplateRender,
-) -> AIMetadataResponse:
-    return AIMetadataResponse(
-        title=metadata.get('title') or '',
-        description=metadata.get('description') or '',
-        keywords=_extract_string_list(metadata.get('keywords')),
-        categories=_extract_string_list(metadata.get('categories')),
-        category_2=_extract_optional_string(metadata.get('category_2')),
-        license_type=_extract_optional_string(metadata.get('license_type')),
-        location_metadata=_extract_optional_string(
-            metadata.get('location_metadata')
-        ),
-        editorial_date=_extract_optional_string(
-            metadata.get('editorial_date')
-        ),
-        is_editorial=bool(metadata.get('is_editorial') or False),
-        editorial_caption=_extract_optional_string(
-            metadata.get('editorial_caption')
-        ),
-        has_people=_extract_optional_bool(metadata.get('has_people')),
-        people_count=_extract_optional_int(metadata.get('people_count')),
-        model_release_available=_extract_optional_bool(
-            metadata.get('model_release_available')
-        ),
-        releases=_extract_string_list(metadata.get('releases')),
-        ai_generated_content_disclosure=bool(
-            metadata.get('ai_generated_content_disclosure') or False
-        ),
-        is_illustration=_extract_optional_bool(
-            metadata.get('is_illustration')
-        ),
-        mature_content=_extract_optional_bool(metadata.get('mature_content')),
-        prompt_version=prompt_render.version,
-        prompt_language=prompt_render.language,
-    )
-
-
-def _extract_gemini_text(payload: object) -> str:
-    if not isinstance(payload, dict):
-        return ''
-
-    candidates = payload.get('candidates')
-    if not isinstance(candidates, list) or not candidates:
-        return ''
-
-    candidate = candidates[0]
-    if not isinstance(candidate, dict):
-        return ''
-
-    content = candidate.get('content')
-    if not isinstance(content, dict):
-        return ''
-
-    return _extract_text_from_content_parts(content.get('parts'))
-
-
-def _extract_openrouter_text(payload: object) -> str:
-    if not isinstance(payload, dict):
-        return ''
-
-    choices = payload.get('choices')
-    if not isinstance(choices, list) or not choices:
-        return ''
-
-    choice = choices[0]
-    if not isinstance(choice, dict):
-        return ''
-
-    message = choice.get('message')
-    if not isinstance(message, dict):
-        return ''
-
-    content = message.get('content')
-    if isinstance(content, str):
-        return content
-
-    return _extract_text_from_content_parts(content)
-
-
-def _extract_text_from_content_parts(parts: object) -> str:
-    if not isinstance(parts, list):
-        return ''
-
-    text_parts: list[str] = []
-    for part in parts:
-        if not isinstance(part, dict):
-            continue
-
-        text = part.get('text')
-        if isinstance(text, str):
-            text_parts.append(text)
-
-    return ''.join(text_parts)
 
 
 def _extract_string_list(value: object) -> list[str]:

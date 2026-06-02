@@ -67,7 +67,7 @@ def resolve_effective_ai_settings(
     provider_models: dict[AIProvider, str | None] = {
         AIProvider.MOCK: None,
         AIProvider.OLLAMA: settings.OLLAMA_REQUIRED_MODEL,
-        AIProvider.GEMINI: settings.GEMINI_MODEL,
+        AIProvider.GEMINI: None,
         AIProvider.OPENROUTER: settings.OPENROUTER_MODEL,
     }
 

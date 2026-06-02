@@ -17,16 +17,16 @@ from app.schemas.desktop import (
     UpdateDesktopSettingsRequest,
 )
 from app.schemas.provider_discovery import ProvidersDiscoveryResponse
-from app.services.desktop.app_settings import (
+from app.services.app_settings import (
     get_desktop_settings,
     update_desktop_settings,
 )
-from app.services.desktop.desktop_open import (
+from app.services.desktop_open import (
     get_job_result_file_path,
     get_job_results_dir,
     open_path_in_default_app,
 )
-from app.services.desktop.desktop_startup import get_desktop_startup_status
+from app.services.desktop_startup import get_desktop_startup_status
 from app.services.provider_discovery import discover_ai_providers
 
 router = APIRouter(

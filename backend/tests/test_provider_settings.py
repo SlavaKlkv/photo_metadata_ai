@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from app.core.config import settings
 from app.core.runtime import reset_runtime_directories_cache
 from app.main import app
-from app.services.desktop.app_settings import get_desktop_settings
+from app.services.app_settings import get_desktop_settings
 
 
 def test_desktop_settings_persist_selected_provider(
@@ -15,7 +15,6 @@ def test_desktop_settings_persist_selected_provider(
     monkeypatch.setattr(settings, 'WORKSPACE_DIR', tmp_path)
     monkeypatch.setattr(settings, 'DESKTOP_WORKSPACE_DIR', None)
     monkeypatch.setattr(settings, 'DEFAULT_AI_PROVIDER', 'ollama')
-    monkeypatch.setattr(settings, 'OPENROUTER_MODEL', 'openrouter/auto')
     reset_runtime_directories_cache()
 
     try:

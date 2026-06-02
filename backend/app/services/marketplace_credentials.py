@@ -12,9 +12,9 @@ from app.schemas.marketplace import (
     MarketplaceConnectionsResponse,
     MarketplaceConnectionState,
     MarketplaceCredentialsRequest,
-    MarketplaceValidationIssue,
+    MarketplaceValidationError,
 )
-from app.services.marketplace.marketplace_connection import (
+from app.services.marketplace_connection import (
     extract_credential_material,
     validate_marketplace_credentials,
 )
@@ -119,7 +119,7 @@ def _build_connection_state(
     )
     error_payload = record.get('error')
     error = (
-        MarketplaceValidationIssue(**error_payload)
+        MarketplaceValidationError(**error_payload)
         if isinstance(error_payload, dict)
         else None
     )
