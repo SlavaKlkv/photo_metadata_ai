@@ -87,6 +87,151 @@ def test_csv_export_uses_latest_metadata_and_skips_unselected_files():
     assert 'latest, selected, metadata' in csv_content
 
 
+def test_results_endpoint_returns_paginated_stably_sorted_page():
+    job = _build_completed_job(
+        files=[
+            _build_completed_file(
+                filename='zebra.jpg',
+                original_filename='zebra.jpg',
+                title='Zebra title',
+            ),
+            _build_completed_file(
+                filename='alpha.jpg',
+                original_filename='alpha.jpg',
+                title='Alpha title',
+            ),
+            _build_completed_file(
+                filename='middle.jpg',
+                original_filename='middle.jpg',
+                title='Middle title',
+            ),
+        ]
+    )
+
+    with TestClient(app) as client:
+        response = client.get(
+            f'/api/v1/jobs/{job.job_id}/results',
+            params={'page': 2, 'page_size': 1},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [result['original_filename'] for result in payload['results']] == [
+        'middle.jpg'
+    ]
+    assert payload['pagination'] == {
+        'page': 2,
+        'page_size': 1,
+        'total_items': 3,
+        'total_pages': 3,
+        'has_next': True,
+        'has_prev': True,
+    }
+
+
+def test_results_pagination_does_not_reset_selection_between_pages():
+    job = _build_completed_job(
+        files=[
+            _build_completed_file(
+                filename=f'image-{index:03}.jpg',
+                original_filename=f'image-{index:03}.jpg',
+                title=f'Image {index:03} title',
+            )
+            for index in range(1, 6)
+        ]
+    )
+    second_file = job.files[1]
+
+    with TestClient(app) as client:
+        patch_response = client.patch(
+            f'/api/v1/jobs/{job.job_id}/files/{second_file.file_id}/metadata',
+            json={'selected_for_export': False},
+        )
+        assert patch_response.status_code == 200
+
+        page_one_response = client.get(
+            f'/api/v1/jobs/{job.job_id}/results',
+            params={'page': 1, 'page_size': 2},
+        )
+        page_two_response = client.get(
+            f'/api/v1/jobs/{job.job_id}/results',
+            params={'page': 2, 'page_size': 2},
+        )
+
+    assert page_one_response.status_code == 200
+    assert page_two_response.status_code == 200
+    page_one_results = page_one_response.json()['results']
+    page_two_results = page_two_response.json()['results']
+    assert page_one_results[1]['original_filename'] == 'image-002.jpg'
+    assert page_one_results[1]['selected_for_export'] is False
+    assert all(result['selected_for_export'] for result in page_two_results)
+
+
+def test_results_pagination_handles_large_jobs_with_page_slice():
+    job = _build_completed_job(
+        files=[
+            _build_completed_file(
+                filename=f'image-{index:03}.jpg',
+                original_filename=f'image-{index:03}.jpg',
+                title=f'Image {index:03} title',
+            )
+            for index in range(1, 306)
+        ]
+    )
+
+    with TestClient(app) as client:
+        response = client.get(
+            f'/api/v1/jobs/{job.job_id}/results',
+            params={'page': 7, 'page_size': 50},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload['results']) == 5
+    assert payload['results'][0]['original_filename'] == 'image-301.jpg'
+    assert payload['pagination'] == {
+        'page': 7,
+        'page_size': 50,
+        'total_items': 305,
+        'total_pages': 7,
+        'has_next': False,
+        'has_prev': True,
+    }
+
+
+def test_bulk_selection_updates_all_pages_and_export_uses_full_selection():
+    job = _build_completed_job(
+        files=[
+            _build_completed_file(
+                filename=f'image-{index:03}.jpg',
+                original_filename=f'image-{index:03}.jpg',
+                title=f'Image {index:03} title',
+            )
+            for index in range(1, 6)
+        ]
+    )
+    job.files[0].selected_for_export = False
+
+    with TestClient(app) as client:
+        select_all_response = client.patch(
+            f'/api/v1/jobs/{job.job_id}/files/selection',
+            json={'selected_for_export': True},
+        )
+        page_three_response = client.get(
+            f'/api/v1/jobs/{job.job_id}/results',
+            params={'page': 3, 'page_size': 2},
+        )
+
+    csv_content = generate_metadata_csv(job, StockPlatform.SHUTTERSTOCK)
+
+    assert select_all_response.status_code == 200
+    assert select_all_response.json()['updated_count'] == 5
+    assert page_three_response.status_code == 200
+    page_three_result = page_three_response.json()['results'][0]
+    assert page_three_result['selected_for_export'] is True
+    assert csv_content.count('.jpg') == 5
+
+
 def test_regenerate_returns_not_found_for_missing_job_or_file():
     job = _build_completed_job()
 
@@ -183,12 +328,14 @@ def test_regenerate_saves_attempt_history_and_keeps_other_files_unchanged(
 def _build_completed_job(
     *,
     status: JobStatus = JobStatus.COMPLETED,
+    files: list[ProcessingJobFile] | None = None,
 ) -> ProcessingJob:
     job = ProcessingJob(
         status=status,
         ai_provider=AIProvider.MOCK,
         stock_platform=StockPlatform.SHUTTERSTOCK,
-        files=[
+        files=files
+        or [
             _build_completed_file(
                 filename='first.jpg',
                 original_filename='first.jpg',

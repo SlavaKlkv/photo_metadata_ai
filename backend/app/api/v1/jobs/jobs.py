@@ -27,6 +27,7 @@ from app.schemas.job import (
     CleanupJobResult,
     FileStatus,
     MetadataSnapshot,
+    PaginationMetadata,
     ProcessingJob,
     ProcessingJobExportStatus,
     ProcessingJobFile,
@@ -38,6 +39,8 @@ from app.schemas.job import (
     RegenerateFileMetadataRequest,
     RegenerateFileMetadataResponse,
     StockFieldOptions,
+    UpdateJobFileSelectionRequest,
+    UpdateJobFileSelectionResponse,
     UpdateProcessingJobMetadataRequest,
     UpdateProcessingJobSettingsRequest,
 )
@@ -450,6 +453,17 @@ async def get_job_results(
         default=None,
         description='Preview metadata mapped to selected stock platform',
     ),
+    page: int = Query(
+        default=1,
+        ge=1,
+        description='Results page number',
+    ),
+    page_size: int = Query(
+        default=50,
+        ge=1,
+        le=100,
+        description='Results page size',
+    ),
 ):
     """
     Возвращает preview-результаты метаданных для задачи.
@@ -466,14 +480,28 @@ async def get_job_results(
     preview_stock_platform = (
         stock_platform or job.stock_platform or StockPlatform.SHUTTERSTOCK
     )
+    sorted_files = _sort_result_files(job.files)
+    total_items = len(sorted_files)
+    total_pages = _count_total_pages(total_items, page_size)
+    page_start = (page - 1) * page_size
+    page_end = page_start + page_size
+    page_files = sorted_files[page_start:page_end]
 
     return ProcessingJobMetadataResults(
         job_id=job.job_id,
         status=job.status,
         results=[
             _build_metadata_result(file, preview_stock_platform)
-            for file in job.files
+            for file in page_files
         ],
+        pagination=PaginationMetadata(
+            page=page,
+            page_size=page_size,
+            total_items=total_items,
+            total_pages=total_pages,
+            has_next=page < total_pages,
+            has_prev=page > 1 and total_items > 0,
+        ),
     )
 
 
@@ -591,6 +619,38 @@ async def update_file_metadata(
     stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
 
     return _build_metadata_result(job_file, stock_platform)
+
+
+@router.patch(
+    '/{job_id}/files/selection',
+    response_model=UpdateJobFileSelectionResponse,
+)
+async def update_job_files_selection(
+    job_id: UUID,
+    payload: UpdateJobFileSelectionRequest,
+):
+    """
+    Массово обновляет selected_for_export для всех файлов задачи.
+    """
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail='Job not found',
+        )
+
+    for file in job.files:
+        file.selected_for_export = payload.selected_for_export
+
+    await storage.update_job(job)
+
+    return UpdateJobFileSelectionResponse(
+        job_id=job.job_id,
+        selected_for_export=payload.selected_for_export,
+        updated_count=len(job.files),
+        total_items=len(job.files),
+    )
 
 
 # --- экспорт ---
@@ -880,6 +940,32 @@ def _build_metadata_result(
         error_message=file.error_message,
         validation=validation,
     )
+
+
+def _sort_result_files(
+    files: list[ProcessingJobFile],
+) -> list[ProcessingJobFile]:
+    """
+    Стабильно сортирует файлы для постраничного preview.
+    """
+    return sorted(
+        files,
+        key=lambda file: (
+            file.original_filename.lower(),
+            file.filename.lower(),
+            str(file.file_id),
+        ),
+    )
+
+
+def _count_total_pages(total_items: int, page_size: int) -> int:
+    """
+    Возвращает количество страниц без деления на ноль.
+    """
+    if total_items == 0:
+        return 0
+
+    return (total_items + page_size - 1) // page_size
 
 
 def _build_metadata_snapshot(file: ProcessingJobFile) -> MetadataSnapshot:

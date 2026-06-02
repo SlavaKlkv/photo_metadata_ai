@@ -332,6 +332,19 @@ class ProcessingJobMetadataResult(
     )
 
 
+class PaginationMetadata(BaseModel):
+    """
+    Метаданные пагинации списка результатов.
+    """
+
+    page: int
+    page_size: int
+    total_items: int
+    total_pages: int
+    has_next: bool
+    has_prev: bool
+
+
 class ProcessingJobMetadataResults(BaseModel):
     """
     Preview-данные метаданных для всех файлов в задаче.
@@ -341,6 +354,26 @@ class ProcessingJobMetadataResults(BaseModel):
     status: JobStatus
     # Каждый элемент напрямую соответствует одной строке таблицы результатов.
     results: list[ProcessingJobMetadataResult] = Field(default_factory=list)
+    pagination: PaginationMetadata | None = None
+
+
+class UpdateJobFileSelectionRequest(BaseModel):
+    """
+    Массовое изменение выбора файлов для export по всей задаче.
+    """
+
+    selected_for_export: bool
+
+
+class UpdateJobFileSelectionResponse(BaseModel):
+    """
+    Результат массового изменения выбора файлов.
+    """
+
+    job_id: UUID
+    selected_for_export: bool
+    updated_count: int
+    total_items: int
 
 
 class UpdateProcessingJobMetadataRequest(MetadataMixin):
