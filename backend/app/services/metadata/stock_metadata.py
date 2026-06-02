@@ -1153,3 +1153,100 @@ def validate_file_metadata_for_stock(
         errors=errors,
         warnings=warnings,
     )
+
+
+def _build_stock_iptc_special_instructions(
+    mapped_metadata: StockMappedMetadata,
+    stock_platform: StockPlatform,
+) -> str | None:
+    parts: list[str] = []
+
+    if mapped_metadata.license_type:
+        parts.append(f'license={mapped_metadata.license_type}')
+
+    if mapped_metadata.releases:
+        parts.append(f'releases={", ".join(mapped_metadata.releases)}')
+    elif mapped_metadata.model_release_available is not None:
+        release_value = (
+            'yes' if mapped_metadata.model_release_available else 'no'
+        )
+        parts.append(f'model_release={release_value}')
+
+    if stock_platform == StockPlatform.SHUTTERSTOCK:
+        if mapped_metadata.is_illustration is not None:
+            illustration_value = (
+                'yes' if mapped_metadata.is_illustration else 'no'
+            )
+            parts.append(f'illustration={illustration_value}')
+        if mapped_metadata.mature_content is not None:
+            mature_value = 'yes' if mapped_metadata.mature_content else 'no'
+            parts.append(f'mature_content={mature_value}')
+
+    if stock_platform == StockPlatform.GETTY_IMAGES:
+        if mapped_metadata.is_editorial:
+            parts.append('editorial=yes')
+        if mapped_metadata.editorial_date:
+            parts.append(f'editorial_date={mapped_metadata.editorial_date}')
+        if mapped_metadata.location_metadata:
+            parts.append(f'location={mapped_metadata.location_metadata}')
+
+    if stock_platform == StockPlatform.ADOBE_STOCK:
+        if mapped_metadata.ai_generated_content_disclosure:
+            parts.append('ai_generated=yes')
+        if mapped_metadata.is_illustration is not None:
+            illustration_value = (
+                'yes' if mapped_metadata.is_illustration else 'no'
+            )
+            parts.append(f'illustration={illustration_value}')
+        if mapped_metadata.mature_content is not None:
+            mature_value = 'yes' if mapped_metadata.mature_content else 'no'
+            parts.append(f'mature_content={mature_value}')
+
+    if not parts:
+        return None
+
+    return '; '.join(parts)
+
+
+def _collect_validation_categories(file: ProcessingJobFile) -> list[str]:
+    """
+    Возвращает исходный набор категорий для валидации без platform-trimming.
+    """
+    categories = list(file.categories)
+
+    if file.category_2:
+        categories.append(file.category_2)
+
+    return categories
+
+
+def _build_restricted_terms_message(terms: list[str]) -> str:
+    preview_terms = terms[:10]
+    preview = ', '.join(preview_terms)
+
+    if len(terms) > 10:
+        preview = f'{preview}, ...'
+
+    return (
+        'Restricted names/brands/franchises detected: '
+        f'{preview}. Use generic terms instead.'
+    )
+
+
+def _resolve_file_megapixels(file: ProcessingJobFile) -> float | None:
+    if file.status == FileStatus.FAILED:
+        return None
+
+    try:
+        file_path = get_upload_file_path(file.filename)
+        with Image.open(file_path) as image:
+            width, height = image.size
+    except (UnidentifiedImageError, OSError, ValueError, RuntimeError):
+        return None
+    except Exception:
+        return None
+
+    if width <= 0 or height <= 0:
+        return None
+
+    return (width * height) / 1_000_000

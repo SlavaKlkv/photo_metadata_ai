@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from app.core.config import Settings, settings
+from app.core.config import PROJECT_ROOT, ROOT_ENV_FILE, Settings, settings
 from app.core.constants import RESULTS_DIR
 from app.core.runtime import resolve_path_in_base
 from app.main import app
@@ -27,69 +27,11 @@ from app.services.prompt_templates import (
 )
 
 
-def _build_tiny_jpeg_bytes() -> bytes:
-    buffer = BytesIO()
-    Image.new('RGB', (1, 1), color='white').save(buffer, format='JPEG')
-    return buffer.getvalue()
-
-
 @pytest.fixture(autouse=True)
 def reset_desktop_startup_orchestrator():
     desktop_startup_orchestrator.reset_for_tests()
     yield
     desktop_startup_orchestrator.reset_for_tests()
-
-
-def _wait_for_job_status(
-    client: TestClient,
-    job_id: str,
-    expected_status: str,
-    max_attempts: int = 20,
-) -> dict[str, Any]:
-    last_payload: dict[str, Any] = {}
-
-    for _ in range(max_attempts):
-        response = client.get(f'/api/v1/jobs/{job_id}/status')
-        assert response.status_code == 200
-
-        last_payload = response.json()
-        if last_payload['status'] == expected_status:
-            return last_payload
-
-        time.sleep(0.05)
-
-    message = (
-        f'Job status is {last_payload.get("status")} instead of '
-        f'{expected_status}.'
-    )
-    pytest.fail(message)
-    raise AssertionError(message)
-
-
-def _wait_for_export_status(
-    client: TestClient,
-    job_id: str,
-    expected_status: str,
-    max_attempts: int = 20,
-) -> dict[str, Any]:
-    last_payload: dict[str, Any] = {}
-
-    for _ in range(max_attempts):
-        response = client.get(f'/api/v1/jobs/{job_id}/export/status')
-        assert response.status_code == 200
-
-        last_payload = response.json()
-        if last_payload['export_status'] == expected_status:
-            return last_payload
-
-        time.sleep(0.05)
-
-    message = (
-        f'Export status is {last_payload.get("export_status")} instead '
-        f'of {expected_status}.'
-    )
-    pytest.fail(message)
-    raise AssertionError(message)
 
 
 def test_settings_use_desktop_workspace_when_profile_is_desktop(
@@ -108,6 +50,21 @@ def test_settings_use_desktop_workspace_when_profile_is_desktop(
     assert test_settings.workspace_root == desktop_workspace_dir.resolve(
         strict=False
     )
+
+
+def test_settings_read_env_from_project_root():
+    assert ROOT_ENV_FILE == PROJECT_ROOT / '.env'
+
+
+def test_server_profile_resolves_relative_workspace_from_project_root():
+    test_settings = Settings(
+        BACKEND_RUNTIME_PROFILE='server',
+        WORKSPACE_DIR='.',
+        DESKTOP_WORKSPACE_DIR=None,
+        _env_file=None,
+    )
+
+    assert test_settings.workspace_root == PROJECT_ROOT.resolve(strict=False)
 
 
 def test_path_policy_rejects_escape_from_base_directory(tmp_path: Path):
@@ -542,3 +499,61 @@ def test_open_result_file_endpoint_returns_normalized_404():
         'code': 'RESULT_FILE_NOT_FOUND',
         'path': None,
     }
+
+
+def _build_tiny_jpeg_bytes() -> bytes:
+    buffer = BytesIO()
+    Image.new('RGB', (1, 1), color='white').save(buffer, format='JPEG')
+    return buffer.getvalue()
+
+
+def _wait_for_job_status(
+    client: TestClient,
+    job_id: str,
+    expected_status: str,
+    max_attempts: int = 20,
+) -> dict[str, Any]:
+    last_payload: dict[str, Any] = {}
+
+    for _ in range(max_attempts):
+        response = client.get(f'/api/v1/jobs/{job_id}/status')
+        assert response.status_code == 200
+
+        last_payload = response.json()
+        if last_payload['status'] == expected_status:
+            return last_payload
+
+        time.sleep(0.05)
+
+    message = (
+        f'Job status is {last_payload.get("status")} instead of '
+        f'{expected_status}.'
+    )
+    pytest.fail(message)
+    raise AssertionError(message)
+
+
+def _wait_for_export_status(
+    client: TestClient,
+    job_id: str,
+    expected_status: str,
+    max_attempts: int = 20,
+) -> dict[str, Any]:
+    last_payload: dict[str, Any] = {}
+
+    for _ in range(max_attempts):
+        response = client.get(f'/api/v1/jobs/{job_id}/export/status')
+        assert response.status_code == 200
+
+        last_payload = response.json()
+        if last_payload['export_status'] == expected_status:
+            return last_payload
+
+        time.sleep(0.05)
+
+    message = (
+        f'Export status is {last_payload.get("export_status")} instead '
+        f'of {expected_status}.'
+    )
+    pytest.fail(message)
+    raise AssertionError(message)
