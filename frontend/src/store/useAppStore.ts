@@ -5,11 +5,13 @@ import {
   ProcessingJob,
   SessionSettings,
   BatchSettings,
+  ProviderDiscoveryItem,
+  AIProvider,
 } from '../types';
 import { jobsApi } from '../services/api/api';
 
 const defaultSessionSettings: SessionSettings = {
-  aiProvider: 'ollama',
+  selectedProvider: null,
 };
 
 const defaultBatchSettings: BatchSettings = {
@@ -24,6 +26,10 @@ const defaultBatchSettings: BatchSettings = {
 export interface AppState {
   jobs: ProcessingJob[];
   sessionSettings: SessionSettings;
+  availableProviders: AIProvider[];
+  providerDiscoveryItems: ProviderDiscoveryItem[];
+  providerDiscoveryStatus: 'idle' | 'loading' | 'ready' | 'error';
+  providerDiscoveryError: string | null;
   draftBatchSettings: BatchSettings;
   lockedBatchSettings: BatchSettings | null;
   isProcessing: boolean;
@@ -45,6 +51,8 @@ export interface AppState {
     key: keyof SessionSettings,
     value: SessionSettings[keyof SessionSettings],
   ) => void;
+  setSelectedProvider: (provider: AIProvider | null) => void;
+  discoverProviders: () => Promise<void>;
   updateDraftBatchSetting: <K extends keyof BatchSettings>(
     key: K,
     value: BatchSettings[K],
@@ -84,6 +92,10 @@ export const useAppStore = create<AppState>()(
   devtools((set, get) => ({
     jobs: [],
     sessionSettings: defaultSessionSettings,
+    availableProviders: [],
+    providerDiscoveryItems: [],
+    providerDiscoveryStatus: 'idle',
+    providerDiscoveryError: null,
     draftBatchSettings: defaultBatchSettings,
     lockedBatchSettings: null,
     isProcessing: false,
@@ -132,6 +144,92 @@ export const useAppStore = create<AppState>()(
           [key]: value,
         },
       }));
+    },
+
+    setSelectedProvider: (provider) => {
+      set((state) => ({
+        sessionSettings: {
+          ...state.sessionSettings,
+          selectedProvider: provider,
+        },
+      }));
+    },
+
+    discoverProviders: async () => {
+      set({ providerDiscoveryStatus: 'loading', providerDiscoveryError: null });
+
+      try {
+        const response = await jobsApi.providerDiscovery();
+        const discoveryData = response.data;
+        
+        if (!discoveryData || !Array.isArray(discoveryData.providers)) {
+          throw new Error('Invalid provider discovery response');
+        }
+
+        const providerDiscoveryItems: ProviderDiscoveryItem[] = (
+          discoveryData.providers ?? []
+        ).map((item: any) => ({
+          provider: item.provider as AIProvider,
+          displayName: item.display_name,
+          ready: item.ready,
+          status: item.status,
+          reason: item.reason,
+          hints: item.hints ?? [],
+          configured: item.configured ?? false,
+          local: item.local ?? false,
+          model: item.model,
+        }));
+
+        const availableProviders = providerDiscoveryItems
+          .filter((item) => item.ready)
+          .map((item) => item.provider);
+
+        console.log('[Provider Discovery] Found providers:', {
+          total: providerDiscoveryItems.length,
+          available: availableProviders.length,
+          items: availableProviders,
+        });
+
+        set((state) => {
+          const selectedProvider = state.sessionSettings.selectedProvider;
+          const isSelectedProviderAvailable =
+            selectedProvider !== null && availableProviders.includes(selectedProvider);
+          const shouldAutoSelect =
+            availableProviders.length === 1 &&
+            selectedProvider !== availableProviders[0];
+          const shouldClearSelection =
+            selectedProvider !== null &&
+            !isSelectedProviderAvailable &&
+            availableProviders.length === 0;
+
+          return {
+            providerDiscoveryItems,
+            availableProviders,
+            providerDiscoveryStatus: 'ready',
+            sessionSettings: shouldAutoSelect
+              ? {
+                  ...state.sessionSettings,
+                  selectedProvider: availableProviders[0],
+                }
+              : shouldClearSelection
+                ? {
+                    ...state.sessionSettings,
+                    selectedProvider: null,
+                  }
+                : state.sessionSettings,
+          };
+        });
+      } catch (error: unknown) {
+        const errorMsg = error instanceof Error ? error.message : 'Provider discovery failed';
+        console.error('[Provider Discovery] Error:', errorMsg, error);
+        
+        set({
+          providerDiscoveryStatus: 'error',
+          providerDiscoveryError: errorMsg,
+          availableProviders: [],
+          providerDiscoveryItems: [],
+        });
+      }
     },
 
     updateDraftBatchSetting: (key, value) => {
@@ -234,8 +332,7 @@ export const useAppStore = create<AppState>()(
           const parsed = JSON.parse(saved);
           set((state) => ({
             sessionSettings: {
-              ...state.sessionSettings,
-              ...parsed,
+              selectedProvider: parsed.selectedProvider ?? null,
             },
           }));
         }
@@ -273,7 +370,7 @@ export const useAppStore = create<AppState>()(
         const response = await jobsApi.regenerateFile(currentJobId, fileId, {
           shooting_context: lockedBatchSettings.shootingContext,
           stock_platform: lockedBatchSettings.stockPlatform,
-          ai_provider: sessionSettings.aiProvider,
+          ai_provider: sessionSettings.selectedProvider ?? 'ollama',
         });
 
         const newMetadata = response.data?.metadata;

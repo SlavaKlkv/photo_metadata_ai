@@ -22,7 +22,27 @@ export type AIProvider = 'mock' | 'ollama' | 'gemini' | 'openrouter';
 export type StockPlatform = 'getty_images' | 'shutterstock' | 'adobe_stock';
 
 export interface SessionSettings {
-  aiProvider: AIProvider;
+  selectedProvider: AIProvider | null;
+}
+
+export interface ProviderDiscoveryItem {
+  provider: AIProvider;
+  displayName: string;
+  ready: boolean;
+  status: string;
+  reason?: string | null;
+  hints: string[];
+  configured: boolean;
+  local: boolean;
+  model?: string | null;
+}
+
+export interface ProviderDiscoveryResponse {
+  providers: ProviderDiscoveryItem[];
+  ready_providers: AIProvider[];
+  recommended_provider?: AIProvider | null;
+  has_ready_provider: boolean;
+  hints: string[];
 }
 
 export interface BatchSettings {

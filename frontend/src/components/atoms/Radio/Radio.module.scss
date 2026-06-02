@@ -1,0 +1,71 @@
+@import '../../../styles/variables.module.scss';
+
+.radioLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+}
+
+.input {
+  position: absolute;
+  inset: 0;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.radioOuter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--label-default-primary);
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  transition: background var(--transition-normal), border-color var(--transition-normal);
+}
+
+.radioDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ffffff;
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+}
+
+.input:checked + .radioOuter {
+  background: var(--accent-main);
+  border-color: var(--accent-main);
+}
+
+.input:checked + .radioOuter .radioDot {
+  opacity: 1;
+}
+
+.input:disabled + .radioOuter {
+  border-color: var(--label-default-secondary);
+  background: var(--bg-secondary);
+  cursor: not-allowed;
+}
+
+.label {
+  color: var(--label-default-primary);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+}
+
+.input:disabled ~ .label {
+  color: var(--label-default-secondary);
+  cursor: not-allowed;
+}
+
+.input:checked ~ .label {
+  color: var(--text-primary);
+}
