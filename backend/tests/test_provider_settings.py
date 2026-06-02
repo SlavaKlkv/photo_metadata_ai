@@ -15,6 +15,7 @@ def test_desktop_settings_persist_selected_provider(
     monkeypatch.setattr(settings, 'WORKSPACE_DIR', tmp_path)
     monkeypatch.setattr(settings, 'DESKTOP_WORKSPACE_DIR', None)
     monkeypatch.setattr(settings, 'DEFAULT_AI_PROVIDER', 'ollama')
+    monkeypatch.setattr(settings, 'OPENROUTER_MODEL', 'openrouter/auto')
     reset_runtime_directories_cache()
 
     try:
