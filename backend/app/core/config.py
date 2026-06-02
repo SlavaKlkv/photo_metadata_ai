@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     CORS_ALLOW_HEADERS: list[str] = ['*']
     CORS_ALLOW_CREDENTIALS: bool = True
 
-    model_config = SettingsConfigDict(env_file=ROOT_ENV_FILE)
+    model_config = SettingsConfigDict(env_file=ROOT_ENV_FILE, extra='ignore')
 
     @field_validator('WORKSPACE_DIR', 'DESKTOP_WORKSPACE_DIR', mode='before')
     @classmethod
