@@ -5,7 +5,6 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import (
     APIRouter,
-    BackgroundTasks,
     File,
     Form,
     HTTPException,
@@ -68,6 +67,10 @@ from app.services.processing import (
     retry_failed_files,
 )
 from app.services.storage import storage
+from app.services.task_manager import (
+    export_task_manager,
+    job_task_manager,
+)
 from app.services.upload import save_upload_file
 
 router = APIRouter(
@@ -169,7 +172,6 @@ async def get_stock_options(stock_platform: StockPlatform):
 @router.post('/{job_id}/process', response_model=ProcessingJob)
 async def start_job_processing(
     job_id: UUID,
-    background_tasks: BackgroundTasks,
 ):
     """
     Запускает обработку задачи после загрузки файлов и настройки параметров.
@@ -180,6 +182,12 @@ async def start_job_processing(
         raise HTTPException(
             status_code=404,
             detail='Job not found',
+        )
+
+    if job_task_manager.is_running(job.job_id):
+        raise HTTPException(
+            status_code=409,
+            detail='Job processing is already running',
         )
 
     queued_files = [
@@ -211,7 +219,11 @@ async def start_job_processing(
     job.status = JobStatus.PROCESSING
     await storage.update_job(job)
 
-    background_tasks.add_task(process_job, job.job_id)
+    if not job_task_manager.start(job.job_id, process_job):
+        raise HTTPException(
+            status_code=409,
+            detail='Job processing is already running',
+        )
 
     return job
 
@@ -230,6 +242,7 @@ async def cancel_job(job_id: UUID):
         )
 
     await cancel_job_processing(job.job_id)
+    job_task_manager.cancel(job.job_id)
 
     cancelled_job = await storage.get_job(job.job_id)
 
@@ -367,7 +380,6 @@ async def regenerate_file_metadata(
 @router.post('/{job_id}/retry-failed', response_model=ProcessingJob)
 async def retry_failed_job_files(
     job_id: UUID,
-    background_tasks: BackgroundTasks,
 ):
     """
     Перезапускает обработку только failed файлов в задаче.
@@ -380,6 +392,12 @@ async def retry_failed_job_files(
             detail='Job not found',
         )
 
+    if job_task_manager.is_running(job.job_id):
+        raise HTTPException(
+            status_code=409,
+            detail='Job processing is already running',
+        )
+
     failed_files = [
         file for file in job.files if file.status == FileStatus.FAILED
     ]
@@ -390,7 +408,11 @@ async def retry_failed_job_files(
             detail='No failed files to retry',
         )
 
-    background_tasks.add_task(retry_failed_files, job.job_id)
+    if not job_task_manager.start(job.job_id, retry_failed_files):
+        raise HTTPException(
+            status_code=409,
+            detail='Job processing is already running',
+        )
 
     return job
 
@@ -662,7 +684,6 @@ async def update_job_files_selection(
 )
 async def start_job_export(
     job_id: UUID,
-    background_tasks: BackgroundTasks,
     csv: bool = Query(
         default=False,
         description='Include CSV export format',
@@ -681,6 +702,12 @@ async def start_job_export(
         raise HTTPException(
             status_code=404,
             detail='Job not found',
+        )
+
+    if export_task_manager.is_running(job.job_id):
+        raise HTTPException(
+            status_code=409,
+            detail='Job export is already running',
         )
 
     selected_export_formats = _resolve_selected_export_formats(
@@ -747,11 +774,15 @@ async def start_job_export(
     job.export_artifacts = []
     await storage.update_job(job)
 
-    background_tasks.add_task(
-        run_job_export,
+    if not export_task_manager.start(
         job.job_id,
+        run_job_export,
         trigger_export_format,
-    )
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail='Job export is already running',
+        )
 
     return ProcessingJobExportStatus(
         job_id=job.job_id,

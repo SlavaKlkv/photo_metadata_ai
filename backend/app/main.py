@@ -11,6 +11,7 @@ from app.services.desktop.desktop_startup import (
     start_desktop_startup_orchestration,
     stop_desktop_startup_orchestration,
 )
+from app.services.task_manager import stop_background_task_managers
 
 configure_logging()
 
@@ -22,6 +23,7 @@ async def app_lifespan(_: FastAPI):
     try:
         yield
     finally:
+        await stop_background_task_managers()
         await stop_desktop_startup_orchestration()
 
 

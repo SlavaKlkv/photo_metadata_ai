@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 from typing import TypedDict
 from uuid import UUID
@@ -180,6 +181,17 @@ async def run_job_export(
             job,
             requested_export_format,
         )
+    except asyncio.CancelledError:
+        job.export_status = ExportStatus.CANCELLED
+        job.export_progress = 100
+        job.export_error_message = 'Export cancelled'
+        job.export_artifacts = []
+        await storage.update_job(job)
+        logger.info(
+            'job_export_cancelled_by_task',
+            job_id=str(job_id),
+        )
+        raise
     except (ValueError, OSError, HTTPException) as error:
         job.export_status = ExportStatus.FAILED
         job.export_progress = 100

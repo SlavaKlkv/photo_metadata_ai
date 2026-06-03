@@ -135,19 +135,27 @@ async def process_job(job_id: UUID) -> None:
         await _mark_job_as_failed(job.job_id, error)
         return
 
-    await asyncio.gather(
-        *[
-            _process_file(
-                file,
-                effective_ai_settings.provider,
-                job.job_id,
-                job.shooting_context,
-                job.stock_platform,
-                file_number=index,
-            )
-            for index, file in enumerate(queued_files, start=1)
-        ],
-    )
+    try:
+        await asyncio.gather(
+            *[
+                _process_file(
+                    file,
+                    effective_ai_settings.provider,
+                    job.job_id,
+                    job.shooting_context,
+                    job.stock_platform,
+                    file_number=index,
+                )
+                for index, file in enumerate(queued_files, start=1)
+            ],
+        )
+    except asyncio.CancelledError:
+        await _mark_job_as_cancelled(job.job_id)
+        logger.info(
+            'job_processing_cancelled_by_task',
+            job_id=str(job.job_id),
+        )
+        raise
 
     if job.status == JobStatus.CANCELLED:
         return
@@ -240,19 +248,27 @@ async def retry_failed_files(job_id: UUID) -> None:
         await _mark_job_as_failed(job.job_id, error)
         return
 
-    await asyncio.gather(
-        *[
-            _process_file(
-                file,
-                effective_ai_settings.provider,
-                job.job_id,
-                job.shooting_context,
-                job.stock_platform,
-                file_number=file_number,
-            )
-            for file_number, file in failed_indexed_files
-        ],
-    )
+    try:
+        await asyncio.gather(
+            *[
+                _process_file(
+                    file,
+                    effective_ai_settings.provider,
+                    job.job_id,
+                    job.shooting_context,
+                    job.stock_platform,
+                    file_number=file_number,
+                )
+                for file_number, file in failed_indexed_files
+            ],
+        )
+    except asyncio.CancelledError:
+        await _mark_job_as_cancelled(job.job_id)
+        logger.info(
+            'retry_failed_files_cancelled_by_task',
+            job_id=str(job.job_id),
+        )
+        raise
 
     if job.status == JobStatus.CANCELLED:
         return
@@ -287,13 +303,7 @@ async def cancel_job_processing(job_id: UUID) -> None:
         job_id=str(job.job_id),
     )
 
-    job.status = JobStatus.CANCELLED
-
-    for file in job.files:
-        if file.status in {FileStatus.QUEUED, FileStatus.PROCESSING}:
-            file.status = FileStatus.CANCELLED
-
-    await storage.update_job(job)
+    await _mark_job_as_cancelled(job.job_id)
 
 
 async def _process_file(
@@ -370,6 +380,16 @@ async def _process_file(
                 filename=file.original_filename,
             )
 
+        except asyncio.CancelledError:
+            file.status = FileStatus.CANCELLED
+            logger.info(
+                'file_processing_cancelled_by_task',
+                job_id=str(job_id),
+                file_id=str(file.file_id),
+                file_number=file_number,
+                filename=file.original_filename,
+            )
+            raise
         except Exception as error:
             file.status = FileStatus.FAILED
             file.error_message = str(error)
@@ -442,5 +462,27 @@ async def _mark_job_as_failed(job_id: UUID, error: Exception) -> None:
         'job_marked_as_failed',
         job_id=str(job.job_id),
         error=str(error),
+    )
+    await storage.update_job(job)
+
+
+async def _mark_job_as_cancelled(job_id: UUID) -> None:
+    """
+    Переводит задачу и все незавершённые файлы в cancelled.
+    """
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        return
+
+    job.status = JobStatus.CANCELLED
+
+    for file in job.files:
+        if file.status in {FileStatus.QUEUED, FileStatus.PROCESSING}:
+            file.status = FileStatus.CANCELLED
+
+    logger.info(
+        'job_marked_as_cancelled',
+        job_id=str(job.job_id),
     )
     await storage.update_job(job)
