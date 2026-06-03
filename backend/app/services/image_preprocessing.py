@@ -16,6 +16,7 @@ def resize_image_for_ai(
     job_id: UUID,
     file_id: UUID,
     max_long_side_px: int,
+    jpeg_quality: int,
 ) -> Path:
     """
     Ресайзит изображение по длинной стороне с сохранением aspect ratio.
@@ -24,8 +25,13 @@ def resize_image_for_ai(
     if max_long_side_px <= 0:
         raise ValueError('resize_long_side_px must be positive')
 
+    if not 1 <= jpeg_quality <= 100:
+        raise ValueError('jpeg_quality must be between 1 and 100')
+
     if source_path.suffix.lower() not in ALLOWED_IMAGE_SUFFIXES:
         raise ValueError('Only JPEG files are supported for preprocessing')
+
+    source_size_bytes = source_path.stat().st_size
 
     with Image.open(source_path) as image:
         raw_width, raw_height = image.size
@@ -34,6 +40,15 @@ def resize_image_for_ai(
         long_side: int = max(width, height)
 
         if long_side <= max_long_side_px:
+            logger.info(
+                'image_preprocessing_skipped_for_ai',
+                job_id=str(job_id),
+                file_id=str(file_id),
+                source_path=str(source_path),
+                source_size=f'{width}x{height}',
+                source_size_bytes=source_size_bytes,
+                resize_long_side_px=max_long_side_px,
+            )
             return source_path
 
         scale = max_long_side_px / long_side
@@ -50,7 +65,8 @@ def resize_image_for_ai(
     job_resize_dir.mkdir(parents=True, exist_ok=True)
 
     output_path = resolve_path_in_base(job_resize_dir, f'{file_id}.jpg')
-    resized.save(output_path, format='JPEG', quality=95)
+    resized.save(output_path, format='JPEG', quality=jpeg_quality)
+    output_size_bytes = output_path.stat().st_size
 
     logger.info(
         'image_preprocessed_for_ai',
@@ -60,7 +76,10 @@ def resize_image_for_ai(
         output_path=str(output_path),
         source_size=f'{width}x{height}',
         output_size=f'{target_size[0]}x{target_size[1]}',
+        source_size_bytes=source_size_bytes,
+        output_size_bytes=output_size_bytes,
         resize_long_side_px=max_long_side_px,
+        jpeg_quality=jpeg_quality,
     )
 
     return output_path

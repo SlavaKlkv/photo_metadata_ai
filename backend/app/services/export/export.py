@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 from typing import TypedDict
 from uuid import UUID
@@ -14,7 +15,8 @@ from app.core.enums import (
     StockPlatform,
 )
 from app.core.runtime import resolve_path_in_base
-from app.schemas.job import ExportArtifact, ProcessingJob, ProcessingJobFile
+from app.schemas.export import ExportArtifact
+from app.schemas.job import ProcessingJob, ProcessingJobFile
 from app.services.export.csv import generate_metadata_csv
 from app.services.metadata.metadata_embedding import (
     embed_metadata_into_jpg,
@@ -179,6 +181,17 @@ async def run_job_export(
             job,
             requested_export_format,
         )
+    except asyncio.CancelledError:
+        job.export_status = ExportStatus.CANCELLED
+        job.export_progress = 100
+        job.export_error_message = 'Export cancelled'
+        job.export_artifacts = []
+        await storage.update_job(job)
+        logger.info(
+            'job_export_cancelled_by_task',
+            job_id=str(job_id),
+        )
+        raise
     except (ValueError, OSError, HTTPException) as error:
         job.export_status = ExportStatus.FAILED
         job.export_progress = 100

@@ -1,3 +1,4 @@
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 import httpx
@@ -16,6 +17,7 @@ from app.schemas.provider_discovery import (
 logger = structlog.get_logger(__name__)
 
 DISCOVERY_TIMEOUT_SECONDS = 3.0
+ApiKeyValidator = Callable[[str, str | None], Awaitable[bool]]
 
 OLLAMA_INSTALL_LINK = ProviderLink(
     label='Ollama install guide',
@@ -38,8 +40,8 @@ OPENROUTER_API_KEY_LINK = ProviderLink(
 async def discover_ai_providers() -> ProvidersDiscoveryResponse:
     providers = [
         await _discover_ollama_provider(),
-        _discover_gemini_provider(),
-        _discover_openrouter_provider(),
+        await _discover_gemini_provider(),
+        await _discover_openrouter_provider(),
     ]
     ready_providers = [
         provider.provider for provider in providers if provider.ready
@@ -147,8 +149,8 @@ async def _discover_ollama_provider() -> ProviderDiscoveryItem:
     )
 
 
-def _discover_gemini_provider() -> ProviderDiscoveryItem:
-    return _discover_api_key_provider(
+async def _discover_gemini_provider() -> ProviderDiscoveryItem:
+    return await _discover_api_key_provider(
         provider='gemini',
         display_name='Gemini',
         api_key=settings.GEMINI_API_KEY,
@@ -159,11 +161,12 @@ def _discover_gemini_provider() -> ProviderDiscoveryItem:
         missing_reason='Gemini API key is not configured.',
         ready_hint='Gemini API key is configured.',
         setup_hint='Add GEMINI_API_KEY to backend environment settings.',
+        validate_api_key=_validate_gemini_api_key,
     )
 
 
-def _discover_openrouter_provider() -> ProviderDiscoveryItem:
-    return _discover_api_key_provider(
+async def _discover_openrouter_provider() -> ProviderDiscoveryItem:
+    return await _discover_api_key_provider(
         provider='openrouter',
         display_name='OpenRouter',
         api_key=settings.OPENROUTER_API_KEY,
@@ -174,10 +177,11 @@ def _discover_openrouter_provider() -> ProviderDiscoveryItem:
         missing_reason='OpenRouter API key is not configured.',
         ready_hint='OpenRouter API key is configured.',
         setup_hint='Add OPENROUTER_API_KEY to backend environment settings.',
+        validate_api_key=_validate_openrouter_api_key,
     )
 
 
-def _discover_api_key_provider(
+async def _discover_api_key_provider(
     *,
     provider: str,
     display_name: str,
@@ -189,6 +193,7 @@ def _discover_api_key_provider(
     missing_reason: str,
     ready_hint: str,
     setup_hint: str,
+    validate_api_key: ApiKeyValidator,
 ) -> ProviderDiscoveryItem:
     configured = bool(api_key)
 
@@ -196,6 +201,48 @@ def _discover_api_key_provider(
         recommendation = (
             f'Use the detected {display_name} API key from {api_key_env_var}.'
         )
+        validation_valid = await validate_api_key(api_key or '', model)
+
+        if not validation_valid:
+            return ProviderDiscoveryItem(
+                provider=provider,
+                display_name=display_name,
+                ready=False,
+                status='not_ready',
+                reason_code=f'{provider}_api_key_invalid',
+                reason=f'{display_name} API key is invalid.',
+                configured=True,
+                local=False,
+                model=model,
+                api_key_links=[api_key_link],
+                hints=[
+                    setup_hint,
+                    'Show an editable field for pasting an API key.',
+                    'Display "invalid key" when key validation fails.',
+                ],
+                onboarding=ProviderOnboardingState(
+                    ready=False,
+                    input_mode='manual',
+                    manual_input_required=True,
+                    api_key_detected=True,
+                    notify_detected_api_key=True,
+                    detected_api_key_provider=provider,
+                    detected_api_key_source='environment',
+                    recommendation=recommendation,
+                    prefill=ProviderApiKeyPrefill(
+                        available=False,
+                        read_only=False,
+                        editable=True,
+                    ),
+                    validation=ProviderApiKeyValidation(
+                        required=True,
+                        trigger='automatic',
+                        status='invalid',
+                        error_message='invalid key',
+                    ),
+                ),
+            )
+
         return ProviderDiscoveryItem(
             provider=provider,
             display_name=display_name,
@@ -227,11 +274,11 @@ def _discover_api_key_provider(
                 validation=ProviderApiKeyValidation(
                     required=True,
                     trigger='automatic',
-                    status='pending',
+                    status='valid',
                 ),
                 hints=[
                     'Show the detected key in a read-only prefill field.',
-                    'Start validation automatically after prefill.',
+                    'The detected key was validated automatically.',
                     'Allow manual editing only after explicit key reset.',
                 ],
             ),
@@ -300,14 +347,63 @@ def _extract_ollama_model_names(payload: dict[str, Any]) -> set[str]:
     return model_names
 
 
+async def _validate_gemini_api_key(
+    api_key: str,
+    model: str | None,
+) -> bool:
+    validation_model = model or settings.GEMINI_MODEL
+
+    try:
+        async with httpx.AsyncClient(
+            timeout=DISCOVERY_TIMEOUT_SECONDS,
+        ) as client:
+            response = await client.get(
+                f'{settings.GEMINI_BASE_URL}/models/{validation_model}',
+                headers={'x-goog-api-key': api_key},
+            )
+            response.raise_for_status()
+    except httpx.HTTPError as error:
+        logger.info(
+            'gemini_api_key_validation_failed',
+            reason_code='gemini_api_key_invalid',
+            error=str(error),
+        )
+        return False
+
+    return True
+
+
+async def _validate_openrouter_api_key(
+    api_key: str,
+    model: str | None,
+) -> bool:
+    try:
+        async with httpx.AsyncClient(
+            timeout=DISCOVERY_TIMEOUT_SECONDS,
+        ) as client:
+            response = await client.get(
+                f'{settings.OPENROUTER_BASE_URL}/models',
+                headers={'Authorization': f'Bearer {api_key}'},
+            )
+            response.raise_for_status()
+    except httpx.HTTPError as error:
+        logger.info(
+            'openrouter_api_key_validation_failed',
+            reason_code='openrouter_api_key_invalid',
+            model=model,
+            error=str(error),
+        )
+        return False
+
+    return True
+
+
 def _select_recommended_provider(
     providers: list[ProviderDiscoveryItem],
 ) -> str | None:
-    provider_by_name = {provider.provider: provider for provider in providers}
-
     for provider_name in ('ollama', 'gemini', 'openrouter'):
-        provider = provider_by_name.get(provider_name)
-        if provider is not None and provider.ready:
-            return provider.provider
+        for provider in providers:
+            if provider.provider == provider_name and provider.ready:
+                return provider.provider
 
     return None
