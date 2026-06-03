@@ -31,8 +31,11 @@ def reset_provider_settings(monkeypatch):
 def test_provider_discovery_reports_unavailable_ollama(monkeypatch):
     async_client = httpx.AsyncClient
 
-    async def request_handler(_: httpx.Request) -> httpx.Response:
-        raise httpx.ConnectError('connection refused')
+    async def request_handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == 'ollama.test':
+            raise httpx.ConnectError('connection refused')
+
+        return httpx.Response(200, json={})
 
     monkeypatch.setattr(
         httpx,
@@ -99,8 +102,11 @@ def test_provider_discovery_reports_cloud_configuration_without_secrets(
 ):
     async_client = httpx.AsyncClient
 
-    async def request_handler(_: httpx.Request) -> httpx.Response:
-        raise httpx.ConnectError('connection refused')
+    async def request_handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == 'ollama.test':
+            raise httpx.ConnectError('connection refused')
+
+        return httpx.Response(200, json={})
 
     monkeypatch.setattr(settings, 'GEMINI_API_KEY', 'secret-gemini-key')
     monkeypatch.setattr(settings, 'OPENROUTER_API_KEY', 'secret-router-key')
@@ -140,8 +146,11 @@ def test_provider_discovery_returns_read_only_prefill_state_for_found_key(
 ):
     async_client = httpx.AsyncClient
 
-    async def request_handler(_: httpx.Request) -> httpx.Response:
-        raise httpx.ConnectError('connection refused')
+    async def request_handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == 'ollama.test':
+            raise httpx.ConnectError('connection refused')
+
+        return httpx.Response(200, json={})
 
     monkeypatch.setattr(settings, 'GEMINI_API_KEY', 'secret-gemini-key')
     monkeypatch.setattr(
@@ -178,8 +187,53 @@ def test_provider_discovery_returns_read_only_prefill_state_for_found_key(
     assert prefill['reset_required_to_edit'] is True
     assert validation['required'] is True
     assert validation['trigger'] == 'automatic'
-    assert validation['status'] == 'pending'
+    assert validation['status'] == 'valid'
     assert 'secret-gemini-key' not in response.text
+
+
+def test_provider_discovery_returns_manual_key_state_when_found_key_invalid(
+    monkeypatch,
+):
+    async_client = httpx.AsyncClient
+
+    async def request_handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == 'ollama.test':
+            raise httpx.ConnectError('connection refused')
+
+        return httpx.Response(401, json={'error': 'invalid key'})
+
+    monkeypatch.setattr(settings, 'GEMINI_API_KEY', 'invalid-gemini-key')
+    monkeypatch.setattr(
+        httpx,
+        'AsyncClient',
+        lambda **kwargs: async_client(
+            transport=httpx.MockTransport(request_handler),
+            **kwargs,
+        ),
+    )
+
+    with TestClient(app) as client:
+        response = client.get('/api/v1/desktop/providers/discovery')
+
+    assert response.status_code == 200
+    payload = response.json()
+    gemini_provider = _provider_by_name(payload, 'gemini')
+    onboarding = gemini_provider['onboarding']
+    prefill = onboarding['prefill']
+    validation = onboarding['validation']
+
+    assert gemini_provider['ready'] is False
+    assert gemini_provider['reason_code'] == 'gemini_api_key_invalid'
+    assert onboarding['api_key_detected'] is True
+    assert onboarding['notify_detected_api_key'] is True
+    assert onboarding['input_mode'] == 'manual'
+    assert onboarding['manual_input_required'] is True
+    assert prefill['available'] is False
+    assert prefill['editable'] is True
+    assert validation['trigger'] == 'automatic'
+    assert validation['status'] == 'invalid'
+    assert validation['error_message'] == 'invalid key'
+    assert 'invalid-gemini-key' not in response.text
 
 
 def test_provider_discovery_returns_manual_key_state_when_key_missing(
