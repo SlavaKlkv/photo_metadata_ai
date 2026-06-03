@@ -382,7 +382,7 @@ async def _validate_openrouter_api_key(
             timeout=DISCOVERY_TIMEOUT_SECONDS,
         ) as client:
             response = await client.get(
-                f'{settings.OPENROUTER_BASE_URL}/models',
+                f'{settings.OPENROUTER_BASE_URL}/key',
                 headers={'Authorization': f'Bearer {api_key}'},
             )
             response.raise_for_status()
