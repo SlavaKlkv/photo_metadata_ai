@@ -401,11 +401,9 @@ async def _validate_openrouter_api_key(
 def _select_recommended_provider(
     providers: list[ProviderDiscoveryItem],
 ) -> str | None:
-    provider_by_name = {provider.provider: provider for provider in providers}
-
     for provider_name in ('ollama', 'gemini', 'openrouter'):
-        provider = provider_by_name.get(provider_name)
-        if provider is not None and provider.ready:
-            return provider.provider
+        for provider in providers:
+            if provider.provider == provider_name and provider.ready:
+                return provider.provider
 
     return None
