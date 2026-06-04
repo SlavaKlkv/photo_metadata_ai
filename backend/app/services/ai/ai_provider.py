@@ -176,7 +176,6 @@ class OllamaImageMetadataProvider(BaseAIProvider):
 
         prompt_render = render_metadata_generation_prompt(
             shooting_context=shooting_context,
-            stock_platform=stock_platform,
         )
 
         async with httpx.AsyncClient(timeout=AI_PROVIDER_TIMEOUT) as client:
@@ -266,7 +265,6 @@ class GeminiImageMetadataProvider(BaseAIProvider):
         image_base64 = await _encode_image_to_base64(image_path)
         prompt_render = render_metadata_generation_prompt(
             shooting_context=shooting_context,
-            stock_platform=stock_platform,
         )
 
         async with httpx.AsyncClient(timeout=AI_PROVIDER_TIMEOUT) as client:
@@ -368,7 +366,6 @@ class OpenRouterImageMetadataProvider(BaseAIProvider):
         image_base64 = await _encode_image_to_base64(image_path)
         prompt_render = render_metadata_generation_prompt(
             shooting_context=shooting_context,
-            stock_platform=stock_platform,
         )
 
         async with httpx.AsyncClient(timeout=AI_PROVIDER_TIMEOUT) as client:

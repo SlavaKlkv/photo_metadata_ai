@@ -1,0 +1,661 @@
+import re
+from dataclasses import dataclass
+
+from app.core.enums import StockPlatform
+from app.schemas.job import ProcessingJobFile
+from app.services.metadata.metadata_embedding import IPTCEmbeddingPayload
+from app.services.metadata.stock_rules import StockRules, get_stock_rules
+from app.services.metadata.stock_validation_lists import (
+    find_restricted_terms_in_text,
+)
+
+
+@dataclass(frozen=True)
+class StockMappedMetadata:
+    """
+    Stock-aware представление универсальных metadata для preview/export.
+    """
+
+    title: str | None
+    description: str | None
+    keywords: list[str]
+    categories: list[str]
+    category_2: str | None
+    license_type: str | None
+    location_metadata: str | None
+    editorial_date: str | None
+    is_editorial: bool
+    editorial_caption: str | None
+    has_people: bool | None
+    people_count: int | None
+    model_release_available: bool | None
+    releases: list[str]
+    ai_generated_content_disclosure: bool
+    is_illustration: bool | None
+    mature_content: bool | None
+    iptc_embedded_metadata: bool
+
+
+DEFAULT_STOCK_CATEGORIES: dict[StockPlatform, str] = {
+    StockPlatform.GETTY_IMAGES: 'Creative',
+    StockPlatform.SHUTTERSTOCK: 'Objects',
+    StockPlatform.ADOBE_STOCK: 'Lifestyle',
+}
+
+CATEGORY_ALIASES: dict[str, dict[StockPlatform, str]] = {
+    'abstract': {
+        StockPlatform.GETTY_IMAGES: 'Creative',
+        StockPlatform.SHUTTERSTOCK: 'Abstract',
+        StockPlatform.ADOBE_STOCK: 'Graphic Resources',
+    },
+    'animals': {
+        StockPlatform.GETTY_IMAGES: 'Nature',
+        StockPlatform.SHUTTERSTOCK: 'Animals/Wildlife',
+        StockPlatform.ADOBE_STOCK: 'Animals',
+    },
+    'wildlife': {
+        StockPlatform.GETTY_IMAGES: 'Nature',
+        StockPlatform.SHUTTERSTOCK: 'Animals/Wildlife',
+        StockPlatform.ADOBE_STOCK: 'Animals',
+    },
+    'architecture': {
+        StockPlatform.GETTY_IMAGES: 'Travel',
+        StockPlatform.SHUTTERSTOCK: 'Buildings/Landmarks',
+        StockPlatform.ADOBE_STOCK: 'Buildings and Architecture',
+    },
+    'buildings': {
+        StockPlatform.GETTY_IMAGES: 'Travel',
+        StockPlatform.SHUTTERSTOCK: 'Buildings/Landmarks',
+        StockPlatform.ADOBE_STOCK: 'Buildings and Architecture',
+    },
+    'business': {
+        StockPlatform.GETTY_IMAGES: 'Business',
+        StockPlatform.SHUTTERSTOCK: 'Business/Finance',
+        StockPlatform.ADOBE_STOCK: 'Business',
+    },
+    'finance': {
+        StockPlatform.GETTY_IMAGES: 'Business',
+        StockPlatform.SHUTTERSTOCK: 'Business/Finance',
+        StockPlatform.ADOBE_STOCK: 'Business',
+    },
+    'food': {
+        StockPlatform.GETTY_IMAGES: 'Food',
+        StockPlatform.SHUTTERSTOCK: 'Food and Drink',
+        StockPlatform.ADOBE_STOCK: 'Food',
+    },
+    'drink': {
+        StockPlatform.GETTY_IMAGES: 'Food',
+        StockPlatform.SHUTTERSTOCK: 'Food and Drink',
+        StockPlatform.ADOBE_STOCK: 'Drinks',
+    },
+    'healthcare': {
+        StockPlatform.GETTY_IMAGES: 'Healthcare',
+        StockPlatform.SHUTTERSTOCK: 'Healthcare/Medical',
+        StockPlatform.ADOBE_STOCK: 'Social Issues',
+    },
+    'medical': {
+        StockPlatform.GETTY_IMAGES: 'Healthcare',
+        StockPlatform.SHUTTERSTOCK: 'Healthcare/Medical',
+        StockPlatform.ADOBE_STOCK: 'Science',
+    },
+    'nature': {
+        StockPlatform.GETTY_IMAGES: 'Nature',
+        StockPlatform.SHUTTERSTOCK: 'Nature',
+        StockPlatform.ADOBE_STOCK: 'Landscape',
+    },
+    'landscape': {
+        StockPlatform.GETTY_IMAGES: 'Nature',
+        StockPlatform.SHUTTERSTOCK: 'Nature',
+        StockPlatform.ADOBE_STOCK: 'Landscape',
+    },
+    'environment': {
+        StockPlatform.GETTY_IMAGES: 'Nature',
+        StockPlatform.SHUTTERSTOCK: 'Nature',
+        StockPlatform.ADOBE_STOCK: 'The Environment',
+    },
+    'plants': {
+        StockPlatform.GETTY_IMAGES: 'Nature',
+        StockPlatform.SHUTTERSTOCK: 'Nature',
+        StockPlatform.ADOBE_STOCK: 'Plants and Flowers',
+    },
+    'flowers': {
+        StockPlatform.GETTY_IMAGES: 'Nature',
+        StockPlatform.SHUTTERSTOCK: 'Nature',
+        StockPlatform.ADOBE_STOCK: 'Plants and Flowers',
+    },
+    'people': {
+        StockPlatform.GETTY_IMAGES: 'Lifestyle',
+        StockPlatform.SHUTTERSTOCK: 'People',
+        StockPlatform.ADOBE_STOCK: 'People',
+    },
+    'lifestyle': {
+        StockPlatform.GETTY_IMAGES: 'Lifestyle',
+        StockPlatform.SHUTTERSTOCK: 'People',
+        StockPlatform.ADOBE_STOCK: 'Lifestyle',
+    },
+    'fashion': {
+        StockPlatform.GETTY_IMAGES: 'Lifestyle',
+        StockPlatform.SHUTTERSTOCK: 'Beauty/Fashion',
+        StockPlatform.ADOBE_STOCK: 'People',
+    },
+    'beauty': {
+        StockPlatform.GETTY_IMAGES: 'Lifestyle',
+        StockPlatform.SHUTTERSTOCK: 'Beauty/Fashion',
+        StockPlatform.ADOBE_STOCK: 'People',
+    },
+    'sport': {
+        StockPlatform.GETTY_IMAGES: 'Sport',
+        StockPlatform.SHUTTERSTOCK: 'Sports/Recreation',
+        StockPlatform.ADOBE_STOCK: 'Sports',
+    },
+    'sports': {
+        StockPlatform.GETTY_IMAGES: 'Sport',
+        StockPlatform.SHUTTERSTOCK: 'Sports/Recreation',
+        StockPlatform.ADOBE_STOCK: 'Sports',
+    },
+    'technology': {
+        StockPlatform.GETTY_IMAGES: 'Technology',
+        StockPlatform.SHUTTERSTOCK: 'Technology',
+        StockPlatform.ADOBE_STOCK: 'Technology',
+    },
+    'transport': {
+        StockPlatform.GETTY_IMAGES: 'Travel',
+        StockPlatform.SHUTTERSTOCK: 'Transportation',
+        StockPlatform.ADOBE_STOCK: 'Transport',
+    },
+    'transportation': {
+        StockPlatform.GETTY_IMAGES: 'Travel',
+        StockPlatform.SHUTTERSTOCK: 'Transportation',
+        StockPlatform.ADOBE_STOCK: 'Transport',
+    },
+    'travel': {
+        StockPlatform.GETTY_IMAGES: 'Travel',
+        StockPlatform.SHUTTERSTOCK: 'Transportation',
+        StockPlatform.ADOBE_STOCK: 'Travel',
+    },
+    'education': {
+        StockPlatform.GETTY_IMAGES: 'Lifestyle',
+        StockPlatform.SHUTTERSTOCK: 'Education',
+        StockPlatform.ADOBE_STOCK: 'Lifestyle',
+    },
+    'science': {
+        StockPlatform.GETTY_IMAGES: 'Technology',
+        StockPlatform.SHUTTERSTOCK: 'Science',
+        StockPlatform.ADOBE_STOCK: 'Science',
+    },
+    'objects': {
+        StockPlatform.GETTY_IMAGES: 'Creative',
+        StockPlatform.SHUTTERSTOCK: 'Objects',
+        StockPlatform.ADOBE_STOCK: 'Graphic Resources',
+    },
+    'background': {
+        StockPlatform.GETTY_IMAGES: 'Creative',
+        StockPlatform.SHUTTERSTOCK: 'Backgrounds/Textures',
+        StockPlatform.ADOBE_STOCK: 'Graphic Resources',
+    },
+    'texture': {
+        StockPlatform.GETTY_IMAGES: 'Creative',
+        StockPlatform.SHUTTERSTOCK: 'Backgrounds/Textures',
+        StockPlatform.ADOBE_STOCK: 'Graphic Resources',
+    },
+    'art': {
+        StockPlatform.GETTY_IMAGES: 'Creative',
+        StockPlatform.SHUTTERSTOCK: 'Arts',
+        StockPlatform.ADOBE_STOCK: 'Graphic Resources',
+    },
+    'graphic': {
+        StockPlatform.GETTY_IMAGES: 'Creative',
+        StockPlatform.SHUTTERSTOCK: 'Arts',
+        StockPlatform.ADOBE_STOCK: 'Graphic Resources',
+    },
+    'culture': {
+        StockPlatform.GETTY_IMAGES: 'Lifestyle',
+        StockPlatform.SHUTTERSTOCK: 'Religion',
+        StockPlatform.ADOBE_STOCK: 'Culture and Religion',
+    },
+    'religion': {
+        StockPlatform.GETTY_IMAGES: 'Lifestyle',
+        StockPlatform.SHUTTERSTOCK: 'Religion',
+        StockPlatform.ADOBE_STOCK: 'Culture and Religion',
+    },
+    'holiday': {
+        StockPlatform.GETTY_IMAGES: 'Lifestyle',
+        StockPlatform.SHUTTERSTOCK: 'Holidays',
+        StockPlatform.ADOBE_STOCK: 'Culture and Religion',
+    },
+    'industrial': {
+        StockPlatform.GETTY_IMAGES: 'Business',
+        StockPlatform.SHUTTERSTOCK: 'Industrial',
+        StockPlatform.ADOBE_STOCK: 'Industry',
+    },
+    'industry': {
+        StockPlatform.GETTY_IMAGES: 'Business',
+        StockPlatform.SHUTTERSTOCK: 'Industrial',
+        StockPlatform.ADOBE_STOCK: 'Industry',
+    },
+}
+
+LICENSE_ALIASES: dict[str, dict[StockPlatform, str]] = {
+    'commercial': {
+        StockPlatform.GETTY_IMAGES: 'creative',
+        StockPlatform.SHUTTERSTOCK: 'commercial',
+        StockPlatform.ADOBE_STOCK: 'standard',
+    },
+    'creative': {
+        StockPlatform.GETTY_IMAGES: 'creative',
+        StockPlatform.SHUTTERSTOCK: 'commercial',
+        StockPlatform.ADOBE_STOCK: 'standard',
+    },
+    'standard': {
+        StockPlatform.GETTY_IMAGES: 'creative',
+        StockPlatform.SHUTTERSTOCK: 'commercial',
+        StockPlatform.ADOBE_STOCK: 'standard',
+    },
+    'extended': {
+        StockPlatform.GETTY_IMAGES: 'creative',
+        StockPlatform.SHUTTERSTOCK: 'commercial',
+        StockPlatform.ADOBE_STOCK: 'extended',
+    },
+    'royalty free': {
+        StockPlatform.GETTY_IMAGES: 'creative',
+        StockPlatform.SHUTTERSTOCK: 'commercial',
+        StockPlatform.ADOBE_STOCK: 'standard',
+    },
+    'editorial': {
+        StockPlatform.GETTY_IMAGES: 'editorial',
+        StockPlatform.SHUTTERSTOCK: 'editorial',
+        StockPlatform.ADOBE_STOCK: 'editorial',
+    },
+}
+
+
+def get_effective_categories(
+    file: ProcessingJobFile,
+    stock_platform: StockPlatform,
+) -> list[str]:
+    """
+    Возвращает категории файла в формате выбранного стока.
+    """
+    rules = get_stock_rules(stock_platform)
+    categories = map_stock_categories(file, stock_platform, rules)
+
+    return categories[: rules.max_categories]
+
+
+def build_stock_mapped_metadata(
+    file: ProcessingJobFile,
+    stock_platform: StockPlatform,
+) -> StockMappedMetadata:
+    """
+    Преобразует универсальные metadata в представление выбранного стока.
+    """
+    rules = get_stock_rules(stock_platform)
+    mapped_title = map_stock_title(file, rules)
+    mapped_description = map_stock_description(
+        file,
+        rules,
+        mapped_title,
+    )
+    mapped_keywords = map_stock_keywords(file, rules)
+    mapped_categories = get_effective_categories(file, stock_platform)
+    mapped_category_2 = (
+        mapped_categories[1]
+        if rules.supports_category_2 and len(mapped_categories) > 1
+        else None
+    )
+    mapped_is_editorial = map_stock_is_editorial(file)
+
+    return StockMappedMetadata(
+        title=mapped_title,
+        description=mapped_description,
+        keywords=mapped_keywords,
+        categories=mapped_categories,
+        category_2=mapped_category_2,
+        license_type=map_stock_license_type(
+            file,
+            stock_platform,
+            rules,
+            mapped_is_editorial,
+        ),
+        location_metadata=file.location_metadata,
+        editorial_date=file.editorial_date,
+        is_editorial=mapped_is_editorial,
+        editorial_caption=file.editorial_caption,
+        has_people=file.has_people,
+        people_count=file.people_count,
+        model_release_available=file.model_release_available,
+        releases=list(file.releases),
+        ai_generated_content_disclosure=file.ai_generated_content_disclosure,
+        is_illustration=file.is_illustration,
+        mature_content=file.mature_content,
+        iptc_embedded_metadata=rules.iptc_embedded_metadata,
+    )
+
+
+def build_stock_iptc_payload(
+    file: ProcessingJobFile,
+    stock_platform: StockPlatform,
+) -> IPTCEmbeddingPayload:
+    mapped_metadata = build_stock_mapped_metadata(file, stock_platform)
+    caption = mapped_metadata.description or ''
+
+    if mapped_metadata.is_editorial and mapped_metadata.editorial_caption:
+        caption = mapped_metadata.editorial_caption
+
+    return IPTCEmbeddingPayload(
+        object_name=mapped_metadata.title or '',
+        caption_abstract=caption,
+        keywords=list(mapped_metadata.keywords),
+        supplemental_category=list(mapped_metadata.categories),
+        city=mapped_metadata.location_metadata,
+        date_created=(
+            mapped_metadata.editorial_date
+            if mapped_metadata.is_editorial
+            else None
+        ),
+        special_instructions=_build_stock_iptc_special_instructions(
+            mapped_metadata,
+            stock_platform,
+        ),
+    )
+
+
+def map_stock_title(
+    file: ProcessingJobFile,
+    rules: StockRules,
+) -> str | None:
+    title = file.title or file.description
+    return _trim_metadata_text(title, rules.title_max_characters)
+
+
+def map_stock_description(
+    file: ProcessingJobFile,
+    rules: StockRules,
+    mapped_title: str | None,
+) -> str | None:
+    description = file.description
+
+    if not description and rules.description_required:
+        description = mapped_title or file.title
+
+    return _trim_metadata_text(description, rules.description_max_characters)
+
+
+def map_stock_keywords(
+    file: ProcessingJobFile,
+    rules: StockRules,
+) -> list[str]:
+    keywords: list[str] = []
+    seen_keywords: set[str] = set()
+
+    for keyword in file.keywords:
+        normalized_keyword = ' '.join(str(keyword).strip().split())
+        dedupe_key = normalized_keyword.lower()
+
+        if not normalized_keyword or dedupe_key in seen_keywords:
+            continue
+
+        if (
+            rules.validation_restricted_terms_forbidden
+            and find_restricted_terms_in_text(normalized_keyword)
+        ):
+            continue
+
+        keywords.append(normalized_keyword)
+        seen_keywords.add(dedupe_key)
+
+        if len(keywords) >= rules.keywords_max_count:
+            break
+
+    return keywords
+
+
+def map_stock_categories(
+    file: ProcessingJobFile,
+    stock_platform: StockPlatform,
+    rules: StockRules,
+) -> list[str]:
+    mapped_categories: list[str] = []
+    raw_categories = list(file.categories)
+
+    if file.category_2:
+        raw_categories.append(file.category_2)
+
+    for category in raw_categories:
+        mapped_category = _map_single_stock_category(
+            category,
+            stock_platform,
+            rules,
+        )
+
+        if not mapped_category or mapped_category in mapped_categories:
+            continue
+
+        mapped_categories.append(mapped_category)
+
+        if len(mapped_categories) >= rules.max_categories:
+            return mapped_categories
+
+    if not mapped_categories:
+        inferred_category = _infer_stock_category(file, stock_platform)
+        if inferred_category:
+            mapped_categories.append(inferred_category)
+
+    if not mapped_categories and rules.categories_required:
+        mapped_categories.append(DEFAULT_STOCK_CATEGORIES[stock_platform])
+
+    return mapped_categories[: rules.max_categories]
+
+
+def map_stock_license_type(
+    file: ProcessingJobFile,
+    stock_platform: StockPlatform,
+    rules: StockRules,
+    is_editorial: bool,
+) -> str | None:
+    normalized_license = _normalize_stock_value(file.license_type or '')
+
+    if is_editorial and 'editorial' in rules.license_types:
+        return 'editorial'
+
+    if not normalized_license:
+        return _get_default_license_type(
+            stock_platform,
+            rules,
+            is_editorial,
+            has_source_license=False,
+        )
+
+    license_types_by_key = {
+        _normalize_stock_value(license_type): license_type
+        for license_type in rules.license_types
+    }
+    direct_license_type = license_types_by_key.get(normalized_license)
+
+    if direct_license_type:
+        return direct_license_type
+
+    alias_license_type = LICENSE_ALIASES.get(normalized_license, {}).get(
+        stock_platform
+    )
+
+    if alias_license_type:
+        return alias_license_type
+
+    return _get_default_license_type(
+        stock_platform,
+        rules,
+        is_editorial,
+        has_source_license=True,
+    )
+
+
+def map_stock_is_editorial(file: ProcessingJobFile) -> bool:
+    if file.is_editorial:
+        return True
+
+    return _normalize_stock_value(file.license_type or '') == 'editorial'
+
+
+def _map_single_stock_category(
+    category: str,
+    stock_platform: StockPlatform,
+    rules: StockRules,
+) -> str | None:
+    normalized_category = _normalize_stock_value(category)
+
+    if not normalized_category:
+        return None
+
+    categories_by_key = {
+        _normalize_stock_value(stock_category): stock_category
+        for stock_category in rules.categories
+    }
+    direct_category = categories_by_key.get(normalized_category)
+
+    if direct_category:
+        return direct_category
+
+    return _match_category_alias(normalized_category, stock_platform)
+
+
+def _infer_stock_category(
+    file: ProcessingJobFile,
+    stock_platform: StockPlatform,
+) -> str | None:
+    if file.has_people:
+        return CATEGORY_ALIASES['people'][stock_platform]
+
+    search_text = _normalize_stock_value(
+        ' '.join(
+            [
+                file.title or '',
+                file.description or '',
+                ' '.join(file.keywords),
+            ]
+        )
+    )
+
+    return _match_category_alias(search_text, stock_platform)
+
+
+def _match_category_alias(
+    normalized_value: str,
+    stock_platform: StockPlatform,
+) -> str | None:
+    value_tokens = set(normalized_value.split())
+
+    for alias, platform_categories in CATEGORY_ALIASES.items():
+        normalized_alias = _normalize_stock_value(alias)
+        alias_tokens = set(normalized_alias.split())
+
+        if (
+            normalized_value == normalized_alias
+            or alias_tokens <= value_tokens
+        ):
+            return platform_categories[stock_platform]
+
+    return None
+
+
+def _get_default_license_type(
+    stock_platform: StockPlatform,
+    rules: StockRules,
+    is_editorial: bool,
+    *,
+    has_source_license: bool,
+) -> str | None:
+    if is_editorial and 'editorial' in rules.license_types:
+        return 'editorial'
+
+    if stock_platform == StockPlatform.GETTY_IMAGES:
+        return 'creative'
+
+    if not has_source_license and not rules.license_required:
+        return None
+
+    for license_type in rules.license_types:
+        if license_type != 'editorial':
+            return license_type
+
+    return rules.license_types[0] if rules.license_types else None
+
+
+def _trim_metadata_text(
+    value: str | None,
+    max_characters: int,
+) -> str | None:
+    if value is None:
+        return None
+
+    normalized_value = ' '.join(value.strip().split())
+
+    if not normalized_value:
+        return None
+
+    if len(normalized_value) <= max_characters:
+        return normalized_value
+
+    trimmed_value = normalized_value[:max_characters].rstrip()
+    word_trimmed_value = trimmed_value.rsplit(' ', 1)[0].rstrip('.,;:-')
+
+    return word_trimmed_value or trimmed_value
+
+
+def _normalize_stock_value(value: str) -> str:
+    normalized_value = value.lower().replace('_', ' ')
+    normalized_value = re.sub(r'[^a-z0-9]+', ' ', normalized_value)
+    return ' '.join(normalized_value.split())
+
+
+def _build_stock_iptc_special_instructions(
+    mapped_metadata: StockMappedMetadata,
+    stock_platform: StockPlatform,
+) -> str | None:
+    parts: list[str] = []
+
+    if mapped_metadata.license_type:
+        parts.append(f'license={mapped_metadata.license_type}')
+
+    if mapped_metadata.releases:
+        parts.append(f'releases={", ".join(mapped_metadata.releases)}')
+    elif mapped_metadata.model_release_available is not None:
+        release_value = (
+            'yes' if mapped_metadata.model_release_available else 'no'
+        )
+        parts.append(f'model_release={release_value}')
+
+    if stock_platform == StockPlatform.SHUTTERSTOCK:
+        if mapped_metadata.is_illustration is not None:
+            illustration_value = (
+                'yes' if mapped_metadata.is_illustration else 'no'
+            )
+            parts.append(f'illustration={illustration_value}')
+        if mapped_metadata.mature_content is not None:
+            mature_value = 'yes' if mapped_metadata.mature_content else 'no'
+            parts.append(f'mature_content={mature_value}')
+
+    if stock_platform == StockPlatform.GETTY_IMAGES:
+        if mapped_metadata.is_editorial:
+            parts.append('editorial=yes')
+        if mapped_metadata.editorial_date:
+            parts.append(f'editorial_date={mapped_metadata.editorial_date}')
+        if mapped_metadata.location_metadata:
+            parts.append(f'location={mapped_metadata.location_metadata}')
+
+    if stock_platform == StockPlatform.ADOBE_STOCK:
+        if mapped_metadata.ai_generated_content_disclosure:
+            parts.append('ai_generated=yes')
+        if mapped_metadata.is_illustration is not None:
+            illustration_value = (
+                'yes' if mapped_metadata.is_illustration else 'no'
+            )
+            parts.append(f'illustration={illustration_value}')
+        if mapped_metadata.mature_content is not None:
+            mature_value = 'yes' if mapped_metadata.mature_content else 'no'
+            parts.append(f'mature_content={mature_value}')
+
+    if not parts:
+        return None
+
+    return '; '.join(parts)

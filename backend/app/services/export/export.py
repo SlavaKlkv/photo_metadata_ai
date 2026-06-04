@@ -22,8 +22,8 @@ from app.services.metadata.metadata_embedding import (
     embed_metadata_into_jpg,
     get_upload_file_path,
 )
-from app.services.metadata.stock_metadata import (
-    build_stock_iptc_payload,
+from app.services.metadata.stock_mapping import build_stock_iptc_payload
+from app.services.metadata.stock_validation import (
     validate_file_metadata_for_stock,
 )
 from app.services.storage import storage

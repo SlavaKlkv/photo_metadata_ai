@@ -8,10 +8,10 @@ from fastapi import UploadFile
 from PIL import Image, UnidentifiedImageError
 from starlette.concurrency import run_in_threadpool
 
+from app.core.config import settings
 from app.core.constants import (
     ALLOWED_IMAGE_SUFFIXES,
     ALLOWED_IMAGE_TYPES,
-    MAX_FILE_SIZE_BYTES,
     UPLOAD_DIR,
 )
 from app.core.exceptions import UploadValidationError
@@ -63,16 +63,19 @@ async def validate_upload_file(file: UploadFile, content: bytes) -> None:
             f'(received extension: {suffix or "none"})',
         )
 
-    if len(content) > MAX_FILE_SIZE_BYTES:
+    max_file_size_bytes = settings.MAX_UPLOAD_FILE_SIZE_MB * 1024 * 1024
+
+    if len(content) > max_file_size_bytes:
         logger.warning(
             'upload_validation_failed',
             filename=file.filename,
             file_size=len(content),
-            max_file_size=MAX_FILE_SIZE_BYTES,
+            max_file_size=max_file_size_bytes,
             reason='file_too_large',
         )
         raise UploadValidationError(
-            f'File size exceeds 10 MB ({len(content)} bytes)',
+            'File size exceeds '
+            f'{settings.MAX_UPLOAD_FILE_SIZE_MB} MB ({len(content)} bytes)',
         )
 
     try:
