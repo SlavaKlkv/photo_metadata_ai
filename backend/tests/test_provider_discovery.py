@@ -236,6 +236,85 @@ def test_provider_discovery_returns_manual_key_state_when_found_key_invalid(
     assert 'invalid-gemini-key' not in response.text
 
 
+def test_provider_discovery_validates_openrouter_key_via_key_endpoint(
+    monkeypatch,
+):
+    async_client = httpx.AsyncClient
+    requested_paths: list[str] = []
+
+    async def request_handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == 'ollama.test':
+            raise httpx.ConnectError('connection refused')
+
+        requested_paths.append(request.url.path)
+        return httpx.Response(200, json={'data': {'limit': 100}})
+
+    monkeypatch.setattr(settings, 'OPENROUTER_API_KEY', 'valid-router-key')
+    monkeypatch.setattr(
+        httpx,
+        'AsyncClient',
+        lambda **kwargs: async_client(
+            transport=httpx.MockTransport(request_handler),
+            **kwargs,
+        ),
+    )
+
+    with TestClient(app) as client:
+        response = client.get('/api/v1/desktop/providers/discovery')
+
+    assert response.status_code == 200
+    payload = response.json()
+    openrouter_provider = _provider_by_name(payload, 'openrouter')
+    validation = openrouter_provider['onboarding']['validation']
+
+    assert requested_paths
+    assert set(requested_paths) == {'/api/v1/key'}
+    assert openrouter_provider['ready'] is True
+    assert validation['trigger'] == 'automatic'
+    assert validation['status'] == 'valid'
+    assert 'valid-router-key' not in response.text
+
+
+def test_provider_discovery_rejects_invalid_openrouter_key(
+    monkeypatch,
+):
+    async_client = httpx.AsyncClient
+
+    async def request_handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == 'ollama.test':
+            raise httpx.ConnectError('connection refused')
+
+        return httpx.Response(401, json={'error': 'invalid key'})
+
+    monkeypatch.setattr(settings, 'OPENROUTER_API_KEY', 'invalid-router-key')
+    monkeypatch.setattr(
+        httpx,
+        'AsyncClient',
+        lambda **kwargs: async_client(
+            transport=httpx.MockTransport(request_handler),
+            **kwargs,
+        ),
+    )
+
+    with TestClient(app) as client:
+        response = client.get('/api/v1/desktop/providers/discovery')
+
+    assert response.status_code == 200
+    payload = response.json()
+    openrouter_provider = _provider_by_name(payload, 'openrouter')
+    onboarding = openrouter_provider['onboarding']
+    validation = onboarding['validation']
+
+    assert openrouter_provider['ready'] is False
+    assert openrouter_provider['reason_code'] == 'openrouter_api_key_invalid'
+    assert onboarding['input_mode'] == 'manual'
+    assert onboarding['manual_input_required'] is True
+    assert validation['trigger'] == 'automatic'
+    assert validation['status'] == 'invalid'
+    assert validation['error_message'] == 'invalid key'
+    assert 'invalid-router-key' not in response.text
+
+
 def test_provider_discovery_returns_manual_key_state_when_key_missing(
     monkeypatch,
 ):
