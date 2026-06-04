@@ -202,10 +202,12 @@ async def discover_desktop_ai_providers():
 
 
 @router.post(
-    '/ai-providers/{provider}/api-key/validate',
+    '/ai-providers/{provider}/api-key/validate-and-save',
     response_model=AIProviderApiKeyValidationResponse,
+    summary='Validate and save AI provider API key',
+    description='Validates an API key and saves it for desktop runtime.',
 )
-async def validate_desktop_ai_provider_api_key(
+async def validate_and_save_desktop_ai_provider_api_key(
     provider: AIProviderApiKeyProvider,
     payload: AIProviderApiKeyValidationRequest,
 ):
