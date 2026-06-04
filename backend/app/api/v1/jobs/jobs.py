@@ -53,10 +53,10 @@ from app.services.export.export import (
     ensure_job_exports,
     run_job_export,
 )
-from app.services.metadata.stock_metadata import (
-    build_stock_aware_preview,
-    build_stock_mapped_metadata,
-    get_stock_field_options,
+from app.services.metadata.stock_mapping import build_stock_mapped_metadata
+from app.services.metadata.stock_preview import build_stock_aware_preview
+from app.services.metadata.stock_rules import get_stock_field_options
+from app.services.metadata.stock_validation import (
     validate_file_metadata_for_stock,
 )
 from app.services.processing import (

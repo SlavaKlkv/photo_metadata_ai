@@ -22,8 +22,8 @@ from app.services.metadata.metadata_embedding import (
     embed_metadata_into_jpg,
     get_upload_file_path,
 )
-from app.services.metadata.stock_metadata import (
-    build_stock_iptc_payload,
+from app.services.metadata.stock_mapping import build_stock_iptc_payload
+from app.services.metadata.stock_validation import (
     validate_file_metadata_for_stock,
 )
 from app.storage.jobs import storage
@@ -300,10 +300,9 @@ def _ensure_iptc_export(job: ProcessingJob) -> list[ExportArtifact]:
         if file.status != FileStatus.COMPLETED or not file.selected_for_export:
             continue
 
-        if not file.iptc_embedded_metadata:
-            iptc_payload = build_stock_iptc_payload(file, stock_platform)
-            embed_metadata_into_jpg(file, payload=iptc_payload)
-            file.iptc_embedded_metadata = True
+        iptc_payload = build_stock_iptc_payload(file, stock_platform)
+        embed_metadata_into_jpg(file, payload=iptc_payload)
+        file.iptc_embedded_metadata = True
 
         file_path = get_upload_file_path(file.filename)
 

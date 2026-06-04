@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.enums import AIProvider
@@ -36,11 +36,15 @@ class Settings(BaseSettings):
 
     OPENROUTER_API_KEY: str | None = None
     OPENROUTER_BASE_URL: str = 'https://openrouter.ai/api/v1'
-    OPENROUTER_MODEL: str = 'openrouter/auto'
+    OPENROUTER_MODEL: str = 'openrouter/free'
 
     DESKTOP_STARTUP_AI_CHECK_TIMEOUT_SECONDS: float = 8.0
     DESKTOP_STARTUP_AI_CHECK_RETRY_ATTEMPTS: int = 2
     DESKTOP_STARTUP_AI_CHECK_RETRY_DELAY_SECONDS: float = 0.5
+
+    MAX_UPLOAD_FILE_SIZE_MB: int = Field(default=50, ge=1)
+    AI_RESIZE_LONG_SIDE_PX: int = Field(default=1280, ge=1)
+    AI_JPEG_QUALITY: int = Field(default=85, ge=1, le=100)
 
     BACKEND_RUNTIME_PROFILE: RuntimeProfile = 'desktop'
     WORKSPACE_DIR: Path = PROJECT_ROOT
