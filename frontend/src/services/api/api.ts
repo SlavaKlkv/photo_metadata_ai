@@ -72,6 +72,8 @@ export const jobsApi = {
     apiClient.post(`/api/v1/jobs/${jobId}/files/${fileId}/regenerate`, settings),
 
   providerDiscovery: () => apiClient.get('/api/v1/desktop/providers/discovery'),
+  updateDesktopSettings: (settings: { selected_provider: string }) =>
+  apiClient.patch('/api/v1/desktop/settings', settings),
 };
 
 export default apiClient;

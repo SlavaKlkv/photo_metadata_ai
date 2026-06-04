@@ -31,10 +31,13 @@ export interface ProviderDiscoveryItem {
   ready: boolean;
   status: string;
   reason?: string | null;
+  reason_code?: string | null;
   hints: string[];
   configured: boolean;
   local: boolean;
   model?: string | null;
+  setup_links?: Array<{ label: string; url: string }>;
+  api_key_links?: Array<{ label: string; url: string }>;
 }
 
 export interface ProviderDiscoveryResponse {

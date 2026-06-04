@@ -12,6 +12,7 @@ import { ResultsTable } from './components/organisms/ResultsTable/ResultsTable';
 import { MetadataPreview } from './components/organisms/MetadataPreview/MetadataPreview';
 import { ExportModal } from './components/organisms/ExportModal/ExportModal';
 import { SuccessModal } from './components/organisms/SuccessModal/SuccessModal';
+import { OnboardingModal } from './components/organisms/OnboardingModal/OnboardingModal';
 import { useAppStore } from './store/useAppStore';
 
 function App() {
@@ -74,6 +75,7 @@ function App() {
       <ProgressModal />
       <ExportModal />
       <SuccessModal />
+      <OnboardingModal />
     </div>
   );
 }

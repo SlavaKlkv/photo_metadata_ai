@@ -1,22 +1,22 @@
 // frontend/src/store/useAppStore.ts
-import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
+import { create } from "zustand";
+import { devtools } from "zustand/middleware";
 import {
   ProcessingJob,
   SessionSettings,
   BatchSettings,
   ProviderDiscoveryItem,
   AIProvider,
-} from '../types';
-import { jobsApi } from '../services/api/api';
+} from "../types";
+import { jobsApi } from "../services/api/api";
 
 const defaultSessionSettings: SessionSettings = {
   selectedProvider: null,
 };
 
 const defaultBatchSettings: BatchSettings = {
-  shootingContext: '',
-  stockPlatform: 'getty_images',
+  shootingContext: "",
+  stockPlatform: "getty_images",
   exportFormats: {
     csv: true,
     iptc: false,
@@ -28,23 +28,22 @@ export interface AppState {
   sessionSettings: SessionSettings;
   availableProviders: AIProvider[];
   providerDiscoveryItems: ProviderDiscoveryItem[];
-  providerDiscoveryStatus: 'idle' | 'loading' | 'ready' | 'error';
+  providerDiscoveryStatus: "idle" | "loading" | "ready" | "error";
   providerDiscoveryError: string | null;
   draftBatchSettings: BatchSettings;
   lockedBatchSettings: BatchSettings | null;
   isProcessing: boolean;
   diagnosticCount: number;
+  hasAcceptedOnboarding: boolean;
+  manualProviderApiKeys: Record<string, string>;
 
   addJobs: (files: ProcessingJob[]) => void;
   updateJobStatus: (
     jobId: string,
-    status: ProcessingJob['status'],
+    status: ProcessingJob["status"],
     error?: string,
   ) => void;
-  updateMetadata: (
-    jobId: string,
-    metadata: ProcessingJob['metadata'],
-  ) => void;
+  updateMetadata: (jobId: string, metadata: ProcessingJob["metadata"]) => void;
   removeJob: (jobId: string) => void;
 
   updateSessionSetting: (
@@ -58,7 +57,7 @@ export interface AppState {
     value: BatchSettings[K],
   ) => void;
   updateExportFormat: (
-    key: keyof BatchSettings['exportFormats'],
+    key: keyof BatchSettings["exportFormats"],
     value: boolean,
   ) => void;
   lockBatchSettings: () => void;
@@ -80,6 +79,9 @@ export interface AppState {
   loadSessionSettings: () => void;
   saveSessionSettings: () => void;
 
+  completeOnboarding: () => void;
+  updateProviderApiKey: (provider: string, key: string) => void;
+
   // regenerate одного файла, используя lockedBatchSettings — не дёргает весь batch
   regeneratingFileId: string | null;
   regenerateFile: (
@@ -93,14 +95,16 @@ export const useAppStore = create<AppState>()(
     jobs: [],
     sessionSettings: defaultSessionSettings,
     availableProviders: [],
+    providerDiscoveryStatus: "idle",
     providerDiscoveryItems: [],
-    providerDiscoveryStatus: 'idle',
     providerDiscoveryError: null,
     draftBatchSettings: defaultBatchSettings,
     lockedBatchSettings: null,
     isProcessing: false,
     diagnosticCount: 0,
     regeneratingFileId: null,
+    hasAcceptedOnboarding: false,
+    manualProviderApiKeys: {},
 
     addJobs: (newJobs: ProcessingJob[]) => {
       set((state) => ({
@@ -110,7 +114,7 @@ export const useAppStore = create<AppState>()(
 
     updateJobStatus: (
       jobId: string,
-      status: ProcessingJob['status'],
+      status: ProcessingJob["status"],
       error?: string,
     ) => {
       set((state) => ({
@@ -120,10 +124,7 @@ export const useAppStore = create<AppState>()(
       }));
     },
 
-    updateMetadata: (
-      jobId: string,
-      metadata: ProcessingJob['metadata'],
-    ) => {
+    updateMetadata: (jobId: string, metadata: ProcessingJob["metadata"]) => {
       set((state) => ({
         jobs: state.jobs.map((job) =>
           job.id === jobId ? { ...job, metadata } : job,
@@ -156,14 +157,14 @@ export const useAppStore = create<AppState>()(
     },
 
     discoverProviders: async () => {
-      set({ providerDiscoveryStatus: 'loading', providerDiscoveryError: null });
+      set({ providerDiscoveryStatus: "loading", providerDiscoveryError: null });
 
       try {
         const response = await jobsApi.providerDiscovery();
         const discoveryData = response.data;
-        
+
         if (!discoveryData || !Array.isArray(discoveryData.providers)) {
-          throw new Error('Invalid provider discovery response');
+          throw new Error("Invalid provider discovery response");
         }
 
         const providerDiscoveryItems: ProviderDiscoveryItem[] = (
@@ -178,13 +179,15 @@ export const useAppStore = create<AppState>()(
           configured: item.configured ?? false,
           local: item.local ?? false,
           model: item.model,
+          setup_links: item.setup_links ?? [],
+          api_key_links: item.api_key_links ?? [],
         }));
 
         const availableProviders = providerDiscoveryItems
           .filter((item) => item.ready)
           .map((item) => item.provider);
 
-        console.log('[Provider Discovery] Found providers:', {
+        console.log("[Provider Discovery] Found providers:", {
           total: providerDiscoveryItems.length,
           available: availableProviders.length,
           items: availableProviders,
@@ -193,7 +196,8 @@ export const useAppStore = create<AppState>()(
         set((state) => {
           const selectedProvider = state.sessionSettings.selectedProvider;
           const isSelectedProviderAvailable =
-            selectedProvider !== null && availableProviders.includes(selectedProvider);
+            selectedProvider !== null &&
+            availableProviders.includes(selectedProvider);
           const shouldAutoSelect =
             availableProviders.length === 1 &&
             selectedProvider !== availableProviders[0];
@@ -205,7 +209,7 @@ export const useAppStore = create<AppState>()(
           return {
             providerDiscoveryItems,
             availableProviders,
-            providerDiscoveryStatus: 'ready',
+            providerDiscoveryStatus: "ready",
             sessionSettings: shouldAutoSelect
               ? {
                   ...state.sessionSettings,
@@ -220,11 +224,12 @@ export const useAppStore = create<AppState>()(
           };
         });
       } catch (error: unknown) {
-        const errorMsg = error instanceof Error ? error.message : 'Provider discovery failed';
-        console.error('[Provider Discovery] Error:', errorMsg, error);
-        
+        const errorMsg =
+          error instanceof Error ? error.message : "Provider discovery failed";
+        console.error("[Provider Discovery] Error:", errorMsg, error);
+
         set({
-          providerDiscoveryStatus: 'error',
+          providerDiscoveryStatus: "error",
           providerDiscoveryError: errorMsg,
           availableProviders: [],
           providerDiscoveryItems: [],
@@ -301,7 +306,7 @@ export const useAppStore = create<AppState>()(
       if (jobs.length === 0) return 0;
 
       const completedCount = jobs.filter(
-        (job) => job.status === 'done' || job.status === 'error',
+        (job) => job.status === "done" || job.status === "error",
       ).length;
 
       return Math.round((completedCount / jobs.length) * 100);
@@ -314,7 +319,7 @@ export const useAppStore = create<AppState>()(
 
     hasErrors: () => {
       const { jobs } = get();
-      return jobs.some((job) => job.status === 'error');
+      return jobs.some((job) => job.status === "error");
     },
 
     clearAll: () => {
@@ -327,7 +332,7 @@ export const useAppStore = create<AppState>()(
 
     loadSessionSettings: () => {
       try {
-        const saved = localStorage.getItem('session_settings');
+        const saved = localStorage.getItem("session_settings");
         if (saved) {
           const parsed = JSON.parse(saved);
           set((state) => ({
@@ -336,8 +341,16 @@ export const useAppStore = create<AppState>()(
             },
           }));
         }
+
+        // Load onboarding status
+        const onboardingCompleted = localStorage.getItem(
+          "onboarding_completed",
+        );
+        if (onboardingCompleted === "true") {
+          set({ hasAcceptedOnboarding: true });
+        }
       } catch (err) {
-        console.error('Failed to load session settings:', err);
+        console.error("Failed to load session settings:", err);
       }
     },
 
@@ -345,12 +358,37 @@ export const useAppStore = create<AppState>()(
       try {
         const { sessionSettings } = get();
         localStorage.setItem(
-          'session_settings',
+          "session_settings",
           JSON.stringify(sessionSettings),
         );
       } catch (err) {
-        console.error('Failed to save session settings:', err);
+        console.error("Failed to save session settings:", err);
       }
+    },
+
+    completeOnboarding: async () => {
+      const { sessionSettings } = get();
+
+      try {
+        // сохраняем выбранный провайдер или mock если ничего не выбрано
+        await jobsApi.updateDesktopSettings({
+          selected_provider: sessionSettings.selectedProvider ?? "mock",
+        });
+      } catch (err) {
+        console.error("[completeOnboarding] Failed to save provider:", err);
+      }
+
+      set({ hasAcceptedOnboarding: true });
+      localStorage.setItem("onboarding_completed", "true");
+    },
+
+    updateProviderApiKey: (provider: string, key: string) => {
+      set((state) => ({
+        manualProviderApiKeys: {
+          ...state.manualProviderApiKeys,
+          [provider]: key,
+        },
+      }));
     },
 
     // Regenerate одного файла используя lockedBatchSettings.
@@ -361,7 +399,7 @@ export const useAppStore = create<AppState>()(
 
       // regenerate доступен только после processing — locked settings обязательны
       if (!lockedBatchSettings) {
-        return { success: false, error: 'No locked batch settings found' };
+        return { success: false, error: "No locked batch settings found" };
       }
 
       set({ regeneratingFileId: fileId });
@@ -370,7 +408,7 @@ export const useAppStore = create<AppState>()(
         const response = await jobsApi.regenerateFile(currentJobId, fileId, {
           shooting_context: lockedBatchSettings.shootingContext,
           stock_platform: lockedBatchSettings.stockPlatform,
-          ai_provider: sessionSettings.selectedProvider ?? 'ollama',
+          ai_provider: sessionSettings.selectedProvider ?? "ollama",
         });
 
         const newMetadata = response.data?.metadata;
@@ -382,10 +420,13 @@ export const useAppStore = create<AppState>()(
       } catch (err: unknown) {
         // TODO(backend): убрать mock когда появится реальный endpoint
         // Пока endpoint не реализован — логируем и возвращаем ошибку наверх
-        console.warn('[regenerateFile] Backend endpoint not yet implemented:', err);
+        console.warn(
+          "[regenerateFile] Backend endpoint not yet implemented:",
+          err,
+        );
         return {
           success: false,
-          error: 'Regenerate is not yet available. Backend endpoint pending.',
+          error: "Regenerate is not yet available. Backend endpoint pending.",
         };
       } finally {
         set({ regeneratingFileId: null });
