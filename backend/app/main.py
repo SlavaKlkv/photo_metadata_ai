@@ -12,6 +12,7 @@ from app.services.desktop.desktop_startup import (
     stop_desktop_startup_orchestration,
 )
 from app.services.task_manager import stop_background_task_managers
+from app.storage.jobs import storage
 
 configure_logging()
 
@@ -19,6 +20,7 @@ configure_logging()
 @asynccontextmanager
 async def app_lifespan(_: FastAPI):
     ensure_runtime_directories()
+    await storage.initialize()
     start_desktop_startup_orchestration()
     try:
         yield

@@ -14,6 +14,7 @@ class RuntimeDirectories:
     profile: str
     workspace_dir: Path
     jobs_dir: Path
+    job_storage_db_path: Path
     results_dir: Path
     temp_dir: Path
     uploads_dir: Path
@@ -36,6 +37,7 @@ def build_runtime_directories() -> RuntimeDirectories:
         profile=settings.runtime_profile,
         workspace_dir=workspace_dir,
         jobs_dir=jobs_dir,
+        job_storage_db_path=jobs_dir / 'job_storage.sqlite',
         results_dir=results_dir,
         temp_dir=temp_dir,
         uploads_dir=jobs_dir / 'uploads',

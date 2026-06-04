@@ -26,7 +26,7 @@ from app.services.metadata.stock_mapping import build_stock_iptc_payload
 from app.services.metadata.stock_validation import (
     validate_file_metadata_for_stock,
 )
-from app.services.storage import storage
+from app.storage.jobs import storage
 
 logger = structlog.get_logger(__name__)
 

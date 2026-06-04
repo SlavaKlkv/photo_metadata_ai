@@ -1,18 +1,17 @@
-import json
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 import structlog
 
 from app.core.config import settings
 from app.core.enums import AIProvider
-from app.core.runtime import ensure_runtime_directories, resolve_path_in_base
 from app.schemas.desktop import DesktopSettingsResponse
+from app.storage.desktop_settings import (
+    load_desktop_settings_payload,
+    write_desktop_settings_payload,
+)
 
 logger = structlog.get_logger(__name__)
-
-SETTINGS_FILENAME = 'desktop_settings.json'
 
 
 @dataclass(frozen=True)
@@ -36,13 +35,8 @@ def update_desktop_settings(
     selected_provider: AIProvider,
 ) -> DesktopSettingsResponse:
     effective_settings = resolve_effective_ai_settings(selected_provider)
-    settings_path = _get_settings_path()
     payload = {'selected_provider': selected_provider.value}
-
-    settings_path.write_text(
-        json.dumps(payload, indent=2, sort_keys=True),
-        encoding='utf-8',
-    )
+    settings_path = write_desktop_settings_payload(payload)
     logger.info(
         'desktop_settings_saved',
         selected_provider=selected_provider,
@@ -78,21 +72,7 @@ def resolve_effective_ai_settings(
 
 
 def _load_selected_provider() -> AIProvider:
-    settings_path = _get_settings_path()
-
-    if not settings_path.is_file():
-        return AIProvider(settings.DEFAULT_AI_PROVIDER)
-
-    try:
-        payload = json.loads(settings_path.read_text(encoding='utf-8'))
-    except (OSError, json.JSONDecodeError) as error:
-        logger.warning(
-            'desktop_settings_load_failed',
-            path=str(settings_path),
-            error=str(error),
-        )
-        return AIProvider(settings.DEFAULT_AI_PROVIDER)
-
+    payload = load_desktop_settings_payload()
     selected_provider = _extract_selected_provider(payload)
 
     if selected_provider is None:
@@ -118,11 +98,3 @@ def _extract_selected_provider(payload: Any) -> AIProvider | None:
             selected_provider=raw_provider,
         )
         return None
-
-
-def _get_settings_path() -> Path:
-    runtime_directories = ensure_runtime_directories()
-    return resolve_path_in_base(
-        runtime_directories.workspace_dir,
-        SETTINGS_FILENAME,
-    )
