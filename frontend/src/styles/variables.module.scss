@@ -16,6 +16,7 @@
   --border-hover: #8D8DA5;       // Цвет границ при наведении
   --border-active: #F4F4F6;      // Цвет границ при активном состоянии
   --border-focus: #A9A9BC;    // Цвет границ для отключённых 
+  --border-disabled: #3D3D4B;   // Цвет границ для отключённых элементов
 
   // ===== BUTTONS =====
   --bt-default-primary: #5A5AED;       // Цвет фона для основных кнопок
@@ -35,6 +36,7 @@
   // ===== ACCENTS =====
   --accent-main: #5A5AED;       // Основной цвет (синий)
   --accent-light: #7171EE;       // Светлый вариант
+  --accent-link: #9191F3; 
   --accent-dark: #3A3A5F;        // Тёмный вариант
   --success-color: #4caf50;      // Зелёный (успех)
   --error-color: #ff6b6b;        // Красный (ошибка)

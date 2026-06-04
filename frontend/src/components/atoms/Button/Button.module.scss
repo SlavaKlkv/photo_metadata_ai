@@ -61,7 +61,7 @@
     &:disabled {
       background: var(--bt-disabled-primary);
       color: var(--bt-disabled-text);
-      border-color: transparent;
+      border-color: var(--border-disabled);
     }
   }
   
@@ -83,7 +83,7 @@
     &:disabled {
       background: var(--bt-disabled-secondary);
       color: var(--bt-disabled-text);
-      border-color: var(--bt-disabled-secondary);
+      border-color: var(--border-disabled);
     }
   }
   
