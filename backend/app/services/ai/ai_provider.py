@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.core.constants import AI_PROVIDER_TIMEOUT
 from app.core.enums import AIProvider, StockPlatform
 from app.core.exceptions import AIProviderConfigurationError
+from app.services.desktop.ai_provider_api_keys import get_ai_provider_api_key
 from app.services.prompt_templates import (
     DEFAULT_PROMPT_LANGUAGE,
     METADATA_PROMPT_TEMPLATE_VERSION,
@@ -239,7 +240,9 @@ class GeminiImageMetadataProvider(BaseAIProvider):
 
     def __init__(self, model: str | None = None):
         super().__init__(model=model)
-        if not settings.GEMINI_API_KEY:
+        self.api_key = get_ai_provider_api_key(AIProvider.GEMINI)
+
+        if self.api_key is None:
             raise AIProviderConfigurationError(
                 reason_code='gemini_api_key_missing',
                 message='GEMINI_API_KEY is not configured',
@@ -279,7 +282,7 @@ class GeminiImageMetadataProvider(BaseAIProvider):
 
             response = await client.post(
                 f'{settings.GEMINI_BASE_URL}/models/{model}:generateContent',
-                headers={'x-goog-api-key': settings.GEMINI_API_KEY or ''},
+                headers={'x-goog-api-key': self.api_key},
                 json={
                     'contents': [
                         {
@@ -341,7 +344,9 @@ class OpenRouterImageMetadataProvider(BaseAIProvider):
 
     def __init__(self, model: str | None = None):
         super().__init__(model=model)
-        if not settings.OPENROUTER_API_KEY:
+        self.api_key = get_ai_provider_api_key(AIProvider.OPENROUTER)
+
+        if self.api_key is None:
             raise AIProviderConfigurationError(
                 reason_code='openrouter_api_key_missing',
                 message='OPENROUTER_API_KEY is not configured',
@@ -382,9 +387,7 @@ class OpenRouterImageMetadataProvider(BaseAIProvider):
             response = await client.post(
                 f'{settings.OPENROUTER_BASE_URL}/chat/completions',
                 headers={
-                    'Authorization': (
-                        f'Bearer {settings.OPENROUTER_API_KEY or ""}'
-                    ),
+                    'Authorization': f'Bearer {self.api_key}',
                     'Content-Type': 'application/json',
                 },
                 json={

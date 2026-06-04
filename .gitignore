@@ -37,5 +37,6 @@ backend/uploads/
 /jobs/
 /results/
 /temp/
-/desktop_settings.json
-/marketplace_credentials.json
+desktop_settings.json
+ai_provider_api_keys.json
+marketplace_credentials.json

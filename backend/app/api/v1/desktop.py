@@ -1,12 +1,18 @@
 from uuid import UUID
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
+from app.core.enums import AIProvider
 from app.core.runtime import (
     ensure_runtime_directories,
     get_runtime_directories,
+)
+from app.schemas.ai_provider_api_key import (
+    AIProviderApiKeyProvider,
+    AIProviderApiKeyValidationRequest,
+    AIProviderApiKeyValidationResponse,
 )
 from app.schemas.desktop import (
     DesktopActionResponse,
@@ -17,6 +23,9 @@ from app.schemas.desktop import (
     UpdateDesktopSettingsRequest,
 )
 from app.schemas.provider_discovery import ProvidersDiscoveryResponse
+from app.services.desktop.ai_provider_api_keys import (
+    validate_and_save_ai_provider_api_key,
+)
 from app.services.desktop.app_settings import (
     get_desktop_settings,
     update_desktop_settings,
@@ -190,6 +199,26 @@ async def open_result_file(
 )
 async def discover_desktop_ai_providers():
     return await discover_ai_providers()
+
+
+@router.post(
+    '/ai-providers/{provider}/api-key/validate',
+    response_model=AIProviderApiKeyValidationResponse,
+)
+async def validate_desktop_ai_provider_api_key(
+    provider: AIProviderApiKeyProvider,
+    payload: AIProviderApiKeyValidationRequest,
+):
+    try:
+        return await validate_and_save_ai_provider_api_key(
+            AIProvider(provider.value),
+            payload.api_key,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        ) from error
 
 
 def _build_runtime_info() -> DesktopRuntimeInfo:
