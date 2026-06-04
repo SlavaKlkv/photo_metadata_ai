@@ -91,6 +91,11 @@ class JobStorage:
         )
         return jobs
 
+    def reset_for_tests(self) -> None:
+        with self._lock:
+            self._jobs.clear()
+            self._initialized = False
+
     def _ensure_initialized(self) -> None:
         if self._initialized:
             return
