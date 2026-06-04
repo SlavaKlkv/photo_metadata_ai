@@ -16,7 +16,7 @@ from app.schemas.job import ProcessingJob, ProcessingJobFile
 from app.services.ai.ai_fallback import FallbackMetadataResult
 from app.services.ai.ai_provider import AIMetadataResponse
 from app.services.export.csv import generate_metadata_csv
-from app.services.storage import storage
+from app.storage.jobs import storage
 
 
 @pytest.fixture(autouse=True)

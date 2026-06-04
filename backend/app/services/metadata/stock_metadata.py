@@ -736,7 +736,7 @@ def validate_file_metadata_for_stock(
     description = file.description or ''
     keywords = list(file.keywords)
     effective_categories = get_effective_categories(file, stock_platform)
-    validation_categories = _collect_validation_categories(file)
+    validation_categories = effective_categories
 
     if rules.title_required and not title:
         errors.append(

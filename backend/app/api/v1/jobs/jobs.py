@@ -66,12 +66,12 @@ from app.services.processing import (
     regenerate_metadata_for_file,
     retry_failed_files,
 )
-from app.services.storage import storage
 from app.services.task_manager import (
     export_task_manager,
     job_task_manager,
 )
 from app.services.upload import save_upload_file
+from app.storage.jobs import storage
 
 router = APIRouter(
     prefix='/jobs',
