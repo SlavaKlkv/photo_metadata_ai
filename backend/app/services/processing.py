@@ -4,11 +4,8 @@ from uuid import UUID
 import structlog
 from starlette.concurrency import run_in_threadpool
 
-from app.core.constants import (
-    DEFAULT_AI_JPEG_QUALITY,
-    DEFAULT_AI_RESIZE_LONG_SIDE_PX,
-    MAX_CONCURRENT_AI_REQUESTS,
-)
+from app.core.config import settings
+from app.core.constants import MAX_CONCURRENT_AI_REQUESTS
 from app.core.enums import AIProvider, MetadataFieldSource, StockPlatform
 from app.schemas.job import (
     FileStatus,
@@ -417,8 +414,8 @@ async def _generate_metadata_for_file(
         source_image_path,
         job_id=job_id,
         file_id=file.file_id,
-        max_long_side_px=DEFAULT_AI_RESIZE_LONG_SIDE_PX,
-        jpeg_quality=DEFAULT_AI_JPEG_QUALITY,
+        max_long_side_px=settings.AI_RESIZE_LONG_SIDE_PX,
+        jpeg_quality=settings.AI_JPEG_QUALITY,
     )
 
     return await generate_metadata_with_fallback(
