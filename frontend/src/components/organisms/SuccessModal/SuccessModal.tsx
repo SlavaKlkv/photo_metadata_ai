@@ -1,11 +1,12 @@
 // frontend/src/components/organisms/SuccessModal/SuccessModal.tsx
-import React from 'react';
-import { Modal } from '../../atoms/Modal/Modal';
-import { Button } from '../../atoms/Button/Button';
-import { Icon } from '../../atoms/Icon/Icon';
-import { useUIStore } from '../../../store/useUIStore';
-import { useAppStore } from '../../../store/useAppStore';
-import styles from './SuccessModal.module.scss';
+import React from "react";
+import { Modal } from "../../atoms/Modal/Modal";
+import { Button } from "../../atoms/Button/Button";
+import { Icon } from "../../atoms/Icon/Icon";
+import { useUIStore } from "../../../store/useUIStore";
+import { useAppStore } from "../../../store/useAppStore";
+import styles from "./SuccessModal.module.scss";
+import { jobsApi } from "../../../services/api/api";
 
 export const SuccessModal: React.FC = () => {
   const isOpen = useUIStore((state) => state.isSuccessModalOpen);
@@ -18,6 +19,7 @@ export const SuccessModal: React.FC = () => {
   const jobs = useAppStore((state) => state.jobs);
   const setCurrentJobId = useUIStore((state) => state.setCurrentJobId);
   const setSelectedJobId = useUIStore((state) => state.setSelectedJobId);
+  const currentJobId = useUIStore((state) => state.currentJobId);
 
   const handleBackToResults = () => {
     closeSuccessModal();
@@ -35,23 +37,50 @@ export const SuccessModal: React.FC = () => {
     closeSuccessModal();
   };
 
+  const handleOpenCsv = async () => {
+    if (!currentJobId) return;
+
+    try {
+      await jobsApi.openResultFile(currentJobId);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleOpenFolder = async () => {
+    if (!currentJobId) return;
+
+    try {
+      await jobsApi.openResultsFolder(currentJobId);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={closeSuccessModal} closeOnBackdrop={false}>
       <div className={styles.content}>
         <Icon name="img-modal-icon" className={styles.icon} />
         <h2 className={styles.title}>Export completed successfully!</h2>
         <p className={styles.subtitle}>
-          {jobs.length} photos are ready for stock upload. CSV file generated, IPTC metadata embedded, approved photos exported.
+          {jobs.length} photos are ready for stock upload. CSV file generated,
+          IPTC metadata embedded, approved photos exported.
         </p>
         <div className={styles.actions}>
           <Button variant="secondary" size="md" onClick={handleBackToResults}>
             Back to results
           </Button>
+
           <Button variant="secondary" size="md" onClick={handleStartNewBatch}>
             Start new batch
           </Button>
-          <Button variant="primary" size="md" onClick={closeSuccessModal}>
-            Open export folder
+
+          <Button variant="secondary" size="md" onClick={handleOpenCsv}>
+            Open CSV file
+          </Button>
+
+          <Button variant="primary" size="md" onClick={handleOpenFolder}>
+            Open folder
           </Button>
         </div>
       </div>
