@@ -6,6 +6,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-lg);
+  flex-wrap: wrap;
 }
 
 .stepper {
@@ -80,9 +81,11 @@
   align-items: center;
   gap: var(--spacing-sm);
   flex-shrink: 0;
+  margin-left: auto;
 
   @media (max-width: 1200px) {
     justify-content: flex-end;
+    margin-left: 0;
   }
 
   @media (max-width: 1080px) {

@@ -1,6 +1,7 @@
 // frontend/src/components/organisms/SettingsPanel/SettingsPanel.tsx
 import React from 'react';
 import { useAppStore } from '../../../store/useAppStore';
+import { useUIStore } from '../../../store/useUIStore';
 import { Panel } from '../../atoms/Panel/Panel';
 import { Input } from '../../atoms/Input/Input';
 import { Select } from '../../atoms/Select/Select';
@@ -8,7 +9,11 @@ import { Checkbox } from '../../atoms/Checkbox/Checkbox';
 import { Radio } from '../../atoms/Radio/Radio';
 import styles from './SettingsPanel.module.scss';
 import { SectionHeader } from '../../molecules/SectionHeader/SectionHeader';
-import { AIProvider, ProviderDiscoveryItem } from '../../../types';
+import {
+  AIProvider,
+  ProviderDiscoveryItem,
+  StockPlatform,
+} from '../../../types';
 
 const platformOptions = [
   { value: 'getty_images', label: 'Getty Images' },
@@ -45,6 +50,11 @@ export const SettingsPanel: React.FC = () => {
     (state) => state.updateDraftBatchSetting,
   );
   const updateExportFormat = useAppStore((state) => state.updateExportFormat);
+
+  const switchStockPlatform = useAppStore((state) => state.switchStockPlatform);
+
+  const currentJobId = useUIStore((state) => state.currentJobId);
+  const isExportReady = useUIStore((state) => state.isExportReady);
 
   const selectedProvider = sessionSettings.selectedProvider;
 
@@ -85,14 +95,14 @@ export const SettingsPanel: React.FC = () => {
           <Input
             value={displayedShootingContext}
             onChange={(e) =>
-              updateDraftBatchSetting('shootingContext', e.target.value)
+              updateDraftBatchSetting("shootingContext", e.target.value)
             }
             placeholder='Describe the context of the shooting, and the following questions will help you — Where? What? When? E.g., "New York, Central Park, Sunset, two people on a bench 10 May 2026"'
             hasError={isOverLimit}
             disabled={isPromptLocked}
           />
           <div
-            className={`${styles.charCounter} ${isOverLimit ? styles.counterError : ''}`}
+            className={`${styles.charCounter} ${isOverLimit ? styles.counterError : ""}`}
           >
             {charCount}/{CHAR_LIMIT}
           </div>
@@ -113,12 +123,15 @@ export const SettingsPanel: React.FC = () => {
             label="Stock Platform"
             options={platformOptions}
             value={draftBatchSettings.stockPlatform}
-            onChange={(e) =>
-              updateDraftBatchSetting(
-                'stockPlatform',
-                e.target.value as typeof draftBatchSettings.stockPlatform,
-              )
-            }
+            onChange={(e) => {
+              const platform = e.target.value as StockPlatform;
+
+              if (isExportReady && currentJobId) {
+                switchStockPlatform(platform, currentJobId);
+              } else {
+                updateDraftBatchSetting("stockPlatform", platform);
+              }
+            }}
           />
           {/* Re-export hint: меняем stock после processing → export без новой AI генерации */}
           {stockChangedAfterLock && (
@@ -135,13 +148,13 @@ export const SettingsPanel: React.FC = () => {
               id="csv"
               label="CSV"
               checked={draftBatchSettings.exportFormats.csv}
-              onChange={handleFormatChange('csv')}
+              onChange={handleFormatChange("csv")}
             />
             <Checkbox
               id="iptc"
               label="IPTC"
               checked={draftBatchSettings.exportFormats.iptc}
-              onChange={handleFormatChange('iptc')}
+              onChange={handleFormatChange("iptc")}
             />
           </div>
         </div>
@@ -151,7 +164,7 @@ export const SettingsPanel: React.FC = () => {
           <div className={styles.providerOptions}>
             {providerOptions.map((option) => {
               const isAvailable =
-                providerDiscoveryStatus !== 'ready' ||
+                providerDiscoveryStatus !== "ready" ||
                 availableProviders.includes(option.value);
 
               return (
@@ -163,30 +176,32 @@ export const SettingsPanel: React.FC = () => {
                   disabled={!isAvailable}
                   onChange={() => handleProviderChange(option.value)}
                   className={`${styles.providerOption} ${
-                    selectedProvider === option.value ? styles.selectedOption : ''
-                  } ${
-                    !isAvailable ? styles.disabledOption : ''
-                  }`}
+                    selectedProvider === option.value
+                      ? styles.selectedOption
+                      : ""
+                  } ${!isAvailable ? styles.disabledOption : ""}`}
                 />
               );
             })}
           </div>
 
-          {providerDiscoveryStatus === 'loading' && (
+          {providerDiscoveryStatus === "loading" && (
             <small className={styles.hintText}>
               Detecting available AI providers…
             </small>
           )}
 
-          {providerDiscoveryStatus === 'ready' && availableProviders.length === 0 && (
-            <small className={styles.errorText}>
-              No AI providers were detected. Provider onboarding will be added later.
-            </small>
-          )}
+          {providerDiscoveryStatus === "ready" &&
+            availableProviders.length === 0 && (
+              <small className={styles.errorText}>
+                No AI providers were detected. Provider onboarding will be added
+                later.
+              </small>
+            )}
 
-          {providerDiscoveryStatus === 'error' && (
+          {providerDiscoveryStatus === "error" && (
             <small className={styles.errorText}>
-              {providerDiscoveryError ?? 'Failed to detect AI providers.'}
+              {providerDiscoveryError ?? "Failed to detect AI providers."}
             </small>
           )}
         </div>
