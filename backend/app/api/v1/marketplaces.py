@@ -26,6 +26,9 @@ router = APIRouter(
 
 @router.get('/connections', response_model=MarketplaceConnectionsResponse)
 async def list_connections():
+    """
+    Возвращает состояния подключений ко всем маркетплейсам.
+    """
     return await list_marketplace_connections()
 
 
@@ -34,6 +37,9 @@ async def list_connections():
     response_model=MarketplaceConnectionState,
 )
 async def get_connection(marketplace: StockPlatform):
+    """
+    Возвращает состояние подключения к выбранному маркетплейсу.
+    """
     return await get_marketplace_connection(marketplace)
 
 
@@ -45,6 +51,9 @@ async def validate_credentials(
     marketplace: StockPlatform,
     credentials: MarketplaceCredentialsRequest,
 ):
+    """
+    Проверяет учетные данные маркетплейса без сохранения.
+    """
     return await validate_marketplace_credentials(marketplace, credentials)
 
 
@@ -56,6 +65,9 @@ async def save_credentials(
     marketplace: StockPlatform,
     credentials: MarketplaceCredentialsRequest,
 ):
+    """
+    Проверяет и сохраняет учетные данные маркетплейса.
+    """
     connection = await save_marketplace_credentials(marketplace, credentials)
 
     if not connection.connected:
@@ -80,4 +92,7 @@ async def save_credentials(
     response_model=MarketplaceConnectionState,
 )
 async def delete_credentials(marketplace: StockPlatform):
+    """
+    Удаляет сохраненные учетные данные маркетплейса.
+    """
     return await delete_marketplace_credentials(marketplace)

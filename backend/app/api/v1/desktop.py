@@ -46,6 +46,9 @@ router = APIRouter(
 
 @router.get('/health', response_model=DesktopHealthResponse)
 async def desktop_health_check():
+    """
+    Проверяет доступность десктопного окружения.
+    """
     runtime_directories = ensure_runtime_directories()
     return DesktopHealthResponse(
         status='ok',
@@ -55,22 +58,34 @@ async def desktop_health_check():
 
 @router.get('/runtime', response_model=DesktopRuntimeInfo)
 async def get_desktop_runtime_info():
+    """
+    Возвращает информацию о директориях десктопного окружения.
+    """
     ensure_runtime_directories()
     return _build_runtime_info()
 
 
 @router.get('/settings', response_model=DesktopSettingsResponse)
 async def get_settings():
+    """
+    Возвращает сохраненные настройки десктопного окружения.
+    """
     return get_desktop_settings()
 
 
 @router.patch('/settings', response_model=DesktopSettingsResponse)
 async def update_settings(payload: UpdateDesktopSettingsRequest):
+    """
+    Обновляет настройки десктопного окружения.
+    """
     return update_desktop_settings(payload.selected_provider)
 
 
 @router.get('/startup/status', response_model=DesktopStartupStatusResponse)
 async def get_desktop_startup_status_endpoint():
+    """
+    Возвращает состояние запуска десктопного окружения.
+    """
     return get_desktop_startup_status()
 
 
@@ -198,19 +213,21 @@ async def open_result_file(
     response_model=ProvidersDiscoveryResponse,
 )
 async def discover_desktop_ai_providers():
+    """
+    Возвращает доступность AI-провайдеров для десктопного окружения.
+    """
     return await discover_ai_providers()
 
 
 @router.post(
     '/ai-providers/{provider}/api-key/validate-and-save',
     response_model=AIProviderApiKeyValidationResponse,
-    summary='Validate and save AI provider API key',
-    description='Validates an API key and saves it for desktop runtime.',
 )
 async def validate_and_save_desktop_ai_provider_api_key(
     provider: AIProviderApiKeyProvider,
     payload: AIProviderApiKeyValidationRequest,
 ):
+    """Валидирует и сохраняет API-ключ в десктопном окружении."""
     try:
         return await validate_and_save_ai_provider_api_key(
             AIProvider(provider.value),

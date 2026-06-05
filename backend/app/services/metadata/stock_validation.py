@@ -1,3 +1,5 @@
+import re
+
 from PIL import Image, UnidentifiedImageError
 
 from app.core.enums import FileStatus, StockPlatform
@@ -137,6 +139,14 @@ def validate_file_metadata_for_stock(
                     f'Max {rules.description_max_characters} characters.'
                 ),
             )
+        )
+
+    if rules.validation_english_required:
+        _append_non_english_script_errors(
+            errors,
+            title=title,
+            description=description,
+            keywords=keywords,
         )
 
     if (
@@ -342,23 +352,44 @@ def validate_file_metadata_for_stock(
             )
         )
 
-    has_release_data = bool(mapped_metadata.releases) or (
-        mapped_metadata.model_release_available is True
-    )
-    should_require_release = mapped_metadata.has_people is not False
-
     if (
-        rules.releases_required
-        and should_require_release
-        and not has_release_data
+        rules.location_recommended
+        and not mapped_metadata.location_metadata
+        and not mapped_metadata.is_editorial
     ):
         warnings.append(
             MetadataValidationIssue(
-                field='model_release_available',
+                field='location_metadata',
                 code='recommended',
-                message='Release information is recommended.',
+                message='Location information is recommended.',
             )
         )
+
+    has_release_data = bool(mapped_metadata.releases) or (
+        mapped_metadata.model_release_available is True
+    )
+    has_people_unknown = mapped_metadata.has_people is None
+
+    if not has_release_data:
+        if (
+            rules.model_release_required_when_people
+            and mapped_metadata.has_people is True
+        ):
+            warnings.append(
+                MetadataValidationIssue(
+                    field='model_release_available',
+                    code='recommended_when_people',
+                    message='Release information is recommended for people.',
+                )
+            )
+        elif rules.releases_required and has_people_unknown:
+            warnings.append(
+                MetadataValidationIssue(
+                    field='model_release_available',
+                    code='recommended',
+                    message='Release information is recommended.',
+                )
+            )
 
     if (
         mapped_metadata.model_release_available is True
@@ -503,6 +534,40 @@ def _build_restricted_terms_message(terms: list[str]) -> str:
     return (
         'Restricted names/brands/franchises detected: '
         f'{preview}. Use generic terms instead.'
+    )
+
+
+def _append_non_english_script_errors(
+    errors: list[MetadataValidationIssue],
+    *,
+    title: str,
+    description: str,
+    keywords: list[str],
+) -> None:
+    fields = {
+        'title': title,
+        'description': description,
+        'keywords': ', '.join(keywords),
+    }
+
+    for field_name, value in fields.items():
+        if _contains_non_english_script(value):
+            errors.append(
+                MetadataValidationIssue(
+                    field=field_name,
+                    code='english_required',
+                    message='Metadata must be written in English.',
+                )
+            )
+
+
+def _contains_non_english_script(value: str) -> bool:
+    return bool(
+        re.search(
+            r'[\u0370-\u03ff\u0400-\u04ff\u3040-\u30ff'
+            r'\u4e00-\u9fff\uac00-\ud7af]',
+            value,
+        )
     )
 
 

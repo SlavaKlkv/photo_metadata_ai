@@ -1,7 +1,7 @@
 import re
 from dataclasses import dataclass
 
-from app.core.enums import StockPlatform
+from app.core.enums import MetadataFieldSource, StockPlatform
 from app.schemas.job import ProcessingJobFile
 from app.services.metadata.metadata_embedding import IPTCEmbeddingPayload
 from app.services.metadata.stock_rules import StockRules, get_stock_rules
@@ -268,7 +268,6 @@ LICENSE_ALIASES: dict[str, dict[StockPlatform, str]] = {
     },
 }
 
-
 def get_effective_categories(
     file: ProcessingJobFile,
     stock_platform: StockPlatform,
@@ -317,13 +316,21 @@ def build_stock_mapped_metadata(
             rules,
             mapped_is_editorial,
         ),
-        location_metadata=file.location_metadata,
+        location_metadata=(
+            file.location_metadata if rules.location_supported else None
+        ),
         editorial_date=file.editorial_date,
         is_editorial=mapped_is_editorial,
-        editorial_caption=file.editorial_caption,
+        editorial_caption=map_stock_editorial_caption(
+            file,
+            rules,
+            mapped_title,
+            mapped_description,
+            mapped_is_editorial,
+        ),
         has_people=file.has_people,
         people_count=file.people_count,
-        model_release_available=file.model_release_available,
+        model_release_available=map_stock_model_release_available(file),
         releases=list(file.releases),
         ai_generated_content_disclosure=file.ai_generated_content_disclosure,
         is_illustration=file.is_illustration,
@@ -365,7 +372,13 @@ def map_stock_title(
     rules: StockRules,
 ) -> str | None:
     title = file.title or file.description
-    return _trim_metadata_text(title, rules.title_max_characters)
+    max_characters = _get_stock_title_characters_limit(rules)
+    trimmed_title = _trim_metadata_text(title, max_characters)
+
+    if trimmed_title is None:
+        return None
+
+    return _trim_title_words(trimmed_title, rules)
 
 
 def map_stock_description(
@@ -387,9 +400,14 @@ def map_stock_keywords(
 ) -> list[str]:
     keywords: list[str] = []
     seen_keywords: set[str] = set()
+    keywords_limit = _get_stock_keywords_limit(rules)
+    keywords_target_min = min(
+        rules.keywords_recommended_min,
+        keywords_limit,
+    )
 
     for keyword in file.keywords:
-        normalized_keyword = ' '.join(str(keyword).strip().split())
+        normalized_keyword = _normalize_keyword_candidate(str(keyword))
         dedupe_key = normalized_keyword.lower()
 
         if not normalized_keyword or dedupe_key in seen_keywords:
@@ -404,10 +422,70 @@ def map_stock_keywords(
         keywords.append(normalized_keyword)
         seen_keywords.add(dedupe_key)
 
-        if len(keywords) >= rules.keywords_max_count:
+        if len(keywords) >= keywords_limit:
             break
 
+    if (
+        len(keywords) < keywords_target_min
+        and file.field_sources.get('keywords') != MetadataFieldSource.EDITED
+    ):
+        for keyword in _iter_keyword_candidates(file):
+            normalized_keyword = _normalize_keyword_candidate(keyword)
+            dedupe_key = normalized_keyword.lower()
+
+            if not normalized_keyword or dedupe_key in seen_keywords:
+                continue
+
+            if (
+                rules.validation_restricted_terms_forbidden
+                and find_restricted_terms_in_text(normalized_keyword)
+            ):
+                continue
+
+            keywords.append(normalized_keyword)
+            seen_keywords.add(dedupe_key)
+
+            if (
+                len(keywords) >= keywords_target_min
+                or len(keywords) >= keywords_limit
+            ):
+                break
+
     return keywords
+
+
+def map_stock_editorial_caption(
+    file: ProcessingJobFile,
+    rules: StockRules,
+    mapped_title: str | None,
+    mapped_description: str | None,
+    is_editorial: bool,
+) -> str | None:
+    editorial_caption = file.editorial_caption
+
+    if (
+        not editorial_caption
+        and is_editorial
+        and rules.editorial_caption_required
+    ):
+        editorial_caption = mapped_description or mapped_title
+
+    return _trim_metadata_text(
+        editorial_caption,
+        rules.description_max_characters,
+    )
+
+
+def map_stock_model_release_available(
+    file: ProcessingJobFile,
+) -> bool | None:
+    if file.model_release_available is not None:
+        return file.model_release_available
+
+    if file.has_people is False:
+        return False
+
+    return None
 
 
 def map_stock_categories(
@@ -579,6 +657,67 @@ def _get_default_license_type(
             return license_type
 
     return rules.license_types[0] if rules.license_types else None
+
+
+def _get_stock_keywords_limit(rules: StockRules) -> int:
+    if rules.keywords_recommended_max <= 0:
+        return rules.keywords_max_count
+
+    return min(rules.keywords_max_count, rules.keywords_recommended_max)
+
+
+def _get_stock_title_characters_limit(rules: StockRules) -> int:
+    if rules.title_warning_characters is None:
+        return rules.title_max_characters
+
+    return min(rules.title_max_characters, rules.title_warning_characters)
+
+
+def _trim_title_words(
+    title: str,
+    rules: StockRules,
+) -> str:
+    max_words = rules.title_recommended_max_words
+    words = title.split()
+
+    if max_words is not None and len(words) > max_words:
+        return ' '.join(words[:max_words])
+
+    return ' '.join(words)
+
+
+def _iter_keyword_candidates(
+    file: ProcessingJobFile,
+) -> list[str]:
+    keyword_candidates = [
+        *file.categories,
+        *([file.category_2] if file.category_2 else []),
+    ]
+    word_candidates = [
+        word
+        for value in [file.title, file.description]
+        if value
+        for word in _split_metadata_words(value)
+    ]
+
+    return [*keyword_candidates, *word_candidates]
+
+
+def _split_metadata_words(value: str) -> list[str]:
+    return [
+        word
+        for word in re.findall(r"[A-Za-z][A-Za-z'-]{2,}", value)
+    ]
+
+
+def _normalize_keyword_candidate(value: str) -> str:
+    normalized_keyword = ' '.join(value.strip().split())
+    normalized_keyword = normalized_keyword.strip('.,;:-')
+
+    if len(normalized_keyword) < 3:
+        return ''
+
+    return normalized_keyword
 
 
 def _trim_metadata_text(
