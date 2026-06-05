@@ -81,13 +81,12 @@
   gap: var(--spacing-sm);
   flex-shrink: 0;
 
-  @media (max-width: 768px) {
+  @media (max-width: 1200px) {
     justify-content: flex-end;
   }
 
-  @media (max-width: 480px) {
+  @media (max-width: 1080px) {
     flex-wrap: wrap;
-    justify-content: stretch;
 
     > * {
       flex: 1;
@@ -100,7 +99,7 @@
   height: 16px;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1200px) {
   .bar {
     flex-direction: column;
     align-items: stretch;
