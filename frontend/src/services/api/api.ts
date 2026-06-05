@@ -42,11 +42,17 @@ export const jobsApi = {
 
   // старт экспорта — новый endpoint
   startExport: (jobId: string, exportFormat: string) =>
-    apiClient.post(`/api/v1/jobs/${jobId}/export/${exportFormat}`),
+    apiClient.post(`/api/v1/jobs/${jobId}/export`, null, {
+      params: {
+        [exportFormat]: true,
+      },
+    }),
 
-  // скачать экспорт
   downloadExport: (jobId: string, exportFormat: string) =>
-    apiClient.get(`/api/v1/jobs/${jobId}/export/${exportFormat}`, {
+    apiClient.get(`/api/v1/jobs/${jobId}/export`, {
+      params: {
+        [exportFormat]: true,
+      },
       responseType: "blob",
     }),
 
