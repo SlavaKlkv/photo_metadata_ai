@@ -146,7 +146,7 @@ export const OnboardingModal: React.FC = () => {
             variant="primary"
             size="md"
             onClick={handleGetStarted}
-            disabled={isScanning || isError} // TODO: для принудительного включения кнопки вернуть {isScanning}
+            disabled={isScanning} // TODO: для принудительного включения кнопки вернуть {isScanning || isError}
             className={styles.actionBtn}
           >
             {isScanning && "Scanning..."}

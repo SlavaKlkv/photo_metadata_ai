@@ -9,6 +9,16 @@ export interface ProcessingJob {
   originalFilename: string;
   status: 'queued' | 'processing' | 'done' | 'error';
   error?: string;
+  // плоские поля — source of truth от бэкенда
+  title?: string;
+  description?: string;
+  keywords?: string[];
+  selected_for_export?: boolean;
+  field_sources?: Record<string, 'generated' | 'edited'>;
+  edited_fields?: string[];
+  // stock-specific preview — меняется при смене стока
+  preview?: FilePreview;
+  // legacy — оставляем для обратной совместимости пока не перейдём полностью
   metadata?: {
     title: string;
     description: string;
@@ -67,4 +77,59 @@ export interface ApiStatusResponse {
 
 export interface ApiResultsResponse {
   results: ProcessingJob[];
+}
+
+// Поле preview — одна запись (key/label/value)
+export interface PreviewField {
+  key: string;
+  label: string;
+  value: string;
+}
+
+// Ошибка/предупреждение валидации
+export interface ValidationMessage {
+  field: string;
+  code: string;
+  message: string;
+}
+
+// Preview секция внутри результата файла
+export interface FilePreview {
+  stock_platform: StockPlatform;
+  common_fields: PreviewField[];
+  stock_specific: {
+    title: string;
+    fields: PreviewField[];
+  };
+  errors: ValidationMessage[];
+  warnings: ValidationMessage[];
+}
+
+// Stock options — правила и лимиты выбранного стока
+export interface StockOptions {
+  stock_platform: StockPlatform;
+  platform_type: string;
+  categories: string[];
+  license_types: string[];
+  title_required: boolean;
+  title_max_characters: number;
+  title_warning_characters: number;
+  title_min_words: number;
+  description_required: boolean;
+  description_max_characters: number;
+  keywords_required: boolean;
+  keywords_min_count: number;
+  keywords_max_count: number;
+  keywords_recommended_min: number;
+  keywords_recommended_max: number;
+  categories_required: boolean;
+  multi_category_supported: boolean;
+  max_categories: number;
+  supports_category_2: boolean;
+  license_required: boolean;
+  releases_required: boolean;
+  editorial_caption_required: boolean;
+  editorial_date_required: boolean;
+  people_supported: boolean;
+  model_release_required_when_people: boolean;
 }

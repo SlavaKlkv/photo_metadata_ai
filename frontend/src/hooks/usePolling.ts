@@ -3,6 +3,8 @@ import { useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { useUIStore } from '../store/useUIStore';
 import { jobsApi } from '../services/api/api';
+import { StockPlatform } from '../types';
+
 
 const POLLING_INTERVAL = 2000;
 
@@ -14,6 +16,10 @@ export const usePolling = (jobId: string | null) => {
   const setIsExportReady = useUIStore((state) => state.setIsExportReady);
   const setIsPollingActive = useUIStore((state) => state.setIsPollingActive);
   const setIsProcessing = useUIStore((state) => state.setIsProcessing);
+
+  const updateJobPreview = useAppStore((state) => state.updateJobPreview);
+  const setStockOptions = useAppStore((state) => state.setStockOptions);
+  const draftBatchSettings = useAppStore((state) => state.draftBatchSettings);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -34,16 +40,16 @@ export const usePolling = (jobId: string | null) => {
 
         if (statusData.files) {
           statusData.files.forEach((file: any) => {
-            const status = file.status === 'completed' ? 'done' : file.status;
+            const status = file.status === "completed" ? "done" : file.status;
             updateJobStatus(file.file_id, status, file.error_message);
           });
         }
 
         const isDone =
-          statusData.status === 'completed' ||
-          statusData.status === 'error' ||
-          statusData.status === 'cancelled' ||
-          statusData.status === 'failed';
+          statusData.status === "completed" ||
+          statusData.status === "error" ||
+          statusData.status === "cancelled" ||
+          statusData.status === "failed";
 
         if (isDone) {
           stopPolling();
@@ -51,36 +57,53 @@ export const usePolling = (jobId: string | null) => {
           setIsProcessing(false);
 
           if (
-            statusData.status === 'failed' ||
-            statusData.status === 'error' ||
-            statusData.status === 'cancelled'
+            statusData.status === "failed" ||
+            statusData.status === "error" ||
+            statusData.status === "cancelled"
           ) {
             closeProgressModal();
             return;
           }
 
           try {
-            const resultsResponse = await jobsApi.getResults(jobId);
-            const results = resultsResponse.data;
+            const [resultsResponse, optionsResponse] = await Promise.all([
+              jobsApi.getResults(jobId),
+              jobsApi.getStockOptions(
+                draftBatchSettings.stockPlatform as StockPlatform,
+              ),
+            ]);
 
-            if (results.results) {
-              results.results.forEach((file: any) => {
-                updateMetadata(file.file_id, {
-                  title: file.title ?? '',
-                  description: file.description ?? '',
-                  keywords: file.keywords ?? [],
-                });
+            const results = resultsResponse.data?.results ?? [];
+
+            results.forEach((file: any) => {
+              // обновляем статус
+              updateJobStatus(file.file_id, "done", file.error_message);
+
+              // плоские поля — legacy metadata для обратной совместимости
+              updateMetadata(file.file_id, {
+                title: file.title ?? "",
+                description: file.description ?? "",
+                keywords: file.keywords ?? [],
               });
+
+              // новый preview — stock-specific
+              if (file.preview) {
+                updateJobPreview(file.file_id, file.preview);
+              }
+            });
+
+            if (optionsResponse.data) {
+              setStockOptions(optionsResponse.data);
             }
           } catch (error) {
-            console.error('[Results fetch error]:', error);
+            console.error("[Results fetch error]:", error);
           }
 
           closeProgressModal();
           setIsExportReady(true);
         }
       } catch (error) {
-        console.error('[Polling error]:', error);
+        console.error("[Polling error]:", error);
         stopPolling();
         setIsPollingActive(false);
         setIsProcessing(false);
@@ -96,6 +119,9 @@ export const usePolling = (jobId: string | null) => {
     jobId,
     updateJobStatus,
     updateMetadata,
+    updateJobPreview,
+    setStockOptions,
+    draftBatchSettings,
     closeProgressModal,
     setIsExportReady,
     setIsPollingActive,

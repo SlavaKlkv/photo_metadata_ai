@@ -7,6 +7,9 @@ import {
   BatchSettings,
   ProviderDiscoveryItem,
   AIProvider,
+  StockOptions,
+  FilePreview,
+  StockPlatform,
 } from "../types";
 import { jobsApi } from "../services/api/api";
 
@@ -36,6 +39,18 @@ export interface AppState {
   diagnosticCount: number;
   hasAcceptedOnboarding: boolean;
   manualProviderApiKeys: Record<string, string>;
+  stockOptions: StockOptions | null;
+
+  setStockOptions: (options: StockOptions) => void;
+
+  // обновить preview конкретного файла после смены стока
+  updateJobPreview: (fileId: string, preview: FilePreview) => void;
+
+  // сменить сток и перезапросить results + stock-options
+  switchStockPlatform: (
+    stockPlatform: StockPlatform,
+    jobId: string,
+  ) => Promise<void>;
 
   addJobs: (files: ProcessingJob[]) => void;
   updateJobStatus: (
@@ -105,6 +120,7 @@ export const useAppStore = create<AppState>()(
     regeneratingFileId: null,
     hasAcceptedOnboarding: false,
     manualProviderApiKeys: {},
+    stockOptions: null,
 
     addJobs: (newJobs: ProcessingJob[]) => {
       set((state) => ({
@@ -389,6 +405,51 @@ export const useAppStore = create<AppState>()(
           [provider]: key,
         },
       }));
+    },
+
+    setStockOptions: (options) => {
+      set({ stockOptions: options });
+    },
+
+    updateJobPreview: (fileId, preview) => {
+      set((state) => ({
+        jobs: state.jobs.map((job) =>
+          job.id === fileId ? { ...job, preview } : job,
+        ),
+      }));
+    },
+
+    // меняет stock preview без новой AI генерации —
+    // GET results?stock_platform + GET stock-options
+    switchStockPlatform: async (stockPlatform, jobId) => {
+      const { setStockOptions, updateJobPreview, updateDraftBatchSetting } =
+        get();
+
+      // обновляем draft чтобы UI отразил новый выбор
+      updateDraftBatchSetting("stockPlatform", stockPlatform);
+
+      try {
+        const [resultsResponse, optionsResponse] = await Promise.all([
+          jobsApi.getResultsByStock(jobId, stockPlatform),
+          jobsApi.getStockOptions(stockPlatform),
+        ]);
+
+        // обновляем preview для каждого файла
+        const results = resultsResponse.data?.results ?? [];
+
+        results.forEach((file: any) => {
+          if (file.preview) {
+            updateJobPreview(file.file_id, file.preview);
+          }
+        });
+
+        // сохраняем stock options для валидации в MetadataPreview
+        if (optionsResponse.data) {
+          setStockOptions(optionsResponse.data);
+        }
+      } catch (error) {
+        console.error("[switchStockPlatform] Error:", error);
+      }
     },
 
     // Regenerate одного файла используя lockedBatchSettings.
