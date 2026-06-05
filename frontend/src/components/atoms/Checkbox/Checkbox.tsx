@@ -25,7 +25,7 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
       }
 
       if (checked) {
-        return <Icon name="checkmark-icon" className={styles.checkIcon} />;
+        return <Icon name="checkbox-icon" className={styles.checkIcon} />;
       }
 
       return null;
@@ -49,7 +49,7 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
           {indeterminate ? (
             <Icon name="dash-icon" className={styles.checkIcon} />
           ) : checked ? (
-            <Icon name="checkmark-icon" className={styles.checkIcon} />
+            <Icon name="checkbox-icon" className={styles.checkIcon} />
           ) : null}
         </span>
 

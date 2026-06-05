@@ -14,9 +14,11 @@ export const ProgressModal: React.FC = () => {
 
   const total = jobs.length;
   const current = jobs.filter(
-    (j) => j.status === 'done' || j.status === 'error',
+    (j) => j.status === "done" || j.status === "error",
   ).length;
   const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+  const displayPercent =
+  percent === 100 ? 100 : Math.max(percent, 20); // don't show less than 20% to avoid confusion
 
   const setIsPollingActive = useUIStore((state) => state.setIsPollingActive);
 
@@ -36,7 +38,7 @@ export const ProgressModal: React.FC = () => {
             Cancel
           </Button>
         </div>
-        <ProgressBar value={percent} animated={percent < 100} />
+        <ProgressBar value={displayPercent} animated={displayPercent < 100} />
       </div>
     </Modal>
   );

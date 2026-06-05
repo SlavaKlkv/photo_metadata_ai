@@ -79,6 +79,8 @@
   flex-direction: column;
   gap: var(--spacing-sm);
   flex: 1;
+  min-height: 0; /* для корректной работы overflow внутри flex-контейнера */
+  overflow-y: auto;
 }
 
 .field {
