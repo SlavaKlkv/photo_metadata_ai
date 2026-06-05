@@ -6,6 +6,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-lg);
+  flex-wrap: wrap;
 }
 
 .stepper {
@@ -80,14 +81,15 @@
   align-items: center;
   gap: var(--spacing-sm);
   flex-shrink: 0;
+  margin-left: auto;
 
-  @media (max-width: 768px) {
+  @media (max-width: 1200px) {
     justify-content: flex-end;
+    margin-left: 0;
   }
 
   @media (max-width: 480px) {
     flex-wrap: wrap;
-    justify-content: stretch;
 
     > * {
       flex: 1;
@@ -98,6 +100,14 @@
 .btnIcon {
   width: 16px;
   height: 16px;
+}
+
+@media (max-width: 1200px) {
+  .bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-md);
+  }
 }
 
 @media (max-width: 768px) {

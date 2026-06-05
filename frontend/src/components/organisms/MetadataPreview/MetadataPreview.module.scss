@@ -162,3 +162,32 @@
   text-align: center;
   margin: auto;
 }
+
+.validationError {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  color: var(--error-color, #ef4444);
+  padding: var(--spacing-xs) 0;
+}
+
+.validationWarning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  color: var(--warning-color, #f59e0b);
+  padding: var(--spacing-xs) 0;
+}
+
+.validationIcon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.fieldEdited {
+  color: var(--accent-main);
+}
