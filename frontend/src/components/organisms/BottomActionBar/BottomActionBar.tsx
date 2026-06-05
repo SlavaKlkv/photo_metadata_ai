@@ -136,6 +136,7 @@ export const BottomActionBar: React.FC = () => {
           disabled={
             !isUploaded ||
             isProcessing ||
+            isExportReady ||
             !draftBatchSettings.shootingContext.trim() ||
             !sessionSettings.selectedProvider
           }

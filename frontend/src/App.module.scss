@@ -3,9 +3,7 @@
 
 .app {
   min-height: 100vh;
-  background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.04), transparent 28%),
-    linear-gradient(180deg, #16181d 0%, #111318 100%);
+  background: var(--bg-primary);
   color: var(--text-primary);
 }
 
@@ -27,8 +25,7 @@
   padding: 20px 24px;
   border: 1px solid var(--border-color);
   border-radius: 24px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.24);
+  background: var(--bg-secondary);
 }
 
 .titleBlock {
@@ -60,7 +57,7 @@
 
 .bodyContent {
   flex: 1;
-  display: flex;
+  //display: flex;
   min-height: 0;
 }
 
@@ -87,17 +84,18 @@
 .reviewGrid {
   width: 100%;
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 360px;
+  grid-template-columns: 330fr 566fr 448fr;
   gap: var(--spacing-lg);
   align-items: start;
+  height: calc(100vh - 260px);;
+  min-height: 0;
 }
 
 .bodyFooter {
   padding: 18px 24px;
   border: 1px solid var(--border-color);
   border-radius: 24px;
-  background: rgba(255, 255, 255, 0.03);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+  background: var(--bg-secondary);
 }
 
 @media (max-width: 1180px) {

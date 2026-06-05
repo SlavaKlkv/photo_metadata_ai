@@ -24,11 +24,13 @@ import { ReactComponent as GeminiIcon } from '../../../assets/icons/gemini-icon.
 import { ReactComponent as LinkIcon } from '../../../assets/icons/link-icon.svg';
 import { ReactComponent as OpenRouterIcon } from '../../../assets/icons/openrouter-icon.svg';
 import { ReactComponent as QwenIcon } from '../../../assets/icons/qwen-icon.svg';
+import {ReactComponent as CheckboxIcon} from '../../../assets/icons/checkbox-icon.svg';
 
 export type IconName =
   | 'ai-setup-icon'
   | 'arrow-down'
   | 'checkmark-icon'
+  | 'checkbox-icon'
   | 'clock-icon'
   | 'connect-account-icon'
   | 'dash-icon'
@@ -59,6 +61,7 @@ interface IconProps extends SVGProps<SVGSVGElement> {
 const icons: Record<IconName, ComponentType<SVGProps<SVGSVGElement>>> = {
   'arrow-down': ArrowDown,
   'checkmark-icon': CheckmarkIcon,
+  'checkbox-icon': CheckboxIcon,
   'clock-icon': ClockIcon,
   'dash-icon': DashIcon,
   'doc-icon': DocIcon,
