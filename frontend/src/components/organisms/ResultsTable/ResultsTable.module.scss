@@ -23,8 +23,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
-  overflow-y: auto;
   flex: 1;
+  min-height: 0; /* для корректной работы overflow внутри flex-контейнера */
+  overflow-y: auto;
 }
 
 .footer {
