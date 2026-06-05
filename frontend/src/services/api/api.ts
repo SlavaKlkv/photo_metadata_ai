@@ -97,6 +97,13 @@ export const jobsApi = {
   // правила и лимиты выбранного стока
   getStockOptions: (stockPlatform: StockPlatform) =>
     apiClient.get(`/api/v1/jobs/stock-options/${stockPlatform}`),
+
+  // desktop actions
+  openResultFile: (jobId: string) =>
+    apiClient.post(`/api/v1/desktop/jobs/${jobId}/open-result-file`),
+
+  openResultsFolder: (jobId: string) =>
+    apiClient.post(`/api/v1/desktop/jobs/${jobId}/open-results-folder`),
 };
 
 export default apiClient;
