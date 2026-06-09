@@ -10,13 +10,13 @@
 }
 
 .icon {
-  width: 64px;
-  height: 64px;
+  width: 96px;
+  height: 96px;
   color: var(--accent-main);
 }
 
 .title {
-  margin: 0;
+  margin-top: var(--spacing-sm);
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-semibold);
   color: var(--text-primary);
@@ -25,14 +25,14 @@
 .subtitle {
   margin: 0;
   font-size: var(--font-size-base);
-  color: var(--text-secondary);
-  max-width: 400px;
+  color: var(--text-placeholder);
+  max-width: 84%;
 }
 
 .actions {
   display: flex;
-  gap: var(--spacing-sm);
-  margin-top: var(--spacing-sm);
-  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
   justify-content: center;
+  flex-wrap: nowrap;
 }

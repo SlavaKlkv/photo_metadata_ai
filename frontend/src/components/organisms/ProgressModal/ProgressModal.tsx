@@ -28,7 +28,7 @@ export const ProgressModal: React.FC = () => {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={closeModal} closeOnBackdrop={false}>
+    <Modal isOpen={isOpen} onClose={closeModal} closeOnBackdrop={false} size="md">
       <div className={styles.content}>
         <div className={styles.row}>
           <p className={styles.label}>

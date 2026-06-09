@@ -41,11 +41,15 @@ export const jobsApi = {
   getResults: (jobId: string) => apiClient.get(`/api/v1/jobs/${jobId}/results`),
 
   // старт экспорта — новый endpoint
-  startExport: (jobId: string, exportFormat: string) =>
+  startExport: (
+    jobId: string,
+    formats: {
+      csv?: boolean;
+      iptc?: boolean;
+    },
+  ) =>
     apiClient.post(`/api/v1/jobs/${jobId}/export`, null, {
-      params: {
-        [exportFormat]: true,
-      },
+      params: formats,
     }),
 
   downloadExport: (jobId: string, exportFormat: string) =>
@@ -99,8 +103,10 @@ export const jobsApi = {
     apiClient.get(`/api/v1/jobs/stock-options/${stockPlatform}`),
 
   // desktop actions
-  openResultFile: (jobId: string) =>
-    apiClient.post(`/api/v1/desktop/jobs/${jobId}/open-result-file`),
+  openResultFile: (jobId: string, filename: string) =>
+    apiClient.post(`/api/v1/desktop/jobs/${jobId}/open-result-file`, null, {
+      params: { filename },
+    }),
 
   openResultsFolder: (jobId: string) =>
     apiClient.post(`/api/v1/desktop/jobs/${jobId}/open-results-folder`),

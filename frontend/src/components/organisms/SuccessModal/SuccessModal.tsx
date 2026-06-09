@@ -20,6 +20,8 @@ export const SuccessModal: React.FC = () => {
   const setCurrentJobId = useUIStore((state) => state.setCurrentJobId);
   const setSelectedJobId = useUIStore((state) => state.setSelectedJobId);
   const currentJobId = useUIStore((state) => state.currentJobId);
+  const exportArtifacts = useUIStore((state) => state.exportArtifacts);
+  const setExportArtifacts = useUIStore((state) => state.setExportArtifacts);
 
   const handleBackToResults = () => {
     closeSuccessModal();
@@ -34,14 +36,21 @@ export const SuccessModal: React.FC = () => {
     setIsExporting(false);
     setCurrentJobId(null);
     setSelectedJobId(null);
+    setExportArtifacts([]);
     closeSuccessModal();
   };
 
   const handleOpenCsv = async () => {
     if (!currentJobId) return;
 
+    const csvArtifact = exportArtifacts.find(
+      (artifact) => artifact.export_format === "csv",
+    );
+
+    if (!csvArtifact) return;
+
     try {
-      await jobsApi.openResultFile(currentJobId);
+      await jobsApi.openResultFile(currentJobId, csvArtifact.filename);
     } catch (error) {
       console.error(error);
     }
@@ -58,13 +67,13 @@ export const SuccessModal: React.FC = () => {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={closeSuccessModal} closeOnBackdrop={false}>
+    <Modal isOpen={isOpen} onClose={closeSuccessModal} closeOnBackdrop={false} size="lg">
       <div className={styles.content}>
         <Icon name="img-modal-icon" className={styles.icon} />
         <h2 className={styles.title}>Export completed successfully!</h2>
         <p className={styles.subtitle}>
-          {jobs.length} photos are ready for stock upload. CSV file generated,
-          IPTC metadata embedded, approved photos exported.
+          {jobs.length} photos are ready for stock upload. 
+          CSV file generated, IPTC metadata embedded, approved photos exported.
         </p>
         <div className={styles.actions}>
           <Button variant="secondary" size="md" onClick={handleBackToResults}>
@@ -75,7 +84,7 @@ export const SuccessModal: React.FC = () => {
             Start new batch
           </Button>
 
-          <Button variant="secondary" size="md" onClick={handleOpenCsv}>
+          <Button variant="primary" size="md" onClick={handleOpenCsv}>
             Open CSV file
           </Button>
 

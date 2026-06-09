@@ -19,9 +19,16 @@
   border-radius: var(--radius-lg);
   padding: var(--spacing-xl);
   width: 100%;
-  max-width: 480px;
   z-index: var(--z-modal);
   animation: slideUp var(--transition-normal);
+}
+
+  .md {
+  max-width: 480px;
+}
+
+.lg {
+  max-width: 640px;
 }
 
 @keyframes fadeIn {

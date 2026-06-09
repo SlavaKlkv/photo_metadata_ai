@@ -2,6 +2,14 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 
+export interface ExportArtifact {
+  export_format: "csv" | "iptc" | "json";
+  filename: string;
+  path: string;
+  size_bytes: number;
+  count: number;
+}
+
 export interface UIState {
   isSettingsOpen: boolean;
   isFileListOpen: boolean;
@@ -15,7 +23,8 @@ export interface UIState {
   isExporting: boolean;
   isExportModalOpen: boolean;
   isSuccessModalOpen: boolean;
-  
+  exportArtifacts: ExportArtifact[];
+
   // Actions
   toggleSettings: () => void;
   toggleFileList: () => void;
@@ -32,6 +41,7 @@ export interface UIState {
   closeExportModal: () => void;
   openSuccessModal: () => void;
   closeSuccessModal: () => void;
+  setExportArtifacts: (artifacts: ExportArtifact[]) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -50,6 +60,7 @@ export const useUIStore = create<UIState>()(
       isExporting: false,
       isExportModalOpen: false,
       isSuccessModalOpen: false,
+      exportArtifacts: [],
       
       // actions
       toggleSettings: () =>
@@ -75,6 +86,7 @@ export const useUIStore = create<UIState>()(
       closeExportModal: () => set({ isExportModalOpen: false }),
       openSuccessModal: () => set({ isSuccessModalOpen: true }),
       closeSuccessModal: () => set({ isSuccessModalOpen: false }),
+      setExportArtifacts: (artifacts) => set({ exportArtifacts: artifacts }),
     }),
     { name: 'UIStore' }
   )

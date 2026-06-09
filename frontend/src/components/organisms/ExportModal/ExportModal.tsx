@@ -15,6 +15,12 @@ export const ExportModal: React.FC = () => {
   const currentJobId = useUIStore((state) => state.currentJobId);
   const jobs = useAppStore((state) => state.jobs);
 
+  const exportFormats = useAppStore(
+    (state) => state.draftBatchSettings.exportFormats,
+  );
+
+  const setExportArtifacts = useUIStore((state) => state.setExportArtifacts);
+
   const [progress, setProgress] = useState(0);
   const [isCancelled, setIsCancelled] = useState(false);
 
@@ -24,36 +30,37 @@ export const ExportModal: React.FC = () => {
     setProgress(0);
     setIsCancelled(false);
 
-    // анимируем прогресс до 90% пока идёт запрос
-    const fakeInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 90) {
-          clearInterval(fakeInterval);
-          return 90;
-        }
-        return prev + 10;
-      });
-    }, 200);
 
     const doExport = async () => {
       try {
-        // 1. запускаем экспорт
-        await jobsApi.startExport(currentJobId, "csv");
+        await jobsApi.startExport(currentJobId, {
+          csv: exportFormats.csv,
+          iptc: exportFormats.iptc,
+        });
 
-        // 2. скачиваем файл
-        const response = await jobsApi.downloadExport(currentJobId, "csv");
+        let exportCompleted = false;
 
-        if (isCancelled) return;
+        while (!exportCompleted) {
+          const { data } = await jobsApi.getExportStatus(currentJobId);
 
-        const blob = new Blob([response.data], { type: "text/csv" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `metadata_export_${currentJobId}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
+          if (isCancelled) return;
 
-        clearInterval(fakeInterval);
+          setProgress(data.export_progress);
+
+          if (data.export_status === "completed") {
+            setExportArtifacts(data.export_artifacts ?? []);
+
+            exportCompleted = true;
+            break;
+          }
+
+          if (data.export_status === "failed") {
+            throw new Error("Export failed");
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+
         setProgress(100);
 
         setTimeout(() => {
@@ -61,7 +68,6 @@ export const ExportModal: React.FC = () => {
           openSuccessModal();
         }, 500);
       } catch (error) {
-        clearInterval(fakeInterval);
         closeExportModal();
       }
     };
@@ -69,7 +75,6 @@ export const ExportModal: React.FC = () => {
     doExport();
 
     return () => {
-      clearInterval(fakeInterval);
     };
   }, [isOpen]);
 
@@ -82,7 +87,7 @@ export const ExportModal: React.FC = () => {
   const current = Math.round((progress / 100) * total);
 
   return (
-    <Modal isOpen={isOpen} onClose={handleCancel} closeOnBackdrop={false}>
+    <Modal isOpen={isOpen} onClose={handleCancel} closeOnBackdrop={false} size="md">
       <div className={styles.content}>
         <div className={styles.row}>
           <p className={styles.label}>Exporting: {current}/{total}</p>
