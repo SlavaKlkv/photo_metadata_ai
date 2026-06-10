@@ -3,8 +3,7 @@ from pathlib import Path
 
 import structlog
 
-from app.core.constants import JOB_TEMP_DIRS, UPLOAD_DIR
-from app.core.runtime import resolve_path_in_base
+from app.core.runtime import get_runtime_directories, resolve_path_in_base
 from app.schemas.job import ProcessingJob
 
 logger = structlog.get_logger(__name__)
@@ -41,11 +40,12 @@ def _cleanup_uploaded_files(job: ProcessingJob) -> int:
     """
 
     deleted_files = 0
+    upload_dir = get_runtime_directories().uploads_dir
 
     for file in job.files:
         try:
             file_path = resolve_path_in_base(
-                UPLOAD_DIR,
+                upload_dir,
                 Path(file.filename).name,
             )
         except ValueError as error:
@@ -79,8 +79,15 @@ def _cleanup_job_temp_directories(job: ProcessingJob) -> tuple[int, int]:
 
     deleted_files = 0
     deleted_directories = 0
+    runtime_directories = get_runtime_directories()
+    job_temp_dirs = [
+        runtime_directories.temp_preview_dir,
+        runtime_directories.temp_export_dir,
+        runtime_directories.temp_zip_dir,
+        runtime_directories.temp_resized_dir,
+    ]
 
-    for temp_dir in JOB_TEMP_DIRS:
+    for temp_dir in job_temp_dirs:
         try:
             job_temp_dir = resolve_path_in_base(temp_dir, str(job.job_id))
         except ValueError as error:

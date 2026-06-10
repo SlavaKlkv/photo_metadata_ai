@@ -10,8 +10,7 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 from app.core.config import PROJECT_ROOT, ROOT_ENV_FILE, Settings, settings
-from app.core.constants import RESULTS_DIR
-from app.core.runtime import resolve_path_in_base
+from app.core.runtime import get_runtime_directories, resolve_path_in_base
 from app.main import app
 from app.schemas.provider_discovery import (
     ProviderDiscoveryItem,
@@ -21,7 +20,7 @@ from app.services.desktop.desktop_startup import (
     desktop_startup_orchestrator,
     run_desktop_startup_checks,
 )
-from app.services.prompt_templates import (
+from app.services.prompt_templates.constants import (
     DEFAULT_PROMPT_LANGUAGE,
     METADATA_PROMPT_TEMPLATE_VERSION,
 )
@@ -50,6 +49,10 @@ def test_settings_use_desktop_workspace_when_profile_is_desktop(
     assert test_settings.workspace_root == desktop_workspace_dir.resolve(
         strict=False
     )
+
+
+def _get_results_dir() -> Path:
+    return get_runtime_directories().results_dir
 
 
 def test_settings_read_env_from_project_root():
@@ -350,13 +353,13 @@ def test_desktop_flow_upload_process_review_export():
         assert download_response.status_code == 200
         assert 'text/csv' in download_response.headers.get('content-type', '')
 
-        stored_exports = list((RESULTS_DIR / job_id).glob('*.csv'))
+        stored_exports = list((_get_results_dir() / job_id).glob('*.csv'))
         assert stored_exports
 
 
 def test_open_results_folder_endpoint(monkeypatch):
     job_id = uuid4()
-    results_dir = RESULTS_DIR / str(job_id)
+    results_dir = _get_results_dir() / str(job_id)
     results_dir.mkdir(parents=True, exist_ok=True)
 
     opened: dict[str, Path] = {}
@@ -403,7 +406,7 @@ def test_open_results_folder_endpoint_returns_normalized_404():
 
 def test_open_result_file_endpoint(monkeypatch):
     job_id = uuid4()
-    results_dir = RESULTS_DIR / str(job_id)
+    results_dir = _get_results_dir() / str(job_id)
     results_dir.mkdir(parents=True, exist_ok=True)
 
     file_name = 'result.csv'
@@ -436,7 +439,7 @@ def test_open_result_file_endpoint(monkeypatch):
 
 def test_open_result_file_endpoint_rejects_unsupported_type():
     job_id = uuid4()
-    results_dir = RESULTS_DIR / str(job_id)
+    results_dir = _get_results_dir() / str(job_id)
     results_dir.mkdir(parents=True, exist_ok=True)
     (results_dir / 'malware.exe').write_text('x', encoding='utf-8')
 
@@ -459,7 +462,7 @@ def test_open_result_file_endpoint_rejects_unsupported_type():
 
 def test_open_result_file_endpoint_rejects_path_escape():
     job_id = uuid4()
-    results_dir = RESULTS_DIR / str(job_id)
+    results_dir = _get_results_dir() / str(job_id)
     results_dir.mkdir(parents=True, exist_ok=True)
 
     with TestClient(app) as client:
@@ -481,7 +484,7 @@ def test_open_result_file_endpoint_rejects_path_escape():
 
 def test_open_result_file_endpoint_returns_normalized_404():
     job_id = uuid4()
-    results_dir = RESULTS_DIR / str(job_id)
+    results_dir = _get_results_dir() / str(job_id)
     results_dir.mkdir(parents=True, exist_ok=True)
 
     with TestClient(app) as client:

@@ -9,13 +9,15 @@ import structlog
 from fastapi import HTTPException
 
 from app.core.config import settings
-from app.core.constants import AI_PROVIDER_TIMEOUT
 from app.core.enums import AIProvider, StockPlatform
 from app.core.exceptions import AIProviderConfigurationError
+from app.services.ai.constants import AI_PROVIDER_TIMEOUT
 from app.services.desktop.ai_provider_api_keys import get_ai_provider_api_key
-from app.services.prompt_templates import (
+from app.services.prompt_templates.constants import (
     DEFAULT_PROMPT_LANGUAGE,
     METADATA_PROMPT_TEMPLATE_VERSION,
+)
+from app.services.prompt_templates.prompt_templates import (
     PromptTemplateRender,
     render_metadata_generation_prompt,
 )

@@ -30,7 +30,7 @@ def build_runtime_directories() -> RuntimeDirectories:
     """
     workspace_dir = settings.workspace_root
     jobs_dir = workspace_dir / 'jobs'
-    results_dir = workspace_dir / 'results'
+    results_dir = settings.results_root
     temp_dir = workspace_dir / 'temp'
 
     return RuntimeDirectories(

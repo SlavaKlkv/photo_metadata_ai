@@ -8,7 +8,7 @@ from app.services.ai.ai_provider import (
     GeminiImageMetadataProvider,
     OpenRouterImageMetadataProvider,
 )
-from app.services.prompt_templates import (
+from app.services.prompt_templates.constants import (
     DEFAULT_PROMPT_LANGUAGE,
     METADATA_PROMPT_TEMPLATE_VERSION,
 )

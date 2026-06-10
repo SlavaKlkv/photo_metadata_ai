@@ -8,10 +8,9 @@ import structlog
 
 from app.core.runtime import get_runtime_directories
 from app.schemas.job import ProcessingJob
+from app.storage.constants import JOB_STORAGE_SCHEMA_VERSION
 
 logger = structlog.get_logger(__name__)
-
-SCHEMA_VERSION = 1
 
 
 class JobStorage:
@@ -129,7 +128,7 @@ class JobStorage:
         logger.info(
             'job_storage_initialized',
             db_path=str(db_path),
-            schema_version=SCHEMA_VERSION,
+            schema_version=JOB_STORAGE_SCHEMA_VERSION,
         )
 
     def _apply_v1_migration(

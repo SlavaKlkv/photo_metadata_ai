@@ -18,27 +18,15 @@ from app.services.desktop.ai_provider_api_keys import (
     get_ai_provider_api_key_info,
     validate_ai_provider_api_key,
 )
+from app.services.provider_discovery.constants import (
+    DISCOVERY_TIMEOUT_SECONDS,
+    GEMINI_API_KEY_LINK,
+    OLLAMA_INSTALL_LINK,
+    OLLAMA_MODEL_LINK,
+    OPENROUTER_API_KEY_LINK,
+)
 
 logger = structlog.get_logger(__name__)
-
-DISCOVERY_TIMEOUT_SECONDS = 3.0
-
-OLLAMA_INSTALL_LINK = ProviderLink(
-    label='Ollama install guide',
-    url='https://ollama.com/download',
-)
-OLLAMA_MODEL_LINK = ProviderLink(
-    label='Ollama model library',
-    url='https://ollama.com/library',
-)
-GEMINI_API_KEY_LINK = ProviderLink(
-    label='Get Gemini API key',
-    url='https://aistudio.google.com/app/apikey',
-)
-OPENROUTER_API_KEY_LINK = ProviderLink(
-    label='Get OpenRouter API key',
-    url='https://openrouter.ai/keys',
-)
 
 
 async def discover_ai_providers() -> ProvidersDiscoveryResponse:

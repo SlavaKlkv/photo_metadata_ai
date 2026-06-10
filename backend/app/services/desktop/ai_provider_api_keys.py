@@ -13,17 +13,16 @@ from app.core.config import settings
 from app.core.enums import AIProvider
 from app.core.runtime import ensure_runtime_directories, resolve_path_in_base
 from app.schemas.ai_provider_api_key import AIProviderApiKeyValidationResponse
+from app.services.desktop.constants import (
+    AI_PROVIDER_API_KEY_ENV_VARS,
+    AI_PROVIDER_API_KEY_VALIDATION_TIMEOUT_SECONDS,
+    SUPPORTED_AI_API_KEY_PROVIDERS,
+)
+from app.storage.constants import AI_PROVIDER_API_KEYS_FILENAME
 
 logger = structlog.get_logger(__name__)
 
-AI_PROVIDER_API_KEYS_FILENAME = 'ai_provider_api_keys.json'
-AI_PROVIDER_API_KEY_VALIDATION_TIMEOUT_SECONDS = 3.0
 AIProviderApiKeySource = Literal['desktop_storage', 'environment']
-
-SUPPORTED_AI_API_KEY_PROVIDERS = {
-    AIProvider.GEMINI,
-    AIProvider.OPENROUTER,
-}
 
 
 @dataclass(frozen=True)
@@ -257,11 +256,7 @@ def _get_api_keys_path() -> Path:
 
 
 def _get_api_key_env_var(provider: AIProvider) -> str:
-    env_vars: dict[AIProvider, str] = {
-        AIProvider.GEMINI: 'GEMINI_API_KEY',
-        AIProvider.OPENROUTER: 'OPENROUTER_API_KEY',
-    }
-    return env_vars[provider]
+    return AI_PROVIDER_API_KEY_ENV_VARS[provider]
 
 
 def _normalize_api_key(value: object) -> str | None:

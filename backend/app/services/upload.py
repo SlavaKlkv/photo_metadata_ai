@@ -12,10 +12,9 @@ from app.core.config import settings
 from app.core.constants import (
     ALLOWED_IMAGE_SUFFIXES,
     ALLOWED_IMAGE_TYPES,
-    UPLOAD_DIR,
 )
 from app.core.exceptions import UploadValidationError
-from app.core.runtime import resolve_path_in_base
+from app.core.runtime import ensure_runtime_directories, resolve_path_in_base
 from app.utils.sanitizers import sanitize_filename
 
 logger = structlog.get_logger(__name__)
@@ -110,11 +109,12 @@ async def save_upload_file(file: UploadFile) -> str:
 
     await validate_upload_file(file, content)
 
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    runtime_directories = ensure_runtime_directories()
+    upload_dir = runtime_directories.uploads_dir
 
     saved_filename = f'{uuid4()}_{safe_filename_stem}{suffix}'
     try:
-        saved_file_path = resolve_path_in_base(UPLOAD_DIR, saved_filename)
+        saved_file_path = resolve_path_in_base(upload_dir, saved_filename)
     except ValueError as error:
         logger.warning(
             'upload_validation_failed',

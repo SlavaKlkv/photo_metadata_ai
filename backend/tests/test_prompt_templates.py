@@ -3,9 +3,11 @@ from pathlib import Path
 import pytest
 
 from app.services.ai.ai_provider import MockImageMetadataProvider
-from app.services.prompt_templates import (
+from app.services.prompt_templates.constants import (
     DEFAULT_PROMPT_LANGUAGE,
     METADATA_PROMPT_TEMPLATE_VERSION,
+)
+from app.services.prompt_templates.prompt_templates import (
     render_metadata_generation_prompt,
 )
 

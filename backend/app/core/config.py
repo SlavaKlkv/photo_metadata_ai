@@ -16,6 +16,9 @@ PROJECT_ROOT = (
     else BACKEND_DIR
 )
 ROOT_ENV_FILE = PROJECT_ROOT / '.env' if PROJECT_ROOT != BACKEND_DIR else None
+DEFAULT_DESKTOP_RESULTS_DIR = (
+    Path.home() / 'Documents' / 'Photo Metadata AI' / 'results'
+)
 
 
 class Settings(BaseSettings):
@@ -49,6 +52,7 @@ class Settings(BaseSettings):
     BACKEND_RUNTIME_PROFILE: RuntimeProfile = 'desktop'
     WORKSPACE_DIR: Path = PROJECT_ROOT
     DESKTOP_WORKSPACE_DIR: Path | None = None
+    DESKTOP_RESULTS_DIR: Path | None = None
 
     CORS_ALLOW_ORIGINS: list[str] = ['*']
     CORS_ALLOW_METHODS: list[str] = ['*']
@@ -57,7 +61,12 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=ROOT_ENV_FILE, extra='ignore')
 
-    @field_validator('WORKSPACE_DIR', 'DESKTOP_WORKSPACE_DIR', mode='before')
+    @field_validator(
+        'WORKSPACE_DIR',
+        'DESKTOP_WORKSPACE_DIR',
+        'DESKTOP_RESULTS_DIR',
+        mode='before',
+    )
     @classmethod
     def normalize_path(
         cls,
@@ -94,6 +103,16 @@ class Settings(BaseSettings):
             workspace_dir = self.DESKTOP_WORKSPACE_DIR
 
         return workspace_dir.resolve(strict=False)
+
+    @property
+    def results_root(self) -> Path:
+        if self.runtime_profile == 'desktop':
+            results_dir = (
+                self.DESKTOP_RESULTS_DIR or DEFAULT_DESKTOP_RESULTS_DIR
+            )
+            return results_dir.resolve(strict=False)
+
+        return (self.workspace_root / 'results').resolve(strict=False)
 
 
 settings = Settings()

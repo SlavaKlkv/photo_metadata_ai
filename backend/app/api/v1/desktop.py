@@ -36,7 +36,9 @@ from app.services.desktop.desktop_open import (
     open_path_in_default_app,
 )
 from app.services.desktop.desktop_startup import get_desktop_startup_status
-from app.services.provider_discovery import discover_ai_providers
+from app.services.provider_discovery.provider_discovery import (
+    discover_ai_providers,
+)
 
 router = APIRouter(
     prefix='/desktop',

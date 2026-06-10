@@ -5,48 +5,13 @@ import structlog
 
 from app.core.enums import FileStatus, StockPlatform
 from app.schemas.job import ProcessingJob, ProcessingJobFile
+from app.services.export.constants import CSV_HEADERS
 from app.services.metadata.stock_mapping import (
     StockMappedMetadata,
     build_stock_mapped_metadata,
 )
 
 logger = structlog.get_logger(__name__)
-
-
-CSV_HEADERS: dict[StockPlatform, list[str]] = {
-    StockPlatform.SHUTTERSTOCK: [
-        'Filename',
-        'Title',
-        'Description',
-        'Keywords',
-        'Categories',
-        'Illustration',
-        'Mature Content',
-        'Editorial',
-        'Location',
-        'Releases',
-    ],
-    StockPlatform.GETTY_IMAGES: [
-        'Filename',
-        'Title',
-        'Description',
-        'Keywords',
-        'Categories',
-        'Editorial',
-        'Location',
-        'Releases',
-    ],
-    StockPlatform.ADOBE_STOCK: [
-        'Filename',
-        'Title',
-        'Description',
-        'Keywords',
-        'Category',
-        'Editorial',
-        'Location',
-        'Releases',
-    ],
-}
 
 
 def generate_metadata_csv(

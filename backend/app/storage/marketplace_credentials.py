@@ -6,10 +6,9 @@ from typing import Any
 import structlog
 
 from app.core.runtime import ensure_runtime_directories, resolve_path_in_base
+from app.storage.constants import MARKETPLACE_CREDENTIALS_FILENAME
 
 logger = structlog.get_logger(__name__)
-
-CREDENTIALS_FILENAME = 'marketplace_credentials.json'
 
 
 def load_marketplace_credentials_records() -> dict[str, dict[str, Any]]:
@@ -64,5 +63,5 @@ def get_marketplace_credentials_path() -> Path:
     runtime_directories = ensure_runtime_directories()
     return resolve_path_in_base(
         runtime_directories.workspace_dir,
-        CREDENTIALS_FILENAME,
+        MARKETPLACE_CREDENTIALS_FILENAME,
     )
