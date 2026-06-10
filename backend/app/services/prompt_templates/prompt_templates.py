@@ -1,8 +1,10 @@
 from dataclasses import dataclass
 
-DEFAULT_PROMPT_LANGUAGE = 'en'
-METADATA_PROMPT_TEMPLATE_ID = 'stock_metadata'
-METADATA_PROMPT_TEMPLATE_VERSION = 'stock_metadata.v2'
+from app.services.prompt_templates.constants import (
+    DEFAULT_PROMPT_LANGUAGE,
+    METADATA_PROMPT_TEMPLATE_ID,
+    METADATA_PROMPT_TEMPLATE_VERSION,
+)
 
 
 @dataclass(frozen=True)

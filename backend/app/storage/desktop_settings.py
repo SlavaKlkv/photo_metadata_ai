@@ -5,10 +5,9 @@ from typing import Any
 import structlog
 
 from app.core.runtime import ensure_runtime_directories, resolve_path_in_base
+from app.storage.constants import DESKTOP_SETTINGS_FILENAME
 
 logger = structlog.get_logger(__name__)
-
-SETTINGS_FILENAME = 'desktop_settings.json'
 
 
 def load_desktop_settings_payload() -> dict[str, Any]:
@@ -47,5 +46,5 @@ def get_desktop_settings_path() -> Path:
     runtime_directories = ensure_runtime_directories()
     return resolve_path_in_base(
         runtime_directories.workspace_dir,
-        SETTINGS_FILENAME,
+        DESKTOP_SETTINGS_FILENAME,
     )

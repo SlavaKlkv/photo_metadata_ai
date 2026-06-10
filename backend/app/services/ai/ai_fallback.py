@@ -17,6 +17,7 @@ from app.services.ai.ai_provider import (
     BaseAIProvider,
     get_ai_provider,
 )
+from app.services.ai.constants import FALLBACK_CHAINS
 
 logger = structlog.get_logger(__name__)
 
@@ -34,26 +35,6 @@ class FallbackMetadataResult:
     metadata: AIMetadataResponse
     provider: AIProvider
     model: str | None
-
-
-FALLBACK_CHAINS: dict[AIProvider, tuple[AIProvider, ...]] = {
-    AIProvider.OLLAMA: (
-        AIProvider.OLLAMA,
-        AIProvider.GEMINI,
-        AIProvider.OPENROUTER,
-    ),
-    AIProvider.GEMINI: (
-        AIProvider.GEMINI,
-        AIProvider.OPENROUTER,
-        AIProvider.OLLAMA,
-    ),
-    AIProvider.OPENROUTER: (
-        AIProvider.OPENROUTER,
-        AIProvider.GEMINI,
-        AIProvider.OLLAMA,
-    ),
-    AIProvider.MOCK: (AIProvider.MOCK,),
-}
 
 
 def build_provider_fallback_chain(

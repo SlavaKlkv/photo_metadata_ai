@@ -5,7 +5,6 @@ import structlog
 from starlette.concurrency import run_in_threadpool
 
 from app.core.config import settings
-from app.core.constants import MAX_CONCURRENT_AI_REQUESTS
 from app.core.enums import AIProvider, MetadataFieldSource, StockPlatform
 from app.schemas.job import (
     FileStatus,
@@ -21,6 +20,7 @@ from app.services.ai.ai_provider import AIMetadataResponse
 from app.services.desktop.app_settings import resolve_effective_ai_settings
 from app.services.image_preprocessing import resize_image_for_ai
 from app.services.metadata.metadata_embedding import get_upload_file_path
+from app.services.processing.constants import MAX_CONCURRENT_AI_REQUESTS
 from app.storage.jobs import storage
 
 ai_requests_semaphore = asyncio.Semaphore(MAX_CONCURRENT_AI_REQUESTS)

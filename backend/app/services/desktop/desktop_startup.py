@@ -8,7 +8,9 @@ import structlog
 from app.core.config import settings
 from app.schemas.desktop import DesktopStartupStatusResponse
 from app.schemas.provider_discovery import ProvidersDiscoveryResponse
-from app.services.provider_discovery import discover_ai_providers
+from app.services.provider_discovery.provider_discovery import (
+    discover_ai_providers,
+)
 
 logger = structlog.get_logger(__name__)
 

@@ -1,4 +1,5 @@
 import asyncio
+import shutil
 from pathlib import Path
 from typing import TypedDict
 from uuid import UUID
@@ -7,16 +8,16 @@ import structlog
 from fastapi import HTTPException
 from starlette.concurrency import run_in_threadpool
 
-from app.core.constants import RESULTS_DIR
 from app.core.enums import (
     ExportFormat,
     ExportStatus,
     FileStatus,
     StockPlatform,
 )
-from app.core.runtime import resolve_path_in_base
+from app.core.runtime import get_runtime_directories, resolve_path_in_base
 from app.schemas.export import ExportArtifact
 from app.schemas.job import ProcessingJob, ProcessingJobFile
+from app.services.export.constants import SUPPORTED_EXPORT_FORMATS
 from app.services.export.csv import generate_metadata_csv
 from app.services.metadata.metadata_embedding import (
     embed_metadata_into_jpg,
@@ -29,11 +30,6 @@ from app.services.metadata.stock_validation import (
 from app.storage.jobs import storage
 
 logger = structlog.get_logger(__name__)
-
-SUPPORTED_EXPORT_FORMATS = (
-    ExportFormat.CSV,
-    ExportFormat.IPTC,
-)
 
 
 class ExportValidationError(TypedDict):
@@ -97,9 +93,23 @@ def get_job_export_path(
     """
     Возвращает путь к файлу экспорта задачи в директории результатов.
     """
-    job_result_dir = resolve_path_in_base(RESULTS_DIR, str(job.job_id))
+    results_dir = get_runtime_directories().results_dir
+    job_result_dir = resolve_path_in_base(results_dir, str(job.job_id))
     filename = get_export_filename(job, export_format, export_platform)
     return resolve_path_in_base(job_result_dir, filename)
+
+
+def get_job_iptc_export_path(
+    job: ProcessingJob,
+    file: ProcessingJobFile,
+) -> Path:
+    """
+    Возвращает путь к JPG/IPTC artifact в директории результатов задачи.
+    """
+    results_dir = get_runtime_directories().results_dir
+    job_result_dir = resolve_path_in_base(results_dir, str(job.job_id))
+    safe_filename = Path(file.filename).name
+    return resolve_path_in_base(job_result_dir, safe_filename)
 
 
 def store_job_export(
@@ -301,19 +311,27 @@ def _ensure_iptc_export(job: ProcessingJob) -> list[ExportArtifact]:
             continue
 
         iptc_payload = build_stock_iptc_payload(file, stock_platform)
-        embed_metadata_into_jpg(file, payload=iptc_payload)
-        file.iptc_embedded_metadata = True
+        upload_file_path = get_upload_file_path(file.filename)
 
-        file_path = get_upload_file_path(file.filename)
-
-        if not file_path.is_file():
+        if not upload_file_path.is_file():
             raise ValueError(
                 f'IPTC export file not found: {file.original_filename}'
             )
 
+        export_file_path = get_job_iptc_export_path(job, file)
+        export_file_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(upload_file_path, export_file_path)
+
+        embed_metadata_into_jpg(
+            file,
+            payload=iptc_payload,
+            file_path=export_file_path,
+        )
+        file.iptc_embedded_metadata = True
+
         iptc_artifacts.append(
             _build_file_export_artifact(
-                file_path,
+                export_file_path,
                 export_format=ExportFormat.IPTC,
             )
         )

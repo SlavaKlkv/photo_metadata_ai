@@ -2,14 +2,9 @@ import json
 import re
 from dataclasses import dataclass
 from functools import lru_cache
-from pathlib import Path
 
-ADOBE_RESTRICTED_TERMS_FILE = (
-    Path(__file__).resolve().parents[2]
-    / 'data'
-    / 'stock_validation'
-    / 'adobe'
-    / 'restricted_terms.v1.json'
+from app.services.metadata.stock_validation_data import (
+    ADOBE_RESTRICTED_TERMS_FILE,
 )
 
 

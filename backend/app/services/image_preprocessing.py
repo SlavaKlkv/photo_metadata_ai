@@ -4,8 +4,8 @@ from uuid import UUID
 import structlog
 from PIL import Image
 
-from app.core.constants import ALLOWED_IMAGE_SUFFIXES, TEMP_RESIZED_DIR
-from app.core.runtime import resolve_path_in_base
+from app.core.constants import ALLOWED_IMAGE_SUFFIXES
+from app.core.runtime import get_runtime_directories, resolve_path_in_base
 
 logger = structlog.get_logger(__name__)
 
@@ -61,7 +61,11 @@ def resize_image_for_ai(
         if resized.mode not in {'RGB', 'L'}:
             resized = resized.convert('RGB')
 
-    job_resize_dir = resolve_path_in_base(TEMP_RESIZED_DIR, str(job_id))
+    runtime_directories = get_runtime_directories()
+    job_resize_dir = resolve_path_in_base(
+        runtime_directories.temp_resized_dir,
+        str(job_id),
+    )
     job_resize_dir.mkdir(parents=True, exist_ok=True)
 
     output_path = resolve_path_in_base(job_resize_dir, f'{file_id}.jpg')

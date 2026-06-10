@@ -59,7 +59,7 @@ from app.services.metadata.stock_rules import get_stock_field_options
 from app.services.metadata.stock_validation import (
     validate_file_metadata_for_stock,
 )
-from app.services.processing import (
+from app.services.processing.processing import (
     apply_generated_metadata_to_file,
     cancel_job_processing,
     process_job,

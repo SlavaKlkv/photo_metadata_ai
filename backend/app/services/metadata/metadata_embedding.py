@@ -6,8 +6,8 @@ import structlog
 from fastapi import HTTPException
 from iptcinfo3 import IPTCInfo
 
-from app.core.constants import ALLOWED_IMAGE_SUFFIXES, UPLOAD_DIR
-from app.core.runtime import resolve_path_in_base
+from app.core.constants import ALLOWED_IMAGE_SUFFIXES
+from app.core.runtime import get_runtime_directories, resolve_path_in_base
 from app.schemas.job import ProcessingJobFile
 
 logger = structlog.get_logger(__name__)
@@ -27,6 +27,7 @@ class IPTCEmbeddingPayload:
 def embed_metadata_into_jpg(
     file: ProcessingJobFile,
     payload: IPTCEmbeddingPayload | None = None,
+    file_path: Path | None = None,
 ) -> None:
     """
     Записывает metadata в IPTC-поля JPG-файла.
@@ -36,18 +37,19 @@ def embed_metadata_into_jpg(
         file_id=str(file.file_id),
         filename=file.filename,
     )
-    file_path = get_upload_file_path(file.filename)
+    target_file_path = file_path or get_upload_file_path(file.filename)
 
-    _validate_jpg_file_path(file_path)
+    _validate_jpg_file_path(target_file_path)
 
     try:
         effective_payload = payload or _build_default_iptc_payload(file)
-        _embed_iptc_metadata(file_path, effective_payload)
+        _embed_iptc_metadata(target_file_path, effective_payload)
 
         logger.info(
             'metadata_embedding_completed',
             file_id=str(file.file_id),
             filename=file.filename,
+            file_path=str(target_file_path),
             keywords_count=len(effective_payload.keywords),
         )
     except HTTPException:
@@ -69,8 +71,10 @@ def get_upload_file_path(filename: str) -> Path:
     """
     Формирует путь к файлу внутри директории uploads.
     """
+    upload_dir = get_runtime_directories().uploads_dir
+
     try:
-        file_path = resolve_path_in_base(UPLOAD_DIR, Path(filename).name)
+        file_path = resolve_path_in_base(upload_dir, Path(filename).name)
     except ValueError as error:
         logger.warning(
             'upload_file_path_rejected',

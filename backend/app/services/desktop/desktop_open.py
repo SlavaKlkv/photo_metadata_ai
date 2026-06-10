@@ -6,25 +6,18 @@ from uuid import UUID
 
 import structlog
 
-from app.core.constants import RESULTS_DIR
-from app.core.runtime import resolve_path_in_base
+from app.core.runtime import get_runtime_directories, resolve_path_in_base
+from app.services.desktop.constants import ALLOWED_DESKTOP_OPEN_FILE_SUFFIXES
 
 logger = structlog.get_logger(__name__)
-
-ALLOWED_DESKTOP_OPEN_FILE_SUFFIXES = {
-    '.csv',
-    '.iptc',
-    '.jpg',
-    '.jpeg',
-    '.zip',
-}
 
 
 def get_job_results_dir(job_id: UUID) -> Path:
     """
     Возвращает путь к директории результатов задачи.
     """
-    return resolve_path_in_base(RESULTS_DIR, str(job_id))
+    results_dir = get_runtime_directories().results_dir
+    return resolve_path_in_base(results_dir, str(job_id))
 
 
 def get_job_result_file_path(job_id: UUID, filename: str) -> Path:
