@@ -1,4 +1,4 @@
-// Panel
+// frontend/src/components/atoms/Panel/Panel.tsx
 import React from 'react';
 import styles from './Panel.module.scss';
 
