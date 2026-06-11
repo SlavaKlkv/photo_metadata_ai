@@ -2,23 +2,28 @@
 @import './styles/variables.module.scss';
 
 .app {
-  min-height: 100vh;
+  height: 100vh; /* было min-height */
   background: var(--bg-primary);
   color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
 }
 
 .container {
-  min-height: 100vh;
+  height: 100%; /* занимает всю высоту app */
   max-width: 1440px;
   margin: 0 auto;
   padding: 24px;
+  display: flex;
+  flex-direction: column;
 }
 
 .bodyShell {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
-  min-height: calc(100vh - 48px);
+  height: 100%;
+  min-height: 0;
 }
 
 .bodyHeader {
@@ -57,8 +62,9 @@
 
 .bodyContent {
   flex: 1;
-  //display: flex;
   min-height: 0;
+  overflow: hidden;
+  display: flex;
 }
 
 .grid {
@@ -86,9 +92,32 @@
   display: grid;
   grid-template-columns: 330fr 566fr 448fr;
   gap: var(--spacing-lg);
-  align-items: start;
-  height: calc(100vh - 260px);;
   min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* При 1180px уже переходим на flex, не grid с одной колонкой */
+@media (max-width: 1180px) {
+  .bodyContent {
+    overflow: auto; /* разрешить скролл */
+    min-height: auto;
+  }
+
+  .reviewGrid {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    overflow: visible; /* скролл будет на родителе .bodyContent */
+    gap: var(--spacing-lg);
+  }
+
+  /* дочерние Panel займут естественный размер */
+  .reviewGrid > div {
+    height: auto;
+    min-height: auto;
+    overflow: visible;
+  }
 }
 
 .bodyFooter {
@@ -96,12 +125,6 @@
   border: 1px solid var(--border-color);
   border-radius: 24px;
   background: var(--bg-secondary);
-}
-
-@media (max-width: 1180px) {
-  .reviewGrid {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 1024px) {
@@ -120,37 +143,13 @@
   .content {
     order: 1;
   }
-}
 
-@media (max-width: 640px) {
-  .container {
-    padding: 16px;
-  }
-
-  .bodyShell {
-    min-height: auto;
-    gap: var(--spacing-md);
-  }
-
-  .bodyHeader,
-  .bodyFooter {
-    padding: 16px;
-    border-radius: 20px;
-  }
-
-  .titleBlock {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .titleText {
-    h1 {
-      font-size: var(--font-size-xl);
-    }
-  }
-
-  .grid,
+  /* ← ДОБАВИТЬ этот блок */
   .reviewGrid {
-    gap: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    overflow: visible;
+    gap: var(--spacing-lg);
   }
 }

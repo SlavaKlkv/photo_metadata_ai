@@ -269,63 +269,65 @@ export const MetadataPreview: React.FC = () => {
         </button>
       </div>
 
-      {/* Превью фото */}
-      <div className={styles.imagePlaceholder}>
-        {previews[job.id] ? (
-          <img
-            src={previews[job.id]}
-            alt={job.originalFilename}
-            className={styles.previewImage}
-          />
-        ) : (
-          <Icon name="img-icon" className={styles.imagePlaceholderIcon} />
-        )}
-      </div>
+      <div className={styles.scrollableContent}>
+        {/* Превью фото */}
+        <div className={styles.imagePlaceholder}>
+          {previews[job.id] ? (
+            <img
+              src={previews[job.id]}
+              alt={job.originalFilename}
+              className={styles.previewImage}
+            />
+          ) : (
+            <Icon name="img-icon" className={styles.imagePlaceholderIcon} />
+          )}
+        </div>
 
-      {/* Filename */}
-      <div className={styles.filename}>{job.originalFilename}</div>
+        {/* Filename */}
+        <div className={styles.filename}>{job.originalFilename}</div>
 
-      {/* Поля метаданных */}
-      <div className={styles.fields}>
-        {/* common_fields — всегда показываем */}
-        {job.preview?.common_fields.map((field) => (
-          <MetadataField
-            key={field.key}
-            fieldKey={field.key}
-            label={field.label}
-            value={field.value}
-            isEdited={job.edited_fields?.includes(field.key)}
-            jobId={job.id}
-            currentJobId={currentJobId}
-          />
-        ))}
+        {/* Поля метаданных */}
+        <div className={styles.fields}>
+          {/* common_fields — всегда показываем */}
+          {job.preview?.common_fields.map((field) => (
+            <MetadataField
+              key={field.key}
+              fieldKey={field.key}
+              label={field.label}
+              value={field.value}
+              isEdited={job.edited_fields?.includes(field.key)}
+              jobId={job.id}
+              currentJobId={currentJobId}
+            />
+          ))}
 
-        {/* stock_specific.fields — только для выбранного стока */}
-        {job.preview?.stock_specific.fields.map((field) => (
-          <MetadataField
-            key={field.key}
-            fieldKey={field.key}
-            label={field.label}
-            value={field.value}
-            isEdited={job.edited_fields?.includes(field.key)}
-            jobId={job.id}
-            currentJobId={currentJobId}
-          />
-        ))}
+          {/* stock_specific.fields — только для выбранного стока */}
+          {job.preview?.stock_specific.fields.map((field) => (
+            <MetadataField
+              key={field.key}
+              fieldKey={field.key}
+              label={field.label}
+              value={field.value}
+              isEdited={job.edited_fields?.includes(field.key)}
+              jobId={job.id}
+              currentJobId={currentJobId}
+            />
+          ))}
 
-        {/* Ошибки и предупреждения */}
-        {job.preview?.errors.map((err) => (
-          <div key={err.code} className={styles.validationError}>
-            <Icon name="error-icon" className={styles.validationIcon} />
-            <span>{err.message}</span>
-          </div>
-        ))}
-        {job.preview?.warnings.map((warn) => (
-          <div key={warn.code} className={styles.validationWarning}>
-            <Icon name="info-icon" className={styles.validationIcon} />
-            <span>{warn.message}</span>
-          </div>
-        ))}
+          {/* Ошибки и предупреждения */}
+          {job.preview?.errors.map((err) => (
+            <div key={err.code} className={styles.validationError}>
+              <Icon name="error-icon" className={styles.validationIcon} />
+              <span>{err.message}</span>
+            </div>
+          ))}
+          {job.preview?.warnings.map((warn) => (
+            <div key={warn.code} className={styles.validationWarning}>
+              <Icon name="info-icon" className={styles.validationIcon} />
+              <span>{warn.message}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Regenerate — активен только после processing, использует locked settings */}
