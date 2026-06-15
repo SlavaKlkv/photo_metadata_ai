@@ -5,14 +5,15 @@ import styles from './Input.module.scss';
 export interface InputProps
   extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   hasError?: boolean;
+  variant?: 'context' | 'metadata'; // context — большой, metadata — компактный
 }
 
 export const Input = React.forwardRef<HTMLTextAreaElement, InputProps>(
-  ({ hasError = false, className, ...props }, ref) => {
+  ({ hasError = false, variant = 'context', className, ...props }, ref) => {
     return (
       <textarea
         ref={ref}
-        className={`${styles.input} ${hasError ? styles.error : ''} ${className ?? ''}`}
+        className={`${styles.input} ${styles[variant]} ${hasError ? styles.error : ''} ${className ?? ''}`}
         {...props}
       />
     );

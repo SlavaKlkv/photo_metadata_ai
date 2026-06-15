@@ -100,6 +100,7 @@ export const SettingsPanel: React.FC = () => {
             placeholder='Describe the context of the shooting, and the following questions will help you — Where? What? When? E.g., "New York, Central Park, Sunset, two people on a bench 10 May 2026"'
             hasError={isOverLimit}
             disabled={isPromptLocked}
+            variant="context"
           />
           <div
             className={`${styles.charCounter} ${isOverLimit ? styles.counterError : ""}`}

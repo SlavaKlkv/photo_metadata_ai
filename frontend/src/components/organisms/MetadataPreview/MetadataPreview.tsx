@@ -9,15 +9,18 @@ import { Icon } from "../../atoms/Icon/Icon";
 import { Panel } from "../../atoms/Panel/Panel";
 import styles from "./MetadataPreview.module.scss";
 import { SectionHeader } from "../../molecules/SectionHeader/SectionHeader";
+import { Input } from "../../atoms/Input/Input";
 
 // Вспомогательный компонент для редактируемого поля метаданных
 interface MetadataFieldProps {
   fieldKey: string;
   label: string;
-  value: string;
+  value: string | string[];
   isEdited?: boolean;
   jobId: string;
   currentJobId: string | null;
+  errors?: Array<{ code: string; message: string }>;
+  warnings?: Array<{ code: string; message: string }>;
 }
 
 const MetadataField: React.FC<MetadataFieldProps> = ({
@@ -27,69 +30,75 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
   isEdited,
   jobId,
   currentJobId,
+  errors = [],
+  warnings = [],
 }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState(value);
+  const isArray = Array.isArray(value);
+  const stringValue = isArray ? value.join(", ") : String(value || "");
+  const [editValue, setEditValue] = useState(stringValue);
 
-  const updateMetadata = useAppStore((state) => state.updateMetadata);
   const addToast = useToastStore((state) => state.addToast);
 
-  // синхронизируем если value пришёл новый (смена стока)
   useEffect(() => {
-    setEditValue(value);
-  }, [value]);
+    setEditValue(stringValue);
+  }, [stringValue, fieldKey]);
 
   const handleSave = async () => {
     if (!currentJobId) return;
 
     try {
+      // если было массивом — парсим обратно в массив
+      const saveValue = isArray
+        ? editValue.split(",").map(k => k.trim()).filter(Boolean)
+        : editValue;
+
       await jobsApi.updateMetadata(currentJobId, jobId, {
-        [fieldKey]: editValue,
+        [fieldKey]: saveValue,
       });
 
-      // обновляем legacy metadata для title/description/keywords
       addToast("Saved", "success");
     } catch {
       addToast("Failed to save", "error");
     }
-
-    setIsEditing(false);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) handleSave();
-
-    if (e.key === "Escape") {
-      setEditValue(value);
-      setIsEditing(false);
-    }
   };
 
   return (
-    <div className={styles.field}>
-      <span
-        className={`${styles.fieldLabel} ${isEdited ? styles.fieldEdited : ""}`}
-      >
-        {label}
-      </span>
+    <div className={styles.fieldWrapper}>
+      <div className={styles.field}>
+        <label className={`${styles.fieldLabel} ${isEdited ? styles.fieldEdited : ""}`}>
+          {label}
+        </label>
 
-      {isEditing ? (
-        <textarea
-          autoFocus
-          className={styles.fieldTextarea}
+        {/* Input это textarea — используем везде */}
+        <Input
           value={editValue}
           onChange={(e) => setEditValue(e.target.value)}
-          onKeyDown={handleKeyDown}
           onBlur={handleSave}
+          hasError={errors.length > 0}
+          variant="metadata"
         />
-      ) : (
-        <div
-          className={styles.fieldValue}
-          onDoubleClick={() => setIsEditing(true)}
-          title="Double-click to edit"
-        >
-          {value || "—"}
-          <Icon name="edit-icon" className={styles.editIcon} />
+      </div>
+
+      {/* Валидация под полем */}
+      {errors.length > 0 && (
+        <div className={styles.fieldValidation}>
+          {errors.map((err) => (
+            <div key={err.code} className={styles.validationError}>
+              <Icon name="error-icon" className={styles.validationIcon} />
+              <span>{err.message}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {warnings.length > 0 && (
+        <div className={styles.fieldValidation}>
+          {warnings.map((warn) => (
+            <div key={warn.code} className={styles.validationWarning}>
+              <Icon name="info-icon" className={styles.validationIcon} />
+              <span>{warn.message}</span>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -98,7 +107,6 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
 
 export const MetadataPreview: React.FC = () => {
   const jobs = useAppStore((state) => state.jobs);
-  const updateMetadata = useAppStore((state) => state.updateMetadata);
   const regenerateFile = useAppStore((state) => state.regenerateFile);
   const regeneratingFileId = useAppStore((state) => state.regeneratingFileId);
   const lockedBatchSettings = useAppStore((state) => state.lockedBatchSettings);
@@ -115,28 +123,8 @@ export const MetadataPreview: React.FC = () => {
   const currentIndex = doneJobs.findIndex((j) => j.id === selectedJobId);
   const job = doneJobs.find((j) => j.id === selectedJobId);
 
-  // локальный стейт для редактирования
-  const [editingField, setEditingField] = useState<string | null>(null);
-  const [editValues, setEditValues] = useState({
-    title: "",
-    description: "",
-    keywords: "",
-  });
-
   // навигация — ввод номера вручную
   const [indexInput, setIndexInput] = useState<string | null>(null);
-
-  // синхронизируем editValues когда меняется выбранный job
-  useEffect(() => {
-    if (job?.metadata) {
-      setEditValues({
-        title: job.metadata.title ?? "",
-        description: job.metadata.description ?? "",
-        keywords: job.metadata.keywords?.join(", ") ?? "",
-      });
-    }
-    setEditingField(null);
-  }, [job?.id]);
 
   // выбираем первый completed job автоматически
   useEffect(() => {
@@ -163,39 +151,6 @@ export const MetadataPreview: React.FC = () => {
       setIndexInput(null);
     }
     if (e.key === "Escape") setIndexInput(null);
-  };
-
-  const handleSave = async (field: "title" | "description" | "keywords") => {
-    if (!job || !currentJobId) return;
-
-    const updatedMetadata = {
-      ...job.metadata,
-      [field]:
-        field === "keywords"
-          ? editValues.keywords
-              .split(",")
-              .map((k) => k.trim())
-              .filter(Boolean)
-          : editValues[field],
-    };
-
-    try {
-      await jobsApi.updateMetadata(currentJobId, job.id, updatedMetadata);
-      updateMetadata(job.id, updatedMetadata as any);
-      addToast("Saved", "success");
-    } catch {
-      addToast("Failed to save", "error");
-    }
-
-    setEditingField(null);
-  };
-
-  const handleKeyDown = (
-    e: React.KeyboardEvent,
-    field: "title" | "description" | "keywords",
-  ) => {
-    if (e.key === "Enter" && !e.shiftKey) handleSave(field);
-    if (e.key === "Escape") setEditingField(null);
   };
 
   // Regenerate использует lockedBatchSettings — оригинальные настройки batch,
@@ -273,11 +228,13 @@ export const MetadataPreview: React.FC = () => {
         {/* Превью фото */}
         <div className={styles.imagePlaceholder}>
           {previews[job.id] ? (
-            <img
-              src={previews[job.id]}
-              alt={job.originalFilename}
-              className={styles.previewImage}
-            />
+            <div className={styles.imageInner}>
+              <img
+                src={previews[job.id]}
+                alt={job.originalFilename}
+                className={styles.previewImage}
+              />
+            </div>
           ) : (
             <Icon name="img-icon" className={styles.imagePlaceholderIcon} />
           )}
