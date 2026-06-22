@@ -53,6 +53,7 @@ from app.services.export.export import (
     ensure_job_exports,
     run_job_export,
 )
+from app.services.metadata.stock_autofix import apply_stock_metadata_autofixes
 from app.services.metadata.stock_mapping import build_stock_mapped_metadata
 from app.services.metadata.stock_preview import build_stock_aware_preview
 from app.services.metadata.stock_rules import get_stock_field_options
@@ -353,7 +354,11 @@ async def regenerate_file_metadata(
         resolved_shooting_context,
         resolved_stock_platform,
     )
-    apply_generated_metadata_to_file(job_file, regenerate_result.metadata)
+    apply_generated_metadata_to_file(
+        job_file,
+        regenerate_result.metadata,
+        resolved_stock_platform,
+    )
     job_file.status = FileStatus.COMPLETED
 
     regenerated_snapshot = _build_metadata_snapshot(job_file)
@@ -636,9 +641,10 @@ async def update_file_metadata(
             MetadataFieldSource.EDITED
         )
 
-    await storage.update_job(job)
-
     stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
+    apply_stock_metadata_autofixes(job_file, stock_platform)
+
+    await storage.update_job(job)
 
     return _build_metadata_result(job_file, stock_platform)
 

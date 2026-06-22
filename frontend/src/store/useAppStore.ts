@@ -45,6 +45,19 @@ export interface AppState {
 
   // обновить preview конкретного файла после смены стока
   updateJobPreview: (fileId: string, preview: FilePreview) => void;
+  applyMetadataResult: (
+    fileId: string,
+    result: {
+      title?: string;
+      description?: string;
+      keywords?: string[];
+      selected_for_export?: boolean;
+      field_sources?: ProcessingJob["field_sources"];
+      edited_fields?: string[];
+      preview?: FilePreview;
+      error_message?: string | null;
+    },
+  ) => void;
 
   // сменить сток и перезапросить results + stock-options
   switchStockPlatform: (
@@ -416,6 +429,36 @@ export const useAppStore = create<AppState>()(
         jobs: state.jobs.map((job) =>
           job.id === fileId ? { ...job, preview } : job,
         ),
+      }));
+    },
+
+    applyMetadataResult: (fileId, result) => {
+      set((state) => ({
+        jobs: state.jobs.map((job) => {
+          if (job.id !== fileId) return job;
+
+          const title = result.title ?? job.title;
+          const description = result.description ?? job.description;
+          const keywords = result.keywords ?? job.keywords;
+
+          return {
+            ...job,
+            title,
+            description,
+            keywords,
+            selected_for_export:
+              result.selected_for_export ?? job.selected_for_export,
+            field_sources: result.field_sources ?? job.field_sources,
+            edited_fields: result.edited_fields ?? job.edited_fields,
+            preview: result.preview ?? job.preview,
+            error: result.error_message ?? job.error,
+            metadata: {
+              title: title ?? job.metadata?.title ?? "",
+              description: description ?? job.metadata?.description ?? "",
+              keywords: keywords ?? job.metadata?.keywords ?? [],
+            },
+          };
+        }),
       }));
     },
 

@@ -4,6 +4,7 @@ import { useAppStore } from "../../../store/useAppStore";
 import { useUIStore } from "../../../store/useUIStore";
 import { useToastStore } from "../../../store/useToastStore";
 import { jobsApi } from "../../../services/api/api";
+import { PreviewFieldValue } from "../../../types";
 import { Button } from "../../atoms/Button/Button";
 import { Icon } from "../../atoms/Icon/Icon";
 import { Panel } from "../../atoms/Panel/Panel";
@@ -15,7 +16,7 @@ import { Input } from "../../atoms/Input/Input";
 interface MetadataFieldProps {
   fieldKey: string;
   label: string;
-  value: string | string[];
+  value: PreviewFieldValue;
   isEdited?: boolean;
   jobId: string;
   currentJobId: string | null;
@@ -34,28 +35,34 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
   warnings = [],
 }) => {
   const isArray = Array.isArray(value);
-  const stringValue = isArray ? value.join(", ") : String(value || "");
+  const stringValue = isArray
+    ? value.join(", ")
+    : value === null
+      ? ""
+      : String(value);
   const [editValue, setEditValue] = useState(stringValue);
 
   const addToast = useToastStore((state) => state.addToast);
+  const applyMetadataResult = useAppStore(
+    (state) => state.applyMetadataResult,
+  );
+  const isBoolean = typeof value === "boolean";
 
   useEffect(() => {
     setEditValue(stringValue);
   }, [stringValue, fieldKey]);
 
-  const handleSave = async () => {
+  const handleSave = async (nextEditValue = editValue) => {
     if (!currentJobId) return;
 
     try {
-      // если было массивом — парсим обратно в массив
-      const saveValue = isArray
-        ? editValue.split(",").map(k => k.trim()).filter(Boolean)
-        : editValue;
+      const saveValue = getMetadataSaveValue(nextEditValue, value);
 
-      await jobsApi.updateMetadata(currentJobId, jobId, {
+      const response = await jobsApi.updateMetadata(currentJobId, jobId, {
         [fieldKey]: saveValue,
       });
 
+      applyMetadataResult(jobId, response.data);
       addToast("Saved", "success");
     } catch {
       addToast("Failed to save", "error");
@@ -70,13 +77,40 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
         </label>
 
         {/* Input это textarea — используем везде */}
-        <Input
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onBlur={handleSave}
-          hasError={errors.length > 0}
-          variant="metadata"
-        />
+        {isBoolean ? (
+          <div
+            className={`${styles.booleanControl} ${
+              errors.length > 0 ? styles.booleanControlError : ""
+            }`}
+          >
+            {[
+              { label: "Yes", value: "true" },
+              { label: "No", value: "false" },
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`${styles.booleanOption} ${
+                  editValue === option.value ? styles.booleanOptionActive : ""
+                }`}
+                onClick={() => {
+                  setEditValue(option.value);
+                  handleSave(option.value);
+                }}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <Input
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={() => handleSave()}
+            hasError={errors.length > 0}
+            variant="metadata"
+          />
+        )}
       </div>
 
       {/* Валидация под полем */}
@@ -103,6 +137,33 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
       )}
     </div>
   );
+};
+
+const getMetadataSaveValue = (
+  editValue: string,
+  originalValue: PreviewFieldValue,
+) => {
+  if (Array.isArray(originalValue)) {
+    return editValue
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  if (typeof originalValue === "boolean") {
+    const normalizedValue = editValue.trim().toLowerCase();
+
+    if (["true", "yes", "1"].includes(normalizedValue)) return true;
+    if (["false", "no", "0", ""].includes(normalizedValue)) return false;
+  }
+
+  if (typeof originalValue === "number") {
+    const normalizedValue = editValue.trim();
+
+    return normalizedValue ? Number(normalizedValue) : null;
+  }
+
+  return editValue;
 };
 
 export const MetadataPreview: React.FC = () => {
