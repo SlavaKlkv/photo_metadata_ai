@@ -80,10 +80,12 @@ export interface ApiResultsResponse {
 }
 
 // Поле preview — одна запись (key/label/value)
+export type PreviewFieldValue = string | boolean | number | string[] | null;
+
 export interface PreviewField {
   key: string;
   label: string;
-  value: string;
+  value: PreviewFieldValue;
 }
 
 // Ошибка/предупреждение валидации
