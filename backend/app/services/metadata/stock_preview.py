@@ -50,8 +50,8 @@ def build_stock_aware_preview(
             fields=[
                 StockPreviewField(
                     key='categories',
-                    label='Categories',
-                    value=list(mapped.categories),
+                    label='Category 1',
+                    value=mapped.categories[0] if mapped.categories else None,
                 ),
                 StockPreviewField(
                     key='category_2',
@@ -91,8 +91,8 @@ def build_stock_aware_preview(
             fields=[
                 StockPreviewField(
                     key='categories',
-                    label='Categories',
-                    value=list(mapped.categories),
+                    label='Category 1',
+                    value=mapped.categories[0] if mapped.categories else None,
                 ),
                 StockPreviewField(
                     key='category_2',
@@ -136,7 +136,7 @@ def build_stock_aware_preview(
             title='Adobe Specific',
             fields=[
                 StockPreviewField(
-                    key='category',
+                    key='categories',
                     label='Category',
                     value=mapped.categories[0] if mapped.categories else None,
                 ),
