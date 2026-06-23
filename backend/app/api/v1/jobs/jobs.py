@@ -56,7 +56,10 @@ from app.services.export.export import (
 from app.services.metadata.stock_autofix import apply_stock_metadata_autofixes
 from app.services.metadata.stock_mapping import build_stock_mapped_metadata
 from app.services.metadata.stock_preview import build_stock_aware_preview
-from app.services.metadata.stock_rules import get_stock_field_options
+from app.services.metadata.stock_rules import (
+    get_stock_field_options,
+    get_stock_rules,
+)
 from app.services.metadata.stock_validation import (
     validate_file_metadata_for_stock,
 )
@@ -568,6 +571,8 @@ async def update_file_metadata(
             detail='File not found',
         )
 
+    stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
+
     # PATCH обновляет только поля, которые прислал фронтенд.
     if 'title' in payload.model_fields_set:
         job_file.title = payload.title
@@ -606,6 +611,11 @@ async def update_file_metadata(
     if 'is_editorial' in payload.model_fields_set:
         job_file.is_editorial = bool(payload.is_editorial)
         job_file.field_sources['is_editorial'] = MetadataFieldSource.EDITED
+        _sync_license_type_with_editorial_choice(
+            job_file,
+            stock_platform,
+            payload,
+        )
     if 'editorial_caption' in payload.model_fields_set:
         job_file.editorial_caption = payload.editorial_caption
         job_file.field_sources['editorial_caption'] = (
@@ -641,7 +651,6 @@ async def update_file_metadata(
             MetadataFieldSource.EDITED
         )
 
-    stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
     apply_stock_metadata_autofixes(job_file, stock_platform)
 
     await storage.update_job(job)
@@ -977,6 +986,37 @@ def _build_metadata_result(
         error_message=file.error_message,
         validation=validation,
     )
+
+
+def _sync_license_type_with_editorial_choice(
+    file: ProcessingJobFile,
+    stock_platform: StockPlatform,
+    payload: UpdateProcessingJobMetadataRequest,
+) -> None:
+    if 'license_type' in payload.model_fields_set:
+        return
+
+    rules = get_stock_rules(stock_platform)
+    is_editorial = bool(payload.is_editorial)
+    license_type = None
+
+    if is_editorial and 'editorial' in rules.license_types:
+        license_type = 'editorial'
+    elif not is_editorial:
+        license_type = next(
+            (
+                candidate
+                for candidate in rules.license_types
+                if candidate != 'editorial'
+            ),
+            None,
+        )
+
+    if license_type is None or file.license_type == license_type:
+        return
+
+    file.license_type = license_type
+    file.field_sources['license_type'] = MetadataFieldSource.EDITED
 
 
 def _sort_result_files(
