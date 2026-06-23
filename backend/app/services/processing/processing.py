@@ -348,6 +348,11 @@ async def _process_file(
                 file_number=file_number,
             )
             metadata = fallback_result.metadata
+            await _record_effective_ai_provider(
+                job_id,
+                fallback_result.provider,
+                fallback_result.model,
+            )
 
             logger.info(
                 'file_metadata_provider_resolved',
@@ -428,6 +433,27 @@ async def _generate_metadata_for_file(
         file_number=file_number,
         stock_platform=stock_platform,
     )
+
+
+async def _record_effective_ai_provider(
+    job_id: UUID,
+    provider: AIProvider,
+    model: str | None,
+) -> None:
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        return
+
+    if (
+        job.effective_ai_provider == provider
+        and job.effective_ai_model == model
+    ):
+        return
+
+    job.effective_ai_provider = provider
+    job.effective_ai_model = model
+    await storage.update_job(job)
 
 
 async def _is_job_cancelled(job_id: UUID) -> bool:

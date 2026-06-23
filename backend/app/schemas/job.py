@@ -102,6 +102,8 @@ class ProcessingJobStatus(BaseModel):
 
     job_id: UUID
     status: JobStatus
+    effective_ai_provider: AIProvider | None = None
+    effective_ai_model: str | None = None
     # Оставляем в ответе только данные прогресса вместо полных метаданных.
     files: list[ProcessingJobFileStatus] = Field(default_factory=list)
 
@@ -312,6 +314,8 @@ class RegenerateFileMetadataResponse(BaseModel):
     job_id: UUID
     file_id: UUID
     attempt_id: UUID
+    ai_provider: AIProvider
+    ai_model: str | None = None
     metadata: ProcessingJobMetadataResult
     previous_metadata: MetadataSnapshot
 

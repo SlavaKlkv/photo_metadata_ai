@@ -373,6 +373,8 @@ async def regenerate_file_metadata(
         regenerated_metadata=regenerated_snapshot,
     )
     job_file.regenerate_attempts.append(regenerate_attempt)
+    job.effective_ai_provider = regenerate_result.provider
+    job.effective_ai_model = regenerate_result.model
 
     await storage.update_job(job)
 
@@ -380,6 +382,8 @@ async def regenerate_file_metadata(
         job_id=job.job_id,
         file_id=job_file.file_id,
         attempt_id=regenerate_attempt.attempt_id,
+        ai_provider=regenerate_result.provider,
+        ai_model=regenerate_result.model,
         metadata=_build_metadata_result(job_file, resolved_stock_platform),
         previous_metadata=previous_metadata,
     )
@@ -461,6 +465,8 @@ async def get_job_status(job_id: UUID):
     return ProcessingJobStatus(
         job_id=job.job_id,
         status=job.status,
+        effective_ai_provider=job.effective_ai_provider,
+        effective_ai_model=job.effective_ai_model,
         files=[
             # Polling-ответ включает только поля для обновления прогресса
             # в UI и отображения ошибок отдельных файлов.

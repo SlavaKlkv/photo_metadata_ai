@@ -520,8 +520,13 @@ export const useAppStore = create<AppState>()(
     // lockedBatchSettings гарантирует что используется оригинальный shooting context,
     // а не текущий draft — даже если пользователь его уже поменял.
     regenerateFile: async (fileId, currentJobId) => {
-      const { lockedBatchSettings, sessionSettings, applyMetadataResult } =
-        get();
+      const {
+        lockedBatchSettings,
+        sessionSettings,
+        applyMetadataResult,
+        setSelectedProvider,
+        saveSessionSettings,
+      } = get();
 
       // regenerate доступен только после processing — locked settings обязательны
       if (!lockedBatchSettings) {
@@ -536,6 +541,12 @@ export const useAppStore = create<AppState>()(
           stock_platform: lockedBatchSettings.stockPlatform,
           ai_provider: sessionSettings.selectedProvider ?? "ollama",
         });
+
+        const effectiveProvider = response.data?.ai_provider;
+        if (isSelectableProvider(effectiveProvider)) {
+          setSelectedProvider(effectiveProvider);
+          saveSessionSettings();
+        }
 
         const newMetadata = response.data?.metadata;
         if (newMetadata) {
@@ -560,3 +571,8 @@ export const useAppStore = create<AppState>()(
     },
   })),
 );
+
+const isSelectableProvider = (provider: unknown): provider is AIProvider =>
+  provider === "ollama" ||
+  provider === "gemini" ||
+  provider === "openrouter";
