@@ -56,7 +56,11 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
     if (!currentJobId) return;
 
     try {
-      const saveValue = getMetadataSaveValue(nextEditValue, value);
+      const saveValue = getMetadataSaveValue(
+        fieldKey,
+        nextEditValue,
+        value,
+      );
 
       const response = await jobsApi.updateMetadata(currentJobId, jobId, {
         [fieldKey]: saveValue,
@@ -140,9 +144,15 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
 };
 
 const getMetadataSaveValue = (
+  fieldKey: string,
   editValue: string,
   originalValue: PreviewFieldValue,
 ) => {
+  if (fieldKey === "categories") {
+    const category = editValue.trim();
+    return category ? [category] : [];
+  }
+
   if (Array.isArray(originalValue)) {
     return editValue
       .split(",")

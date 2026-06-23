@@ -67,7 +67,12 @@ def test_review_patch_persists_edits_and_remaps_preview():
     assert first_result['field_sources']['keywords'] == 'edited'
     assert first_result['field_sources']['categories'] == 'edited'
     assert first_result['preview']['stock_platform'] == 'adobe_stock'
-    assert first_result['preview']['stock_specific']['fields']
+    stock_fields = {
+        field['label']: field
+        for field in first_result['preview']['stock_specific']['fields']
+    }
+    assert stock_fields['Category']['key'] == 'categories'
+    assert stock_fields['Category']['value'] == 'Animals'
 
 
 def test_review_patch_editorial_false_clears_editorial_required_errors():
