@@ -72,6 +72,8 @@ export interface AppState {
     error?: string,
   ) => void;
   updateMetadata: (jobId: string, metadata: ProcessingJob["metadata"]) => void;
+  updateJobSelection: (jobId: string, selectedForExport: boolean) => void;
+  updateAllJobsSelection: (selectedForExport: boolean) => void;
   removeJob: (jobId: string) => void;
 
   updateSessionSetting: (
@@ -158,6 +160,25 @@ export const useAppStore = create<AppState>()(
         jobs: state.jobs.map((job) =>
           job.id === jobId ? { ...job, metadata } : job,
         ),
+      }));
+    },
+
+    updateJobSelection: (jobId, selectedForExport) => {
+      set((state) => ({
+        jobs: state.jobs.map((job) =>
+          job.id === jobId
+            ? { ...job, selected_for_export: selectedForExport }
+            : job,
+        ),
+      }));
+    },
+
+    updateAllJobsSelection: (selectedForExport) => {
+      set((state) => ({
+        jobs: state.jobs.map((job) => ({
+          ...job,
+          selected_for_export: selectedForExport,
+        })),
       }));
     },
 
@@ -499,7 +520,8 @@ export const useAppStore = create<AppState>()(
     // lockedBatchSettings гарантирует что используется оригинальный shooting context,
     // а не текущий draft — даже если пользователь его уже поменял.
     regenerateFile: async (fileId, currentJobId) => {
-      const { lockedBatchSettings, sessionSettings, updateMetadata } = get();
+      const { lockedBatchSettings, sessionSettings, applyMetadataResult } =
+        get();
 
       // regenerate доступен только после processing — locked settings обязательны
       if (!lockedBatchSettings) {
@@ -517,7 +539,7 @@ export const useAppStore = create<AppState>()(
 
         const newMetadata = response.data?.metadata;
         if (newMetadata) {
-          updateMetadata(fileId, newMetadata);
+          applyMetadataResult(fileId, newMetadata);
         }
 
         return { success: true };
