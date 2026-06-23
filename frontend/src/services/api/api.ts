@@ -71,6 +71,11 @@ export const jobsApi = {
   updateMetadata: (jobId: string, fileId: string, metadata: object) =>
     apiClient.patch(`/api/v1/jobs/${jobId}/files/${fileId}/metadata`, metadata),
 
+  updateSelection: (jobId: string, selectedForExport: boolean) =>
+    apiClient.patch(`/api/v1/jobs/${jobId}/files/selection`, {
+      selected_for_export: selectedForExport,
+    }),
+
   // TODO(backend): implement POST /api/v1/jobs/:jobId/files/:fileId/regenerate
   // должен принимать { shooting_context, stock_platform, ai_provider } из lockedBatchSettings
   // и возвращать новый metadata объект для одного файла без перезапуска всего batch
