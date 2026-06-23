@@ -20,6 +20,7 @@ from app.services.ai.ai_provider import AIMetadataResponse
 from app.services.desktop.app_settings import resolve_effective_ai_settings
 from app.services.image_preprocessing import resize_image_for_ai
 from app.services.metadata.metadata_embedding import get_upload_file_path
+from app.services.metadata.stock_autofix import apply_stock_metadata_autofixes
 from app.services.processing.constants import MAX_CONCURRENT_AI_REQUESTS
 from app.storage.jobs import storage
 
@@ -62,6 +63,7 @@ async def regenerate_metadata_for_file(
 def apply_generated_metadata_to_file(
     file: ProcessingJobFile,
     metadata: AIMetadataResponse,
+    stock_platform: StockPlatform | None = None,
 ) -> None:
     """
     Применяет сгенерированные metadata к объекту файла.
@@ -90,6 +92,7 @@ def apply_generated_metadata_to_file(
     file.prompt_language = metadata.prompt_language
     file.error_message = None
     _mark_generated_field_sources(file)
+    apply_stock_metadata_autofixes(file, stock_platform)
 
 
 async def process_job(job_id: UUID) -> None:
@@ -366,7 +369,7 @@ async def _process_file(
                 )
                 return
 
-            apply_generated_metadata_to_file(file, metadata)
+            apply_generated_metadata_to_file(file, metadata, stock_platform)
 
             file.status = FileStatus.COMPLETED
             logger.info(
