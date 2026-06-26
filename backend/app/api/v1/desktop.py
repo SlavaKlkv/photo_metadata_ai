@@ -249,6 +249,7 @@ def _build_runtime_info() -> DesktopRuntimeInfo:
         path.exists()
         for path in [
             runtime_directories.workspace_dir,
+            runtime_directories.desktop_storage_dir,
             runtime_directories.jobs_dir,
             runtime_directories.results_dir,
             runtime_directories.temp_dir,
@@ -258,6 +259,7 @@ def _build_runtime_info() -> DesktopRuntimeInfo:
     return DesktopRuntimeInfo(
         runtime_profile=runtime_directories.profile,
         workspace_dir=str(runtime_directories.workspace_dir),
+        desktop_storage_dir=str(runtime_directories.desktop_storage_dir),
         jobs_dir=str(runtime_directories.jobs_dir),
         results_dir=str(runtime_directories.results_dir),
         temp_dir=str(runtime_directories.temp_dir),
