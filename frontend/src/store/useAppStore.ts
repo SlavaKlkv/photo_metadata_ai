@@ -26,6 +26,10 @@ const defaultBatchSettings: BatchSettings = {
   },
 };
 
+interface ProviderDiscoveryOptions {
+  silent?: boolean;
+}
+
 export interface AppState {
   jobs: ProcessingJob[];
   sessionSettings: SessionSettings;
@@ -81,7 +85,7 @@ export interface AppState {
     value: SessionSettings[keyof SessionSettings],
   ) => void;
   setSelectedProvider: (provider: AIProvider | null) => void;
-  discoverProviders: () => Promise<void>;
+  discoverProviders: (options?: ProviderDiscoveryOptions) => Promise<void>;
   updateDraftBatchSetting: <K extends keyof BatchSettings>(
     key: K,
     value: BatchSettings[K],
@@ -111,6 +115,10 @@ export interface AppState {
 
   completeOnboarding: () => void;
   updateProviderApiKey: (provider: string, key: string) => void;
+  saveProviderApiKey: (
+    provider: AIProvider,
+    key: string,
+  ) => Promise<{ success: boolean; error?: string }>;
 
   // regenerate одного файла, используя lockedBatchSettings — не дёргает весь batch
   regeneratingFileId: string | null;
@@ -206,8 +214,15 @@ export const useAppStore = create<AppState>()(
       }));
     },
 
-    discoverProviders: async () => {
-      set({ providerDiscoveryStatus: "loading", providerDiscoveryError: null });
+    discoverProviders: async (options = {}) => {
+      const isSilent = options.silent === true;
+
+      if (!isSilent) {
+        set({
+          providerDiscoveryStatus: "loading",
+          providerDiscoveryError: null,
+        });
+      }
 
       try {
         const response = await jobsApi.providerDiscovery();
@@ -224,7 +239,9 @@ export const useAppStore = create<AppState>()(
           displayName: item.display_name,
           ready: item.ready,
           status: item.status,
+          source: item.source,
           reason: item.reason,
+          reason_code: item.reason_code,
           hints: item.hints ?? [],
           configured: item.configured ?? false,
           local: item.local ?? false,
@@ -277,6 +294,11 @@ export const useAppStore = create<AppState>()(
         const errorMsg =
           error instanceof Error ? error.message : "Provider discovery failed";
         console.error("[Provider Discovery] Error:", errorMsg, error);
+
+        if (isSilent) {
+          set({ providerDiscoveryError: errorMsg });
+          return;
+        }
 
         set({
           providerDiscoveryStatus: "error",
@@ -439,6 +461,68 @@ export const useAppStore = create<AppState>()(
           [provider]: key,
         },
       }));
+    },
+
+    saveProviderApiKey: async (provider, key) => {
+      if (provider !== "gemini" && provider !== "openrouter") {
+        return {
+          success: false,
+          error: "Provider does not support API keys",
+        };
+      }
+
+      const normalizedKey = key.trim();
+
+      if (!normalizedKey) {
+        return {
+          success: false,
+          error: "API key is required",
+        };
+      }
+
+      try {
+        const response = await jobsApi.validateAndSaveProviderApiKey(
+          provider,
+          normalizedKey,
+        );
+
+        if (!response.data?.valid || !response.data?.saved) {
+          return {
+            success: false,
+            error: response.data?.message ?? "Invalid API key",
+          };
+        }
+
+        set((state) => ({
+          sessionSettings: {
+            ...state.sessionSettings,
+            selectedProvider: provider,
+          },
+          manualProviderApiKeys: {
+            ...state.manualProviderApiKeys,
+            [provider]: "",
+          },
+        }));
+
+        await get().discoverProviders({ silent: true });
+
+        return { success: true };
+      } catch (error: unknown) {
+        const responseStatus = (
+          error as { response?: { status?: number } }
+        ).response?.status;
+        const errorMessage =
+          responseStatus !== undefined &&
+          responseStatus >= 400 &&
+          responseStatus < 500
+            ? "invalid key"
+            : "Failed to validate API key";
+
+        return {
+          success: false,
+          error: errorMessage,
+        };
+      }
     },
 
     setStockOptions: (options) => {

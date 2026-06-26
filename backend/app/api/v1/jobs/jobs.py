@@ -577,7 +577,11 @@ async def update_file_metadata(
             detail='File not found',
         )
 
-    stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
+    stock_platform = (
+        payload.stock_platform
+        or job.stock_platform
+        or StockPlatform.SHUTTERSTOCK
+    )
 
     # PATCH обновляет только поля, которые прислал фронтенд.
     if 'title' in payload.model_fields_set:

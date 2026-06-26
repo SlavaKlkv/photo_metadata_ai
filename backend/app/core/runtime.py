@@ -13,6 +13,7 @@ logger = structlog.get_logger(__name__)
 class RuntimeDirectories:
     profile: str
     workspace_dir: Path
+    desktop_storage_dir: Path
     jobs_dir: Path
     job_storage_db_path: Path
     results_dir: Path
@@ -29,6 +30,7 @@ def build_runtime_directories() -> RuntimeDirectories:
     Строит структуру runtime-директорий на основе текущих settings.
     """
     workspace_dir = settings.workspace_root
+    desktop_storage_dir = settings.desktop_storage_root
     jobs_dir = workspace_dir / 'jobs'
     results_dir = settings.results_root
     temp_dir = workspace_dir / 'temp'
@@ -36,6 +38,7 @@ def build_runtime_directories() -> RuntimeDirectories:
     return RuntimeDirectories(
         profile=settings.runtime_profile,
         workspace_dir=workspace_dir,
+        desktop_storage_dir=desktop_storage_dir,
         jobs_dir=jobs_dir,
         job_storage_db_path=jobs_dir / 'job_storage.sqlite',
         results_dir=results_dir,
@@ -68,6 +71,7 @@ def ensure_runtime_directories() -> RuntimeDirectories:
 
     for directory in [
         runtime_directories.workspace_dir,
+        runtime_directories.desktop_storage_dir,
         runtime_directories.jobs_dir,
         runtime_directories.results_dir,
         runtime_directories.temp_dir,
@@ -83,6 +87,7 @@ def ensure_runtime_directories() -> RuntimeDirectories:
         'runtime_directories_initialized',
         profile=runtime_directories.profile,
         workspace_dir=str(runtime_directories.workspace_dir),
+        desktop_storage_dir=str(runtime_directories.desktop_storage_dir),
         jobs_dir=str(runtime_directories.jobs_dir),
         results_dir=str(runtime_directories.results_dir),
         temp_dir=str(runtime_directories.temp_dir),

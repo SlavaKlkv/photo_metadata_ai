@@ -40,6 +40,7 @@ export interface ProviderDiscoveryItem {
   displayName: string;
   ready: boolean;
   status: string;
+  source?: 'desktop_storage' | 'environment' | null;
   reason?: string | null;
   reason_code?: string | null;
   hints: string[];
@@ -56,6 +57,15 @@ export interface ProviderDiscoveryResponse {
   recommended_provider?: AIProvider | null;
   has_ready_provider: boolean;
   hints: string[];
+}
+
+export interface AIProviderApiKeyValidationResponse {
+  provider: AIProvider;
+  valid: boolean;
+  status: 'valid' | 'invalid';
+  reason_code?: string | null;
+  message: string;
+  saved: boolean;
 }
 
 export interface BatchSettings {

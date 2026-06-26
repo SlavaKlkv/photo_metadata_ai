@@ -45,6 +45,7 @@ class ProviderDiscoveryItem(BaseModel):
     display_name: str
     ready: bool
     status: str
+    source: str | None = None
     reason_code: str | None = None
     reason: str | None = None
     configured: bool

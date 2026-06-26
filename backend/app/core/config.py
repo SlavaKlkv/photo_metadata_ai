@@ -16,6 +16,9 @@ PROJECT_ROOT = (
     else BACKEND_DIR
 )
 ROOT_ENV_FILE = PROJECT_ROOT / '.env' if PROJECT_ROOT != BACKEND_DIR else None
+DEFAULT_DESKTOP_STORAGE_DIR = (
+    Path.home() / 'Library' / 'Application Support' / 'Photo Metadata AI'
+)
 DEFAULT_DESKTOP_RESULTS_DIR = (
     Path.home() / 'Documents' / 'Photo Metadata AI' / 'results'
 )
@@ -50,11 +53,12 @@ class Settings(BaseSettings):
     AI_JPEG_QUALITY: int = Field(default=85, ge=1, le=100)
 
     BACKEND_RUNTIME_PROFILE: RuntimeProfile = 'desktop'
-    WORKSPACE_DIR: Path = PROJECT_ROOT
+    WORKSPACE_DIR: Path | None = None
     DESKTOP_WORKSPACE_DIR: Path | None = None
+    DESKTOP_STORAGE_DIR: Path | None = None
     DESKTOP_RESULTS_DIR: Path | None = None
 
-    CORS_ALLOW_ORIGINS: list[str] = ['*']
+    CORS_ALLOW_ORIGINS: list[str] = ['http://localhost:3000']
     CORS_ALLOW_METHODS: list[str] = ['*']
     CORS_ALLOW_HEADERS: list[str] = ['*']
     CORS_ALLOW_CREDENTIALS: bool = True
@@ -64,6 +68,7 @@ class Settings(BaseSettings):
     @field_validator(
         'WORKSPACE_DIR',
         'DESKTOP_WORKSPACE_DIR',
+        'DESKTOP_STORAGE_DIR',
         'DESKTOP_RESULTS_DIR',
         mode='before',
     )
@@ -94,15 +99,24 @@ class Settings(BaseSettings):
 
     @property
     def workspace_root(self) -> Path:
-        workspace_dir = self.WORKSPACE_DIR
+        if self.runtime_profile == 'desktop':
+            workspace_dir = (
+                self.DESKTOP_WORKSPACE_DIR or self.desktop_storage_root
+            )
+            return workspace_dir.resolve(strict=False)
 
-        if (
-            self.runtime_profile == 'desktop'
-            and self.DESKTOP_WORKSPACE_DIR is not None
-        ):
-            workspace_dir = self.DESKTOP_WORKSPACE_DIR
-
+        workspace_dir = self.WORKSPACE_DIR or PROJECT_ROOT
         return workspace_dir.resolve(strict=False)
+
+    @property
+    def desktop_storage_root(self) -> Path:
+        if self.runtime_profile == 'desktop':
+            storage_dir = (
+                self.DESKTOP_STORAGE_DIR or DEFAULT_DESKTOP_STORAGE_DIR
+            )
+            return storage_dir.resolve(strict=False)
+
+        return self.workspace_root
 
     @property
     def results_root(self) -> Path:
