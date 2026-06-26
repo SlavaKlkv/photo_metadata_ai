@@ -1,19 +1,20 @@
 // frontend/src/components/organisms/SettingsPanel/SettingsPanel.tsx
 import React from 'react';
-import { useAppStore } from '../../../store/useAppStore';
-import { useUIStore } from '../../../store/useUIStore';
-import { Panel } from '../../atoms/Panel/Panel';
-import { Input } from '../../atoms/Input/Input';
-import { Select } from '../../atoms/Select/Select';
-import { Checkbox } from '../../atoms/Checkbox/Checkbox';
-import { Radio } from '../../atoms/Radio/Radio';
+import { useAppStore } from 'store/useAppStore';
+import { useUIStore } from 'store/useUIStore';
+import { jobsApi } from 'services/api/api';
+import { Panel } from 'components/atoms/Panel/Panel';
+import { Input } from 'components/atoms/Input/Input';
+import { Select } from 'components/atoms/Select/Select';
+import { Checkbox } from 'components/atoms/Checkbox/Checkbox';
+import { Radio } from 'components/atoms/Radio/Radio';
 import styles from './SettingsPanel.module.scss';
-import { SectionHeader } from '../../molecules/SectionHeader/SectionHeader';
+import { SectionHeader } from 'components/molecules/SectionHeader/SectionHeader';
 import {
   AIProvider,
   ProviderDiscoveryItem,
   StockPlatform,
-} from '../../../types';
+} from 'types';
 
 const platformOptions = [
   { value: 'getty_images', label: 'Getty Images' },
@@ -61,6 +62,11 @@ export const SettingsPanel: React.FC = () => {
   const handleProviderChange = (provider: AIProvider) => {
     updateSessionSetting('selectedProvider', provider);
     saveSessionSettings();
+    jobsApi
+      .updateDesktopSettings({ selected_provider: provider })
+      .catch((error) => {
+        console.error('[SettingsPanel] Failed to save provider:', error);
+      });
   };
 
   const displayedShootingContext =
