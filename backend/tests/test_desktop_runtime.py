@@ -9,7 +9,13 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from app.core.config import PROJECT_ROOT, ROOT_ENV_FILE, Settings, settings
+from app.core.config import (
+    DEFAULT_DESKTOP_STORAGE_DIR,
+    PROJECT_ROOT,
+    ROOT_ENV_FILE,
+    Settings,
+    settings,
+)
 from app.core.runtime import get_runtime_directories, resolve_path_in_base
 from app.main import app
 from app.schemas.provider_discovery import (
@@ -33,21 +39,59 @@ def reset_desktop_startup_orchestrator():
     desktop_startup_orchestrator.reset_for_tests()
 
 
+def _test_settings(**values: Any) -> Settings:
+    # noinspection PyArgumentList
+    return Settings(_env_file=None, **values)
+
+
 def test_settings_use_desktop_workspace_when_profile_is_desktop(
     tmp_path: Path,
 ):
     desktop_workspace_dir = tmp_path / 'desktop-workspace'
     server_workspace_dir = tmp_path / 'server-workspace'
 
-    test_settings = Settings(
+    test_settings = _test_settings(
         BACKEND_RUNTIME_PROFILE='desktop',
         WORKSPACE_DIR=server_workspace_dir,
         DESKTOP_WORKSPACE_DIR=desktop_workspace_dir,
-        _env_file=None,
     )
 
     assert test_settings.workspace_root == desktop_workspace_dir.resolve(
         strict=False
+    )
+
+
+def test_settings_use_desktop_storage_dir_when_profile_is_desktop(
+    tmp_path: Path,
+):
+    workspace_dir = tmp_path / 'workspace'
+    desktop_storage_dir = tmp_path / 'desktop-storage'
+
+    test_settings = _test_settings(
+        BACKEND_RUNTIME_PROFILE='desktop',
+        WORKSPACE_DIR=workspace_dir,
+        DESKTOP_STORAGE_DIR=desktop_storage_dir,
+    )
+
+    assert test_settings.desktop_storage_root == desktop_storage_dir.resolve(
+        strict=False
+    )
+    assert test_settings.workspace_root == desktop_storage_dir.resolve(
+        strict=False
+    )
+
+
+def test_settings_default_desktop_storage_dir_is_not_project_root():
+    test_settings = _test_settings(
+        BACKEND_RUNTIME_PROFILE='desktop',
+        DESKTOP_STORAGE_DIR=None,
+    )
+
+    assert test_settings.desktop_storage_root == (
+        DEFAULT_DESKTOP_STORAGE_DIR.resolve(strict=False)
+    )
+    assert test_settings.workspace_root == (
+        DEFAULT_DESKTOP_STORAGE_DIR.resolve(strict=False)
     )
 
 
@@ -60,11 +104,10 @@ def test_settings_read_env_from_project_root():
 
 
 def test_server_profile_resolves_relative_workspace_from_project_root():
-    test_settings = Settings(
+    test_settings = _test_settings(
         BACKEND_RUNTIME_PROFILE='server',
         WORKSPACE_DIR='.',
         DESKTOP_WORKSPACE_DIR=None,
-        _env_file=None,
     )
 
     assert test_settings.workspace_root == PROJECT_ROOT.resolve(strict=False)
@@ -96,6 +139,7 @@ def test_desktop_runtime_endpoints_are_available():
 
         for path_key in (
             'workspace_dir',
+            'desktop_storage_dir',
             'jobs_dir',
             'results_dir',
             'temp_dir',

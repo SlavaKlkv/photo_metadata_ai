@@ -239,6 +239,7 @@ class UpdateProcessingJobMetadataRequest(MetadataMixin):
     Редактируемые поля метаданных, которые отправляет фронтенд.
     """
 
+    stock_platform: StockPlatform | None = None
     keywords: list[str] | None = None
     selected_for_export: bool | None = None
     categories: list[str] | None = None

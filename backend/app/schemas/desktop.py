@@ -10,6 +10,7 @@ from app.schemas.provider_discovery import ProvidersDiscoveryResponse
 class DesktopRuntimeInfo(BaseModel):
     runtime_profile: str
     workspace_dir: str
+    desktop_storage_dir: str
     jobs_dir: str
     results_dir: str
     temp_dir: str

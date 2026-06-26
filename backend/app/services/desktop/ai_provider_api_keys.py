@@ -60,16 +60,7 @@ async def validate_and_save_ai_provider_api_key(
             saved=False,
         )
 
-    records = _load_api_key_records()
-    now = datetime.now(UTC).isoformat()
-    records[provider.value] = {
-        'provider': provider.value,
-        'api_key': normalized_api_key,
-        'source': 'desktop_storage',
-        'last_validated_at': now,
-        'updated_at': now,
-    }
-    _write_api_key_records(records)
+    save_ai_provider_api_key(provider, normalized_api_key)
 
     logger.info(
         'ai_provider_api_key_validated_and_saved',
@@ -82,6 +73,31 @@ async def validate_and_save_ai_provider_api_key(
         message='API key is valid',
         saved=True,
     )
+
+
+def save_ai_provider_api_key(
+    provider: AIProvider,
+    api_key: str,
+) -> None:
+    """
+    Сохраняет уже проверенный API-ключ в локальное desktop-хранилище.
+    """
+    _ensure_supported_provider(provider)
+
+    normalized_api_key = _normalize_api_key(api_key)
+    if normalized_api_key is None:
+        raise ValueError('api_key is required')
+
+    records = _load_api_key_records()
+    now = datetime.now(UTC).isoformat()
+    records[provider.value] = {
+        'provider': provider.value,
+        'api_key': normalized_api_key,
+        'source': 'desktop_storage',
+        'last_validated_at': now,
+        'updated_at': now,
+    }
+    _write_api_key_records(records)
 
 
 async def validate_ai_provider_api_key(
@@ -206,8 +222,18 @@ def _get_stored_api_key(provider: AIProvider) -> str | None:
 def _load_api_key_records() -> dict[str, dict[str, Any]]:
     api_keys_path = _get_api_keys_path()
 
+    records = _read_api_key_records(api_keys_path)
+    if records is not None:
+        return records
+
+    return {}
+
+
+def _read_api_key_records(
+    api_keys_path: Path,
+) -> dict[str, dict[str, Any]] | None:
     if not api_keys_path.is_file():
-        return {}
+        return None
 
     try:
         payload = json.loads(api_keys_path.read_text(encoding='utf-8'))
@@ -250,7 +276,7 @@ def _write_api_key_records(records: dict[str, dict[str, Any]]) -> None:
 def _get_api_keys_path() -> Path:
     runtime_directories = ensure_runtime_directories()
     return resolve_path_in_base(
-        runtime_directories.workspace_dir,
+        runtime_directories.desktop_storage_dir,
         AI_PROVIDER_API_KEYS_FILENAME,
     )
 

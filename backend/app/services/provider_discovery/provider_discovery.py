@@ -16,6 +16,7 @@ from app.schemas.provider_discovery import (
 from app.services.desktop.ai_provider_api_keys import (
     AIProviderApiKeyInfo,
     get_ai_provider_api_key_info,
+    save_ai_provider_api_key,
     validate_ai_provider_api_key,
 )
 from app.services.provider_discovery.constants import (
@@ -197,6 +198,7 @@ async def _discover_api_key_provider(
                 display_name=display_name,
                 ready=False,
                 status='not_ready',
+                source=api_key_info.source,
                 reason_code=f'{provider.value}_api_key_invalid',
                 reason=f'{display_name} API key is invalid.',
                 configured=True,
@@ -231,11 +233,15 @@ async def _discover_api_key_provider(
                 ),
             )
 
+        if api_key_info.source == 'environment':
+            save_ai_provider_api_key(provider, api_key_info.api_key)
+
         return ProviderDiscoveryItem(
             provider=provider.value,
             display_name=display_name,
             ready=True,
             status='ready',
+            source=api_key_info.source,
             configured=True,
             local=False,
             model=model,

@@ -1,16 +1,26 @@
 // frontend/src/components/organisms/MetadataPreview/MetadataPreview.tsx
 import React, { useState, useEffect } from "react";
-import { useAppStore } from "../../../store/useAppStore";
-import { useUIStore } from "../../../store/useUIStore";
-import { useToastStore } from "../../../store/useToastStore";
-import { jobsApi } from "../../../services/api/api";
-import { PreviewFieldValue } from "../../../types";
+import { useAppStore } from "store/useAppStore";
+import { useUIStore } from "store/useUIStore";
+import { useToastStore } from "store/useToastStore";
+import { jobsApi } from "services/api/api";
+import { PreviewFieldValue, StockPlatform } from "types";
 import { Button } from "../../atoms/Button/Button";
 import { Icon } from "../../atoms/Icon/Icon";
 import { Panel } from "../../atoms/Panel/Panel";
 import styles from "./MetadataPreview.module.scss";
 import { SectionHeader } from "../../molecules/SectionHeader/SectionHeader";
 import { Input } from "../../atoms/Input/Input";
+
+const BOOLEAN_METADATA_FIELDS = new Set([
+  "is_editorial",
+  "has_people",
+  "model_release_available",
+  "ai_generated_content_disclosure",
+  "is_illustration",
+  "mature_content",
+  "iptc_embedded_metadata",
+]);
 
 // Вспомогательный компонент для редактируемого поля метаданных
 interface MetadataFieldProps {
@@ -22,6 +32,7 @@ interface MetadataFieldProps {
   currentJobId: string | null;
   errors?: Array<{ code: string; message: string }>;
   warnings?: Array<{ code: string; message: string }>;
+  stockPlatform?: StockPlatform;
 }
 
 const MetadataField: React.FC<MetadataFieldProps> = ({
@@ -33,6 +44,7 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
   currentJobId,
   errors = [],
   warnings = [],
+  stockPlatform,
 }) => {
   const isArray = Array.isArray(value);
   const stringValue = isArray
@@ -46,7 +58,8 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
   const applyMetadataResult = useAppStore(
     (state) => state.applyMetadataResult,
   );
-  const isBoolean = typeof value === "boolean";
+  const isBoolean =
+    typeof value === "boolean" || BOOLEAN_METADATA_FIELDS.has(fieldKey);
 
   useEffect(() => {
     setEditValue(stringValue);
@@ -64,6 +77,7 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
 
       const response = await jobsApi.updateMetadata(currentJobId, jobId, {
         [fieldKey]: saveValue,
+        stock_platform: stockPlatform,
       });
 
       applyMetadataResult(jobId, response.data);
@@ -120,8 +134,11 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
       {/* Валидация под полем */}
       {errors.length > 0 && (
         <div className={styles.fieldValidation}>
-          {errors.map((err) => (
-            <div key={err.code} className={styles.validationError}>
+          {errors.map((err, index) => (
+            <div
+              key={`${fieldKey}-${err.code}-${index}`}
+              className={styles.validationError}
+            >
               <Icon name="error-icon" className={styles.validationIcon} />
               <span>{err.message}</span>
             </div>
@@ -131,8 +148,11 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
 
       {warnings.length > 0 && (
         <div className={styles.fieldValidation}>
-          {warnings.map((warn) => (
-            <div key={warn.code} className={styles.validationWarning}>
+          {warnings.map((warn, index) => (
+            <div
+              key={`${fieldKey}-${warn.code}-${index}`}
+              className={styles.validationWarning}
+            >
               <Icon name="info-icon" className={styles.validationIcon} />
               <span>{warn.message}</span>
             </div>
@@ -160,7 +180,10 @@ const getMetadataSaveValue = (
       .filter(Boolean);
   }
 
-  if (typeof originalValue === "boolean") {
+  if (
+    typeof originalValue === "boolean" ||
+    BOOLEAN_METADATA_FIELDS.has(fieldKey)
+  ) {
     const normalizedValue = editValue.trim().toLowerCase();
 
     if (["true", "yes", "1"].includes(normalizedValue)) return true;
@@ -326,6 +349,7 @@ export const MetadataPreview: React.FC = () => {
               isEdited={job.edited_fields?.includes(field.key)}
               jobId={job.id}
               currentJobId={currentJobId}
+              stockPlatform={job.preview?.stock_platform}
             />
           ))}
 
@@ -339,18 +363,25 @@ export const MetadataPreview: React.FC = () => {
               isEdited={job.edited_fields?.includes(field.key)}
               jobId={job.id}
               currentJobId={currentJobId}
+              stockPlatform={job.preview?.stock_platform}
             />
           ))}
 
           {/* Ошибки и предупреждения */}
-          {job.preview?.errors.map((err) => (
-            <div key={err.code} className={styles.validationError}>
+          {job.preview?.errors.map((err, index) => (
+            <div
+              key={`${err.field}-${err.code}-${index}`}
+              className={styles.validationError}
+            >
               <Icon name="error-icon" className={styles.validationIcon} />
               <span>{err.message}</span>
             </div>
           ))}
-          {job.preview?.warnings.map((warn) => (
-            <div key={warn.code} className={styles.validationWarning}>
+          {job.preview?.warnings.map((warn, index) => (
+            <div
+              key={`${warn.field}-${warn.code}-${index}`}
+              className={styles.validationWarning}
+            >
               <Icon name="info-icon" className={styles.validationIcon} />
               <span>{warn.message}</span>
             </div>

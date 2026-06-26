@@ -2,8 +2,10 @@
 import React, { useState } from "react";
 import { Icon } from "../../atoms/Icon/Icon";
 import { ProgressBar } from "../../atoms/ProgressBar/ProgressBar";
-import { AIProvider } from "../../../types";
+import type { AIProvider } from "types";
 import styles from "./ProviderStatusItem.module.scss";
+
+type ApiKeySaveStatus = "idle" | "validating" | "valid" | "invalid";
 
 export interface ProviderStatusItemProps {
   provider: AIProvider;
@@ -11,6 +13,8 @@ export interface ProviderStatusItemProps {
   status: "scanning" | "found" | "not_found" | "invalid";
   progress?: number;
   onApiKeyChange?: (key: string) => void;
+  apiKeySaveStatus?: ApiKeySaveStatus;
+  apiKeyError?: string | null;
   apiKey?: string | null;
   setupLink?: { label: string; url: string };
 }
@@ -27,6 +31,8 @@ export const ProviderStatusItem: React.FC<ProviderStatusItemProps> = ({
   status,
   progress,
   onApiKeyChange,
+  apiKeySaveStatus = "idle",
+  apiKeyError,
   apiKey,
   setupLink,
 }) => {
@@ -34,6 +40,23 @@ export const ProviderStatusItem: React.FC<ProviderStatusItemProps> = ({
   const isOllama = provider === "ollama";
   const isCloudProvider = ["gemini", "openrouter"].includes(provider);
   const providerIcon = providerIconMap[provider] ?? "settings-icon";
+
+  const cloudSubtitle =
+    apiKeySaveStatus === "validating"
+      ? "Validating key..."
+      : apiKeySaveStatus === "valid"
+        ? "API key saved"
+        : apiKeySaveStatus === "invalid"
+          ? apiKeyError || "Invalid key"
+          : status === "invalid"
+            ? "Invalid key"
+            : "API key not found";
+  const apiKeyErrorMessage =
+    apiKeySaveStatus === "invalid"
+      ? apiKeyError || "invalid key"
+      : status === "invalid"
+        ? apiKeyError || "invalid key"
+        : null;
 
   // QWEN scanning — отдельный layout с progressBar
   if (isOllama && status === "scanning") {
@@ -108,9 +131,7 @@ export const ProviderStatusItem: React.FC<ProviderStatusItemProps> = ({
           <p className={styles.rowSubtitle}>
             {isOllama
               ? "Install a recommended model for local processing"
-              : status === "invalid"
-                ? "Invalid key"
-                : "API key not found"}
+              : cloudSubtitle}
           </p>
         </div>
 
@@ -137,20 +158,33 @@ export const ProviderStatusItem: React.FC<ProviderStatusItemProps> = ({
       {/* Input + ссылка для cloud провайдеров */}
       {isCloudProvider && (
         <>
-          <input
-            className={`${styles.apiKeyInput} ${
-              status === "invalid" ? styles.apiKeyInputError : ""
-            }`}
-            value={inputValue}
-            onChange={(e) => {
-              setInputValue(e.target.value);
-              onApiKeyChange?.(e.target.value);
-            }}
-            placeholder="Enter your API key..."
-            type="text"
-            autoComplete="off"
-            spellCheck={false}
-          />
+          <div className={styles.apiKeyRow}>
+            <input
+              className={`${styles.apiKeyInput} ${
+                status === "invalid" || apiKeySaveStatus === "invalid"
+                  ? styles.apiKeyInputError
+                  : ""
+              }`}
+              value={inputValue}
+              onChange={(e) => {
+                setInputValue(e.target.value);
+                onApiKeyChange?.(e.target.value);
+              }}
+              placeholder="Enter your API key..."
+              type="text"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            {apiKeySaveStatus === "validating" && (
+              <Icon name="load-icon" className={styles.spinner} />
+            )}
+            {apiKeySaveStatus === "valid" && (
+              <Icon name="checkmark-icon" className={styles.checkIcon} />
+            )}
+          </div>
+          {apiKeyErrorMessage && (
+            <p className={styles.apiKeyErrorText}>{apiKeyErrorMessage}</p>
+          )}
 
           {setupLink && (
             <div className={styles.inputFooter}>

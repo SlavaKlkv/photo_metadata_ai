@@ -1,12 +1,16 @@
 // OnboardingModal organism component
-import React, { useEffect, useState } from 'react';
-import { useAppStore } from '../../../store/useAppStore';
+import React, { useEffect, useRef, useState } from 'react';
+import { useAppStore } from 'store/useAppStore';
 import { Modal } from '../../atoms/Modal/Modal';
 import { Button } from '../../atoms/Button/Button';
 import { Icon } from '../../atoms/Icon/Icon';
 import { ProviderStatusItem } from '../../molecules/ProviderStatusItem/ProviderStatusItem';
 import styles from './OnboardingModal.module.scss';
 import { SectionHeader } from '../../molecules/SectionHeader/SectionHeader';
+import type { AIProvider } from 'types';
+
+type ApiKeyValidationStatus = 'idle' | 'validating' | 'valid' | 'invalid';
+type DebounceTimer = ReturnType<typeof setTimeout>;
 
 export const OnboardingModal: React.FC = () => {
   const providerDiscoveryStatus = useAppStore(
@@ -23,9 +27,32 @@ export const OnboardingModal: React.FC = () => {
   const updateProviderApiKey = useAppStore(
     (state) => state.updateProviderApiKey,
   );
+  const saveProviderApiKey = useAppStore((state) => state.saveProviderApiKey);
 
   // Simulated progress for QWEN during scanning
   const [qwenProgress, setQwenProgress] = useState(0);
+  const [apiKeyValidationStatuses, setApiKeyValidationStatuses] = useState<
+    Partial<Record<AIProvider, ApiKeyValidationStatus>>
+  >({});
+  const [apiKeyValidationErrors, setApiKeyValidationErrors] = useState<
+    Partial<Record<AIProvider, string>>
+  >({});
+  const apiKeyValidationTimers = useRef<
+    Partial<Record<AIProvider, DebounceTimer>>
+  >({});
+  const apiKeyValidationSequences = useRef<Partial<Record<AIProvider, number>>>(
+    {},
+  );
+
+  useEffect(() => {
+    return () => {
+      Object.values(apiKeyValidationTimers.current).forEach((timer) => {
+        if (timer !== undefined) {
+          clearTimeout(timer);
+        }
+      });
+    };
+  }, []);
 
   useEffect(() => {
     if (providerDiscoveryStatus === "loading") {
@@ -70,13 +97,77 @@ export const OnboardingModal: React.FC = () => {
     completeOnboarding();
   };
 
-  const handleApiKeyChange = (provider: string, key: string) => {
+  const handleApiKeyChange = (provider: AIProvider, key: string) => {
     updateProviderApiKey(provider, key);
+    const normalizedKey = key.trim();
+    const currentTimer = apiKeyValidationTimers.current[provider];
+    const sequence = (apiKeyValidationSequences.current[provider] ?? 0) + 1;
+
+    apiKeyValidationSequences.current[provider] = sequence;
+
+    if (currentTimer !== undefined) {
+      clearTimeout(currentTimer);
+    }
+
+    setApiKeyValidationStatuses((state) => ({
+      ...state,
+      [provider]: 'idle',
+    }));
+    setApiKeyValidationErrors((state) => ({
+      ...state,
+      [provider]: undefined,
+    }));
+
+    if (!normalizedKey) {
+      return;
+    }
+
+    apiKeyValidationTimers.current[provider] = setTimeout(async () => {
+      setApiKeyValidationStatuses((state) => ({
+        ...state,
+        [provider]: 'validating',
+      }));
+      setApiKeyValidationErrors((state) => ({
+        ...state,
+        [provider]: undefined,
+      }));
+
+      const result = await saveProviderApiKey(provider, normalizedKey);
+
+      if (apiKeyValidationSequences.current[provider] !== sequence) {
+        return;
+      }
+
+      setApiKeyValidationStatuses((state) => ({
+        ...state,
+        [provider]: result.success ? 'valid' : 'invalid',
+      }));
+      setApiKeyValidationErrors((state) => ({
+        ...state,
+        [provider]: result.error,
+      }));
+    }, 700);
   };
 
-  const cloudItems = providerDiscoveryItems
-  .filter((item) => item.provider !== 'ollama')
-  .filter((item) => isScanning || !isSuccess || item.ready);
+  const getProviderStatus = (item: (typeof providerDiscoveryItems)[number]) => {
+    if (isScanning) {
+      return 'scanning';
+    }
+
+    if (item.ready) {
+      return 'found';
+    }
+
+    if (item.reason_code?.endsWith('_api_key_invalid')) {
+      return 'invalid';
+    }
+
+    return 'not_found';
+  };
+
+  const cloudItems = providerDiscoveryItems.filter(
+    (item) => item.provider !== 'ollama',
+  );
 
   return (
     <Modal isOpen={true} onClose={() => {}}>
@@ -103,13 +194,15 @@ export const OnboardingModal: React.FC = () => {
                 <ProviderStatusItem
                   provider={item.provider}
                   displayName={item.displayName}
-                  status={
-                    isScanning ? "scanning" : item.ready ? "found" : "not_found"
-                  }
+                  status={getProviderStatus(item)}
                   progress={isScanning ? qwenProgress : undefined}
                   onApiKeyChange={(key) =>
                     handleApiKeyChange(item.provider, key)
                   }
+                  apiKeySaveStatus={
+                    apiKeyValidationStatuses[item.provider] ?? 'idle'
+                  }
+                  apiKeyError={apiKeyValidationErrors[item.provider]}
                   setupLink={item.setup_links?.[0]}
                 />
               </div>
@@ -121,10 +214,12 @@ export const OnboardingModal: React.FC = () => {
                 key={item.provider}
                 provider={item.provider}
                 displayName={item.displayName}
-                status={
-                  isScanning ? "scanning" : item.ready ? "found" : "not_found"
-                }
+                status={getProviderStatus(item)}
                 onApiKeyChange={(key) => handleApiKeyChange(item.provider, key)}
+                apiKeySaveStatus={
+                  apiKeyValidationStatuses[item.provider] ?? 'idle'
+                }
+                apiKeyError={apiKeyValidationErrors[item.provider]}
                 setupLink={item.api_key_links?.[0]}
               />
             ))}

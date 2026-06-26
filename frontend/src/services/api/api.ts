@@ -1,6 +1,10 @@
 // frontend/src/services/api/api.ts
-import { StockPlatform } from '@/types';
 import axios, { AxiosInstance } from 'axios';
+import type {
+  AIProvider,
+  AIProviderApiKeyValidationResponse,
+  StockPlatform,
+} from 'types';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -94,6 +98,11 @@ export const jobsApi = {
     ),
 
   providerDiscovery: () => apiClient.get("/api/v1/desktop/providers/discovery"),
+  validateAndSaveProviderApiKey: (provider: AIProvider, apiKey: string) =>
+    apiClient.post<AIProviderApiKeyValidationResponse>(
+      `/api/v1/desktop/ai-providers/${provider}/api-key/validate-and-save`,
+      { api_key: apiKey },
+    ),
   updateDesktopSettings: (settings: { selected_provider: string }) =>
     apiClient.patch("/api/v1/desktop/settings", settings),
 
