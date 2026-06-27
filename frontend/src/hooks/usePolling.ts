@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { jobsApi } from 'services/api/api';
 import { useAppStore } from 'store/useAppStore';
 import { useUIStore } from 'store/useUIStore';
-import type { AIProvider, StockPlatform } from 'types';
+import type { StockPlatform } from 'types';
 
 
 const POLLING_INTERVAL = 2000;
@@ -19,13 +19,6 @@ export const usePolling = (jobId: string | null) => {
 
   const updateJobPreview = useAppStore((state) => state.updateJobPreview);
   const setStockOptions = useAppStore((state) => state.setStockOptions);
-  const setSelectedProvider = useAppStore((state) => state.setSelectedProvider);
-  const saveSessionSettings = useAppStore(
-    (state) => state.saveSessionSettings,
-  );
-  const selectedProvider = useAppStore(
-    (state) => state.sessionSettings.selectedProvider,
-  );
   const draftBatchSettings = useAppStore((state) => state.draftBatchSettings);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -44,15 +37,6 @@ export const usePolling = (jobId: string | null) => {
       try {
         const response = await jobsApi.getStatus(jobId);
         const statusData = response.data;
-        const effectiveProvider = statusData.effective_ai_provider;
-
-        if (
-          isSelectableProvider(effectiveProvider) &&
-          effectiveProvider !== selectedProvider
-        ) {
-          setSelectedProvider(effectiveProvider);
-          saveSessionSettings();
-        }
 
         if (statusData.files) {
           statusData.files.forEach((file: any) => {
@@ -137,9 +121,6 @@ export const usePolling = (jobId: string | null) => {
     updateMetadata,
     updateJobPreview,
     setStockOptions,
-    setSelectedProvider,
-    saveSessionSettings,
-    selectedProvider,
     draftBatchSettings,
     closeProgressModal,
     setIsExportReady,
@@ -147,8 +128,3 @@ export const usePolling = (jobId: string | null) => {
     setIsProcessing,
   ]);
 };
-
-const isSelectableProvider = (provider: unknown): provider is AIProvider =>
-  provider === 'ollama' ||
-  provider === 'gemini' ||
-  provider === 'openrouter';

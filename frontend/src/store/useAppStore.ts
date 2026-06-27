@@ -608,8 +608,6 @@ export const useAppStore = create<AppState>()(
         lockedBatchSettings,
         sessionSettings,
         applyMetadataResult,
-        setSelectedProvider,
-        saveSessionSettings,
       } = get();
 
       // regenerate доступен только после processing — locked settings обязательны
@@ -625,12 +623,6 @@ export const useAppStore = create<AppState>()(
           stock_platform: lockedBatchSettings.stockPlatform,
           ai_provider: sessionSettings.selectedProvider ?? "ollama",
         });
-
-        const effectiveProvider = response.data?.ai_provider;
-        if (isSelectableProvider(effectiveProvider)) {
-          setSelectedProvider(effectiveProvider);
-          saveSessionSettings();
-        }
 
         const newMetadata = response.data?.metadata;
         if (newMetadata) {
@@ -655,8 +647,3 @@ export const useAppStore = create<AppState>()(
     },
   })),
 );
-
-const isSelectableProvider = (provider: unknown): provider is AIProvider =>
-  provider === "ollama" ||
-  provider === "gemini" ||
-  provider === "openrouter";
