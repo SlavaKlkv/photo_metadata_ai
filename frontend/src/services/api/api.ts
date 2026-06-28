@@ -80,9 +80,7 @@ export const jobsApi = {
       selected_for_export: selectedForExport,
     }),
 
-  // TODO(backend): implement POST /api/v1/jobs/:jobId/files/:fileId/regenerate
-  // должен принимать { shooting_context, stock_platform, ai_provider } из lockedBatchSettings
-  // и возвращать новый metadata объект для одного файла без перезапуска всего batch
+  // регенерация метаданных одного файла без перезапуска всего batch
   regenerateFile: (
     jobId: string,
     fileId: string,

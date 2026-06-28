@@ -24,6 +24,11 @@
   line-height: 1;
 
   &:hover { color: var(--text-primary); }
+
+  &:disabled {
+    color: var(--text-placeholder);
+    cursor: not-allowed;
+  }
 }
 
 .navCount {
@@ -130,6 +135,13 @@
   padding: var(--spacing-sm) 0;
 }
 
+.fieldWrapperRegenerating,
+.fieldWrapperRegenerated {
+  .fieldLabel {
+    color: var(--accent-main);
+  }
+}
+
 .field {
   display: grid;
   grid-template-columns: 1fr;
@@ -222,6 +234,21 @@
   color: var(--accent-main);
 }
 
+.fieldInputRegenerating {
+  border-color: var(--accent-main) !important;
+  color: transparent;
+  animation: regeneratePulse 1s ease-in-out infinite;
+
+  &::placeholder {
+    color: var(--text-secondary);
+  }
+}
+
+.fieldInputRegenerated {
+  border-color: var(--accent-main) !important;
+  animation: regenerateFlash 1.2s ease-out;
+}
+
 .booleanControl {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -237,6 +264,16 @@
 
 .booleanControlError {
   border-color: var(--error-color, #ef4444);
+}
+
+.fieldWrapperRegenerating .booleanControl {
+  border-color: var(--accent-main);
+  animation: regeneratePulse 1s ease-in-out infinite;
+}
+
+.fieldWrapperRegenerated .booleanControl {
+  border-color: var(--accent-main);
+  animation: regenerateFlash 1.2s ease-out;
 }
 
 .booleanOption {
@@ -255,11 +292,36 @@
   &:hover {
     color: var(--text-primary);
   }
+
+  &:disabled {
+    cursor: not-allowed;
+  }
 }
 
 .booleanOptionActive {
   background: var(--accent-main);
   color: var(--text-primary);
+}
+
+@keyframes regeneratePulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.18);
+  }
+
+  50% {
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.28);
+  }
+}
+
+@keyframes regenerateFlash {
+  0% {
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.32);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+  }
 }
 
 @media (max-width: 1024px) {

@@ -46,6 +46,8 @@ interface MetadataFieldProps {
   errors?: Array<{ code: string; message: string }>;
   warnings?: Array<{ code: string; message: string }>;
   stockPlatform?: StockPlatform;
+  isRegenerating?: boolean;
+  wasRegenerated?: boolean;
 }
 
 const MetadataField: React.FC<MetadataFieldProps> = ({
@@ -58,6 +60,8 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
   errors = [],
   warnings = [],
   stockPlatform,
+  isRegenerating = false,
+  wasRegenerated = false,
 }) => {
   const isArray = Array.isArray(value);
   const stringValue = isArray
@@ -74,13 +78,16 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
   );
   const isBoolean =
     typeof value === "boolean" || BOOLEAN_METADATA_FIELDS.has(fieldKey);
+  const inputClassName = `${isRegenerating ? styles.fieldInputRegenerating : ""} ${
+    wasRegenerated ? styles.fieldInputRegenerated : ""
+  }`;
 
   useEffect(() => {
     setEditValue(stringValue);
   }, [stringValue, fieldKey]);
 
   const handleSave = async (nextEditValue = editValue) => {
-    if (!currentJobId) return;
+    if (!currentJobId || isRegenerating) return;
 
     try {
       const saveValue = getMetadataSaveValue(
@@ -102,7 +109,11 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
   };
 
   return (
-    <div className={styles.fieldWrapper}>
+    <div
+      className={`${styles.fieldWrapper} ${
+        isRegenerating ? styles.fieldWrapperRegenerating : ""
+      } ${wasRegenerated ? styles.fieldWrapperRegenerated : ""}`}
+    >
       <div className={styles.field}>
         <label className={`${styles.fieldLabel} ${isEdited ? styles.fieldEdited : ""}`}>
           {label}
@@ -123,12 +134,15 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
                 key={option.value}
                 type="button"
                 className={`${styles.booleanOption} ${
-                  editValue === option.value ? styles.booleanOptionActive : ""
+                  !isRegenerating && editValue === option.value
+                    ? styles.booleanOptionActive
+                    : ""
                 }`}
                 onClick={() => {
                   setEditValue(option.value);
                   handleSave(option.value);
                 }}
+                disabled={isRegenerating}
               >
                 {option.label}
               </button>
@@ -136,17 +150,20 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
           </div>
         ) : (
           <Input
-            value={editValue}
+            value={isRegenerating ? "" : editValue}
             onChange={(e) => setEditValue(e.target.value)}
             onBlur={() => handleSave()}
             hasError={errors.length > 0}
             variant="metadata"
+            disabled={isRegenerating}
+            placeholder={isRegenerating ? "Regenerating..." : undefined}
+            className={inputClassName}
           />
         )}
       </div>
 
       {/* Валидация под полем */}
-      {!hasChanged && errors.length > 0 && (
+      {!isRegenerating && !hasChanged && errors.length > 0 && (
         <div className={styles.fieldValidation}>
           {errors.map((err, index) => (
             <div
@@ -160,7 +177,7 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
         </div>
       )}
 
-      {!hasChanged && warnings.length > 0 && (
+      {!isRegenerating && !hasChanged && warnings.length > 0 && (
         <div className={styles.fieldValidation}>
           {warnings.map((warn, index) => (
             <div
@@ -218,9 +235,7 @@ export const MetadataPreview: React.FC = () => {
   const regenerateFile = useAppStore((state) => state.regenerateFile);
   const regeneratingFileId = useAppStore((state) => state.regeneratingFileId);
   const lockedBatchSettings = useAppStore((state) => state.lockedBatchSettings);
-  const updateJobPreview = useAppStore((state) => state.updateJobPreview);
-  const updateMetadata = useAppStore((state) => state.updateMetadata);
-  const sessionSettings = useAppStore((state) => state.sessionSettings);
+  const isProcessing = useAppStore((state) => state.isProcessing);
 
   const stockOptions = useAppStore((state) => state.stockOptions);
 
@@ -236,6 +251,19 @@ export const MetadataPreview: React.FC = () => {
 
   // навигация — ввод номера вручную
   const [indexInput, setIndexInput] = useState<string | null>(null);
+  const [recentlyRegeneratedFileId, setRecentlyRegeneratedFileId] = useState<
+    string | null
+  >(null);
+
+  useEffect(() => {
+    if (!recentlyRegeneratedFileId) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setRecentlyRegeneratedFileId(null);
+    }, 1400);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [recentlyRegeneratedFileId]);
 
   // выбираем первый completed job автоматически
   useEffect(() => {
@@ -269,43 +297,24 @@ export const MetadataPreview: React.FC = () => {
   const handleRegenerate = async () => {
     if (!job || !currentJobId || !lockedBatchSettings) return;
 
-    // провайдер ОБЯЗАТЕЛЕН
-    if (!sessionSettings.selectedProvider) {
-      addToast("AI provider not selected", "error");
-      return;
-    }
-
-    try {
-      const response = await jobsApi.regenerateFile(currentJobId, job.id, {
-        shooting_context: lockedBatchSettings.shootingContext,
-        stock_platform: lockedBatchSettings.stockPlatform,
-        ai_provider: sessionSettings.selectedProvider,
-      });
-
-      const newMetadata = response.data.metadata;
-
-      // обновляем preview и metadata в store
-      if (newMetadata.preview) {
-        updateJobPreview(job.id, newMetadata.preview);
-      }
-
-      // обновляем legacy metadata
-      updateMetadata(job.id, {
-        title: newMetadata.title ?? "",
-        description: newMetadata.description ?? "",
-        keywords: newMetadata.keywords ?? [],
-      });
-
+    const result = await regenerateFile(job.id, currentJobId);
+    if (result.success) {
+      setRecentlyRegeneratedFileId(job.id);
       addToast("Metadata regenerated", "success");
-    } catch (error) {
-      addToast("Failed to regenerate", "error");
-      console.error("[Regenerate error]:", error);
+    } else {
+      addToast(result.error ?? "Failed to regenerate", "error");
     }
   };
 
   const isRegenerating = regeneratingFileId === job?.id;
+  const wasRegenerated = recentlyRegeneratedFileId === job?.id;
   // Regenerate доступен только когда batch зафиксирован (после processing)
-  const canRegenerate = !!lockedBatchSettings && !!currentJobId;
+  const canRegenerate =
+    !!job &&
+    job.status === "done" &&
+    !!lockedBatchSettings &&
+    !!currentJobId &&
+    !isProcessing;
 
   if (!job) {
     return (
@@ -324,7 +333,8 @@ export const MetadataPreview: React.FC = () => {
   const fieldErrors = job.preview?.errors ?? [];
   const fieldWarnings = job.preview?.warnings ?? [];
   const photoErrors = fieldErrors.filter(
-    (error) => PHOTO_VALIDATION_FIELDS.has(getValidationDisplayField(error.field)),
+    (error) =>
+      PHOTO_VALIDATION_FIELDS.has(getValidationDisplayField(error.field)),
   );
   const photoWarnings = fieldWarnings.filter(
     (warning) =>
@@ -366,6 +376,7 @@ export const MetadataPreview: React.FC = () => {
         <button
           className={styles.navBtn}
           onClick={() => handleNavigate("prev")}
+          disabled={isRegenerating}
         >
           ‹
         </button>
@@ -390,6 +401,7 @@ export const MetadataPreview: React.FC = () => {
         <button
           className={styles.navBtn}
           onClick={() => handleNavigate("next")}
+          disabled={isRegenerating}
         >
           ›
         </button>
@@ -447,6 +459,8 @@ export const MetadataPreview: React.FC = () => {
                 errors={errors}
                 warnings={warnings}
                 stockPlatform={job.preview?.stock_platform}
+                isRegenerating={isRegenerating}
+                wasRegenerated={wasRegenerated}
               />
             );
           })}
@@ -475,6 +489,8 @@ export const MetadataPreview: React.FC = () => {
                 errors={errors}
                 warnings={warnings}
                 stockPlatform={job.preview?.stock_platform}
+                isRegenerating={isRegenerating}
+                wasRegenerated={wasRegenerated}
               />
             );
           })}
