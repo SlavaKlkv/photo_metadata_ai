@@ -61,6 +61,7 @@ export interface ProviderDiscoveryResponse {
 export interface BatchSettings {
   shootingContext: string;
   stockPlatform: StockPlatform;
+  aiProvider?: AIProvider;
   exportFormats: {
     csv: boolean;
     iptc: boolean;

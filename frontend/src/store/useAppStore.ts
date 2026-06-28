@@ -456,25 +456,41 @@ export const useAppStore = create<AppState>()(
     // lockedBatchSettings гарантирует что используется оригинальный shooting context,
     // а не текущий draft — даже если пользователь его уже поменял.
     regenerateFile: async (fileId, currentJobId) => {
-      const { lockedBatchSettings, sessionSettings, updateMetadata } = get();
+      const {
+        lockedBatchSettings,
+        sessionSettings,
+        updateMetadata,
+        updateJobPreview,
+      } = get();
 
       // regenerate доступен только после processing — locked settings обязательны
       if (!lockedBatchSettings) {
         return { success: false, error: "No locked batch settings found" };
       }
 
+      // провайдер ОБЯЗАТЕЛЕН
+      if (!sessionSettings.selectedProvider) {
+        return { success: false, error: "AI provider not selected" };
+      }
+
       set({ regeneratingFileId: fileId });
 
       try {
-        const response = await jobsApi.regenerateFile(currentJobId, fileId, {
-          shooting_context: lockedBatchSettings.shootingContext,
-          stock_platform: lockedBatchSettings.stockPlatform,
-          ai_provider: sessionSettings.selectedProvider ?? "ollama",
-        });
+    // теперь selectedProvider 100% не null
+    const response = await jobsApi.regenerateFile(currentJobId, fileId, {
+      shooting_context: lockedBatchSettings.shootingContext,
+      stock_platform: lockedBatchSettings.stockPlatform,
+      ai_provider: sessionSettings.selectedProvider,
+    });
 
         const newMetadata = response.data?.metadata;
         if (newMetadata) {
           updateMetadata(fileId, newMetadata);
+
+          // обновить preview для stock-specific полей
+          if (newMetadata.preview) {
+            updateJobPreview(fileId, newMetadata.preview);
+          }
         }
 
         return { success: true };
@@ -492,6 +508,6 @@ export const useAppStore = create<AppState>()(
       } finally {
         set({ regeneratingFileId: null });
       }
-    },
+    }
   })),
 );

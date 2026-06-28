@@ -10,6 +10,15 @@ import { Panel } from "../../atoms/Panel/Panel";
 import styles from "./MetadataPreview.module.scss";
 import { SectionHeader } from "../../molecules/SectionHeader/SectionHeader";
 import { Input } from "../../atoms/Input/Input";
+import { FilePreview } from "../../../types";
+
+interface MetadataSaveResult {
+  file_id: string;
+  title?: string;
+  description?: string;
+  keywords?: string[];
+  preview?: FilePreview;
+}
 
 // Вспомогательный компонент для редактируемого поля метаданных
 interface MetadataFieldProps {
@@ -21,6 +30,7 @@ interface MetadataFieldProps {
   currentJobId: string | null;
   errors?: Array<{ code: string; message: string }>;
   warnings?: Array<{ code: string; message: string }>;
+  onSaved: (result: MetadataSaveResult) => void;
 }
 
 const MetadataField: React.FC<MetadataFieldProps> = ({
@@ -32,10 +42,12 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
   currentJobId,
   errors = [],
   warnings = [],
+  onSaved,
 }) => {
   const isArray = Array.isArray(value);
   const stringValue = isArray ? value.join(", ") : String(value || "");
   const [editValue, setEditValue] = useState(stringValue);
+  const hasChanged = editValue !== stringValue;
 
   const addToast = useToastStore((state) => state.addToast);
 
@@ -52,10 +64,11 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
         ? editValue.split(",").map(k => k.trim()).filter(Boolean)
         : editValue;
 
-      await jobsApi.updateMetadata(currentJobId, jobId, {
+      const response = await jobsApi.updateMetadata(currentJobId, jobId, {
         [fieldKey]: saveValue,
       });
 
+      onSaved(response.data);
       addToast("Saved", "success");
     } catch {
       addToast("Failed to save", "error");
@@ -80,7 +93,7 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
       </div>
 
       {/* Валидация под полем */}
-      {errors.length > 0 && (
+      {!hasChanged && errors.length > 0 && (
         <div className={styles.fieldValidation}>
           {errors.map((err) => (
             <div key={err.code} className={styles.validationError}>
@@ -91,7 +104,7 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
         </div>
       )}
 
-      {warnings.length > 0 && (
+      {!hasChanged && warnings.length > 0 && (
         <div className={styles.fieldValidation}>
           {warnings.map((warn) => (
             <div key={warn.code} className={styles.validationWarning}>
@@ -110,6 +123,9 @@ export const MetadataPreview: React.FC = () => {
   const regenerateFile = useAppStore((state) => state.regenerateFile);
   const regeneratingFileId = useAppStore((state) => state.regeneratingFileId);
   const lockedBatchSettings = useAppStore((state) => state.lockedBatchSettings);
+  const updateJobPreview = useAppStore((state) => state.updateJobPreview);
+  const updateMetadata = useAppStore((state) => state.updateMetadata);
+  const sessionSettings = useAppStore((state) => state.sessionSettings);
 
   const stockOptions = useAppStore((state) => state.stockOptions);
 
@@ -156,20 +172,57 @@ export const MetadataPreview: React.FC = () => {
   // Regenerate использует lockedBatchSettings — оригинальные настройки batch,
   // а не текущий draft. Это гарантирует воспроизводимость результата.
   const handleRegenerate = async () => {
-    if (!job || !currentJobId) return;
+    if (!job || !currentJobId || !lockedBatchSettings) return;
 
-    const result = await regenerateFile(job.id, currentJobId);
+    // провайдер ОБЯЗАТЕЛЕН
+    if (!sessionSettings.selectedProvider) {
+      addToast("AI provider not selected", "error");
+      return;
+    }
 
-    if (result.success) {
+    try {
+      const response = await jobsApi.regenerateFile(currentJobId, job.id, {
+        shooting_context: lockedBatchSettings.shootingContext,
+        stock_platform: lockedBatchSettings.stockPlatform,
+        ai_provider: sessionSettings.selectedProvider,
+      });
+
+      const newMetadata = response.data.metadata;
+
+      // обновляем preview и metadata в store
+      if (newMetadata.preview) {
+        updateJobPreview(job.id, newMetadata.preview);
+      }
+
+      // обновляем legacy metadata
+      updateMetadata(job.id, {
+        title: newMetadata.title ?? "",
+        description: newMetadata.description ?? "",
+        keywords: newMetadata.keywords ?? [],
+      });
+
       addToast("Metadata regenerated", "success");
-    } else {
-      addToast(result.error ?? "Failed to regenerate", "error");
+    } catch (error) {
+      addToast("Failed to regenerate", "error");
+      console.error("[Regenerate error]:", error);
     }
   };
 
   const isRegenerating = regeneratingFileId === job?.id;
   // Regenerate доступен только когда batch зафиксирован (после processing)
   const canRegenerate = !!lockedBatchSettings && !!currentJobId;
+
+  const handleMetadataSaved = (result: MetadataSaveResult) => {
+    if (result.preview) {
+      updateJobPreview(result.file_id, result.preview);
+    }
+
+    updateMetadata(result.file_id, {
+      title: result.title ?? "",
+      description: result.description ?? "",
+      keywords: result.keywords ?? [],
+    });
+  };
 
   if (!job) {
     return (
@@ -246,44 +299,50 @@ export const MetadataPreview: React.FC = () => {
         {/* Поля метаданных */}
         <div className={styles.fields}>
           {/* common_fields — всегда показываем */}
-          {job.preview?.common_fields.map((field) => (
-            <MetadataField
-              key={field.key}
-              fieldKey={field.key}
-              label={field.label}
-              value={field.value}
-              isEdited={job.edited_fields?.includes(field.key)}
-              jobId={job.id}
-              currentJobId={currentJobId}
-            />
-          ))}
+          {job.preview?.common_fields.map((field) => {
+            const fieldErrors =
+              job.preview?.errors.filter((e) => e.field === field.key) || [];
+            const fieldWarnings =
+              job.preview?.warnings.filter((w) => w.field === field.key) || [];
+
+            return (
+              <MetadataField
+                key={field.key}
+                fieldKey={field.key}
+                label={field.label}
+                value={field.value}
+                isEdited={job.edited_fields?.includes(field.key)}
+                jobId={job.id}
+                currentJobId={currentJobId}
+                errors={fieldErrors}
+                warnings={fieldWarnings}
+                onSaved={handleMetadataSaved}
+              />
+            );
+          })}
 
           {/* stock_specific.fields — только для выбранного стока */}
-          {job.preview?.stock_specific.fields.map((field) => (
-            <MetadataField
-              key={field.key}
-              fieldKey={field.key}
-              label={field.label}
-              value={field.value}
-              isEdited={job.edited_fields?.includes(field.key)}
-              jobId={job.id}
-              currentJobId={currentJobId}
-            />
-          ))}
+          {job.preview?.stock_specific.fields.map((field) => {
+            const fieldErrors =
+              job.preview?.errors.filter((e) => e.field === field.key) || [];
+            const fieldWarnings =
+              job.preview?.warnings.filter((w) => w.field === field.key) || [];
 
-          {/* Ошибки и предупреждения */}
-          {job.preview?.errors.map((err) => (
-            <div key={err.code} className={styles.validationError}>
-              <Icon name="error-icon" className={styles.validationIcon} />
-              <span>{err.message}</span>
-            </div>
-          ))}
-          {job.preview?.warnings.map((warn) => (
-            <div key={warn.code} className={styles.validationWarning}>
-              <Icon name="info-icon" className={styles.validationIcon} />
-              <span>{warn.message}</span>
-            </div>
-          ))}
+            return (
+              <MetadataField
+                key={field.key}
+                fieldKey={field.key}
+                label={field.label}
+                value={field.value}
+                isEdited={job.edited_fields?.includes(field.key)}
+                jobId={job.id}
+                currentJobId={currentJobId}
+                errors={fieldErrors}
+                warnings={fieldWarnings}
+                onSaved={handleMetadataSaved}
+              />
+            );
+          })}
         </div>
       </div>
 
