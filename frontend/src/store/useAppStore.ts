@@ -604,11 +604,8 @@ export const useAppStore = create<AppState>()(
     // lockedBatchSettings гарантирует что используется оригинальный shooting context,
     // а не текущий draft — даже если пользователь его уже поменял.
     regenerateFile: async (fileId, currentJobId) => {
-      const {
-        lockedBatchSettings,
-        sessionSettings,
-        applyMetadataResult,
-      } = get();
+      const { lockedBatchSettings, sessionSettings, applyMetadataResult } =
+        get();
 
       // regenerate доступен только после processing — locked settings обязательны
       if (!lockedBatchSettings) {
@@ -623,12 +620,11 @@ export const useAppStore = create<AppState>()(
       set({ regeneratingFileId: fileId });
 
       try {
-    // теперь selectedProvider 100% не null
-    const response = await jobsApi.regenerateFile(currentJobId, fileId, {
-      shooting_context: lockedBatchSettings.shootingContext,
-      stock_platform: lockedBatchSettings.stockPlatform,
-      ai_provider: sessionSettings.selectedProvider,
-    });
+        const response = await jobsApi.regenerateFile(currentJobId, fileId, {
+          shooting_context: lockedBatchSettings.shootingContext,
+          stock_platform: lockedBatchSettings.stockPlatform,
+          ai_provider: sessionSettings.selectedProvider,
+        });
 
         const newMetadata = response.data?.metadata;
         if (newMetadata) {
@@ -637,15 +633,15 @@ export const useAppStore = create<AppState>()(
 
         return { success: true };
       } catch (err: unknown) {
-        // TODO(backend): убрать mock когда появится реальный endpoint
-        // Пока endpoint не реализован — логируем и возвращаем ошибку наверх
-        console.warn(
-          "[regenerateFile] Backend endpoint not yet implemented:",
-          err,
-        );
+        console.warn("[regenerateFile] Failed:", err);
+
+        const responseDetail = (
+          err as { response?: { data?: { detail?: string } } }
+        ).response?.data?.detail;
+
         return {
           success: false,
-          error: "Regenerate is not yet available. Backend endpoint pending.",
+          error: responseDetail ?? "Failed to regenerate metadata",
         };
       } finally {
         set({ regeneratingFileId: null });
