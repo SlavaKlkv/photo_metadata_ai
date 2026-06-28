@@ -67,7 +67,40 @@ def test_review_patch_persists_edits_and_remaps_preview():
     assert first_result['field_sources']['keywords'] == 'edited'
     assert first_result['field_sources']['categories'] == 'edited'
     assert first_result['preview']['stock_platform'] == 'adobe_stock'
-    assert first_result['preview']['stock_specific']['fields']
+    stock_fields = {
+        field['label']: field
+        for field in first_result['preview']['stock_specific']['fields']
+    }
+    assert stock_fields['Category']['key'] == 'categories'
+    assert stock_fields['Category']['value'] == 'Animals'
+
+
+def test_review_patch_editorial_false_clears_editorial_required_errors():
+    job = _build_completed_job()
+    job.stock_platform = StockPlatform.GETTY_IMAGES
+    first_file = job.files[0]
+    first_file.is_editorial = True
+    first_file.license_type = 'editorial'
+    first_file.editorial_date = None
+    first_file.location_metadata = None
+    first_file.editorial_caption = 'Generated editorial caption'
+
+    with TestClient(app) as client:
+        response = client.patch(
+            f'/api/v1/jobs/{job.job_id}/files/{first_file.file_id}/metadata',
+            json={'is_editorial': False},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    blocking_fields = {
+        (error['field'], error['code'])
+        for error in payload['preview']['errors']
+    }
+    assert payload['is_editorial'] is False
+    assert payload['license_type'] == 'creative'
+    assert ('editorial_date', 'required') not in blocking_fields
+    assert ('location_metadata', 'required') not in blocking_fields
 
 
 def test_csv_export_uses_latest_metadata_and_skips_unselected_files():
@@ -311,7 +344,8 @@ def test_regenerate_saves_attempt_history_and_keeps_other_files_unchanged(
     assert payload['previous_metadata']['title'] == (
         'Edited title before regenerate'
     )
-    assert payload['metadata']['title'] == 'Regenerated title'
+    assert payload['metadata']['title'].startswith('Regenerated title')
+    assert len(payload['metadata']['title'].split()) >= 5
 
     stored_first_file = job_response.json()['files'][0]
     stored_second_file = job_response.json()['files'][1]

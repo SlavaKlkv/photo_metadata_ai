@@ -1,9 +1,10 @@
 // frontend/src/components/organisms/MetadataPreview/MetadataPreview.tsx
 import React, { useState, useEffect } from "react";
-import { useAppStore } from "../../../store/useAppStore";
-import { useUIStore } from "../../../store/useUIStore";
-import { useToastStore } from "../../../store/useToastStore";
-import { jobsApi } from "../../../services/api/api";
+import { useAppStore } from "store/useAppStore";
+import { useUIStore } from "store/useUIStore";
+import { useToastStore } from "store/useToastStore";
+import { jobsApi } from "services/api/api";
+import { PreviewFieldValue, StockPlatform } from "types";
 import { Button } from "../../atoms/Button/Button";
 import { Icon } from "../../atoms/Icon/Icon";
 import { Panel } from "../../atoms/Panel/Panel";
@@ -20,17 +21,27 @@ interface MetadataSaveResult {
   preview?: FilePreview;
 }
 
+const BOOLEAN_METADATA_FIELDS = new Set([
+  "is_editorial",
+  "has_people",
+  "model_release_available",
+  "ai_generated_content_disclosure",
+  "is_illustration",
+  "mature_content",
+  "iptc_embedded_metadata",
+]);
+
 // Вспомогательный компонент для редактируемого поля метаданных
 interface MetadataFieldProps {
   fieldKey: string;
   label: string;
-  value: string | string[];
+  value: PreviewFieldValue;
   isEdited?: boolean;
   jobId: string;
   currentJobId: string | null;
   errors?: Array<{ code: string; message: string }>;
   warnings?: Array<{ code: string; message: string }>;
-  onSaved: (result: MetadataSaveResult) => void;
+  stockPlatform?: StockPlatform;
 }
 
 const MetadataField: React.FC<MetadataFieldProps> = ({
@@ -42,33 +53,44 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
   currentJobId,
   errors = [],
   warnings = [],
-  onSaved,
+  stockPlatform,
 }) => {
   const isArray = Array.isArray(value);
-  const stringValue = isArray ? value.join(", ") : String(value || "");
+  const stringValue = isArray
+    ? value.join(", ")
+    : value === null
+      ? ""
+      : String(value);
   const [editValue, setEditValue] = useState(stringValue);
   const hasChanged = editValue !== stringValue;
 
   const addToast = useToastStore((state) => state.addToast);
+  const applyMetadataResult = useAppStore(
+    (state) => state.applyMetadataResult,
+  );
+  const isBoolean =
+    typeof value === "boolean" || BOOLEAN_METADATA_FIELDS.has(fieldKey);
 
   useEffect(() => {
     setEditValue(stringValue);
   }, [stringValue, fieldKey]);
 
-  const handleSave = async () => {
+  const handleSave = async (nextEditValue = editValue) => {
     if (!currentJobId) return;
 
     try {
-      // если было массивом — парсим обратно в массив
-      const saveValue = isArray
-        ? editValue.split(",").map(k => k.trim()).filter(Boolean)
-        : editValue;
+      const saveValue = getMetadataSaveValue(
+        fieldKey,
+        nextEditValue,
+        value,
+      );
 
       const response = await jobsApi.updateMetadata(currentJobId, jobId, {
         [fieldKey]: saveValue,
+        stock_platform: stockPlatform,
       });
 
-      onSaved(response.data);
+      applyMetadataResult(jobId, response.data);
       addToast("Saved", "success");
     } catch {
       addToast("Failed to save", "error");
@@ -83,20 +105,50 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
         </label>
 
         {/* Input это textarea — используем везде */}
-        <Input
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onBlur={handleSave}
-          hasError={errors.length > 0}
-          variant="metadata"
-        />
+        {isBoolean ? (
+          <div
+            className={`${styles.booleanControl} ${
+              errors.length > 0 ? styles.booleanControlError : ""
+            }`}
+          >
+            {[
+              { label: "Yes", value: "true" },
+              { label: "No", value: "false" },
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`${styles.booleanOption} ${
+                  editValue === option.value ? styles.booleanOptionActive : ""
+                }`}
+                onClick={() => {
+                  setEditValue(option.value);
+                  handleSave(option.value);
+                }}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <Input
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={() => handleSave()}
+            hasError={errors.length > 0}
+            variant="metadata"
+          />
+        )}
       </div>
 
       {/* Валидация под полем */}
       {!hasChanged && errors.length > 0 && (
         <div className={styles.fieldValidation}>
-          {errors.map((err) => (
-            <div key={err.code} className={styles.validationError}>
+          {errors.map((err, index) => (
+            <div
+              key={`${fieldKey}-${err.code}-${index}`}
+              className={styles.validationError}
+            >
               <Icon name="error-icon" className={styles.validationIcon} />
               <span>{err.message}</span>
             </div>
@@ -106,8 +158,11 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
 
       {!hasChanged && warnings.length > 0 && (
         <div className={styles.fieldValidation}>
-          {warnings.map((warn) => (
-            <div key={warn.code} className={styles.validationWarning}>
+          {warnings.map((warn, index) => (
+            <div
+              key={`${fieldKey}-${warn.code}-${index}`}
+              className={styles.validationWarning}
+            >
               <Icon name="info-icon" className={styles.validationIcon} />
               <span>{warn.message}</span>
             </div>
@@ -116,6 +171,42 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
       )}
     </div>
   );
+};
+
+const getMetadataSaveValue = (
+  fieldKey: string,
+  editValue: string,
+  originalValue: PreviewFieldValue,
+) => {
+  if (fieldKey === "categories") {
+    const category = editValue.trim();
+    return category ? [category] : [];
+  }
+
+  if (Array.isArray(originalValue)) {
+    return editValue
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  if (
+    typeof originalValue === "boolean" ||
+    BOOLEAN_METADATA_FIELDS.has(fieldKey)
+  ) {
+    const normalizedValue = editValue.trim().toLowerCase();
+
+    if (["true", "yes", "1"].includes(normalizedValue)) return true;
+    if (["false", "no", "0", ""].includes(normalizedValue)) return false;
+  }
+
+  if (typeof originalValue === "number") {
+    const normalizedValue = editValue.trim();
+
+    return normalizedValue ? Number(normalizedValue) : null;
+  }
+
+  return editValue;
 };
 
 export const MetadataPreview: React.FC = () => {
@@ -299,50 +390,52 @@ export const MetadataPreview: React.FC = () => {
         {/* Поля метаданных */}
         <div className={styles.fields}>
           {/* common_fields — всегда показываем */}
-          {job.preview?.common_fields.map((field) => {
-            const fieldErrors =
-              job.preview?.errors.filter((e) => e.field === field.key) || [];
-            const fieldWarnings =
-              job.preview?.warnings.filter((w) => w.field === field.key) || [];
-
-            return (
-              <MetadataField
-                key={field.key}
-                fieldKey={field.key}
-                label={field.label}
-                value={field.value}
-                isEdited={job.edited_fields?.includes(field.key)}
-                jobId={job.id}
-                currentJobId={currentJobId}
-                errors={fieldErrors}
-                warnings={fieldWarnings}
-                onSaved={handleMetadataSaved}
-              />
-            );
-          })}
+          {job.preview?.common_fields.map((field) => (
+            <MetadataField
+              key={field.key}
+              fieldKey={field.key}
+              label={field.label}
+              value={field.value}
+              isEdited={job.edited_fields?.includes(field.key)}
+              jobId={job.id}
+              currentJobId={currentJobId}
+              stockPlatform={job.preview?.stock_platform}
+            />
+          ))}
 
           {/* stock_specific.fields — только для выбранного стока */}
-          {job.preview?.stock_specific.fields.map((field) => {
-            const fieldErrors =
-              job.preview?.errors.filter((e) => e.field === field.key) || [];
-            const fieldWarnings =
-              job.preview?.warnings.filter((w) => w.field === field.key) || [];
+          {job.preview?.stock_specific.fields.map((field) => (
+            <MetadataField
+              key={field.key}
+              fieldKey={field.key}
+              label={field.label}
+              value={field.value}
+              isEdited={job.edited_fields?.includes(field.key)}
+              jobId={job.id}
+              currentJobId={currentJobId}
+              stockPlatform={job.preview?.stock_platform}
+            />
+          ))}
 
-            return (
-              <MetadataField
-                key={field.key}
-                fieldKey={field.key}
-                label={field.label}
-                value={field.value}
-                isEdited={job.edited_fields?.includes(field.key)}
-                jobId={job.id}
-                currentJobId={currentJobId}
-                errors={fieldErrors}
-                warnings={fieldWarnings}
-                onSaved={handleMetadataSaved}
-              />
-            );
-          })}
+          {/* Ошибки и предупреждения */}
+          {job.preview?.errors.map((err, index) => (
+            <div
+              key={`${err.field}-${err.code}-${index}`}
+              className={styles.validationError}
+            >
+              <Icon name="error-icon" className={styles.validationIcon} />
+              <span>{err.message}</span>
+            </div>
+          ))}
+          {job.preview?.warnings.map((warn, index) => (
+            <div
+              key={`${warn.field}-${warn.code}-${index}`}
+              className={styles.validationWarning}
+            >
+              <Icon name="info-icon" className={styles.validationIcon} />
+              <span>{warn.message}</span>
+            </div>
+          ))}
         </div>
       </div>
 

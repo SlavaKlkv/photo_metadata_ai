@@ -114,6 +114,13 @@
 }
 
 /* API key input */
+.apiKeyRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
 .apiKeyInput {
   width: 100%;
   height: 40px;
@@ -136,8 +143,20 @@
   }
 }
 
+.apiKeySaveButton {
+  height: 40px;
+  white-space: nowrap;
+}
+
 .apiKeyInputError {
   border-color: var(--error-color, #ef4444);
+}
+
+.apiKeyErrorText {
+  margin: -2px 0 0;
+  color: var(--error-color, #ef4444);
+  font-size: var(--font-size-xs, 12px);
+  line-height: 1.4;
 }
 
 /* Footer под input для cloud провайдеров */

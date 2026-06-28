@@ -53,9 +53,13 @@ from app.services.export.export import (
     ensure_job_exports,
     run_job_export,
 )
+from app.services.metadata.stock_autofix import apply_stock_metadata_autofixes
 from app.services.metadata.stock_mapping import build_stock_mapped_metadata
 from app.services.metadata.stock_preview import build_stock_aware_preview
-from app.services.metadata.stock_rules import get_stock_field_options
+from app.services.metadata.stock_rules import (
+    get_stock_field_options,
+    get_stock_rules,
+)
 from app.services.metadata.stock_validation import (
     validate_file_metadata_for_stock,
 )
@@ -353,7 +357,11 @@ async def regenerate_file_metadata(
         resolved_shooting_context,
         resolved_stock_platform,
     )
-    apply_generated_metadata_to_file(job_file, regenerate_result.metadata)
+    apply_generated_metadata_to_file(
+        job_file,
+        regenerate_result.metadata,
+        resolved_stock_platform,
+    )
     job_file.status = FileStatus.COMPLETED
 
     regenerated_snapshot = _build_metadata_snapshot(job_file)
@@ -365,6 +373,8 @@ async def regenerate_file_metadata(
         regenerated_metadata=regenerated_snapshot,
     )
     job_file.regenerate_attempts.append(regenerate_attempt)
+    job.effective_ai_provider = regenerate_result.provider
+    job.effective_ai_model = regenerate_result.model
 
     await storage.update_job(job)
 
@@ -372,6 +382,8 @@ async def regenerate_file_metadata(
         job_id=job.job_id,
         file_id=job_file.file_id,
         attempt_id=regenerate_attempt.attempt_id,
+        ai_provider=regenerate_result.provider,
+        ai_model=regenerate_result.model,
         metadata=_build_metadata_result(job_file, resolved_stock_platform),
         previous_metadata=previous_metadata,
     )
@@ -453,6 +465,8 @@ async def get_job_status(job_id: UUID):
     return ProcessingJobStatus(
         job_id=job.job_id,
         status=job.status,
+        effective_ai_provider=job.effective_ai_provider,
+        effective_ai_model=job.effective_ai_model,
         files=[
             # Polling-ответ включает только поля для обновления прогресса
             # в UI и отображения ошибок отдельных файлов.
@@ -563,6 +577,12 @@ async def update_file_metadata(
             detail='File not found',
         )
 
+    stock_platform = (
+        payload.stock_platform
+        or job.stock_platform
+        or StockPlatform.SHUTTERSTOCK
+    )
+
     # PATCH обновляет только поля, которые прислал фронтенд.
     if 'title' in payload.model_fields_set:
         job_file.title = payload.title
@@ -601,6 +621,11 @@ async def update_file_metadata(
     if 'is_editorial' in payload.model_fields_set:
         job_file.is_editorial = bool(payload.is_editorial)
         job_file.field_sources['is_editorial'] = MetadataFieldSource.EDITED
+        _sync_license_type_with_editorial_choice(
+            job_file,
+            stock_platform,
+            payload,
+        )
     if 'editorial_caption' in payload.model_fields_set:
         job_file.editorial_caption = payload.editorial_caption
         job_file.field_sources['editorial_caption'] = (
@@ -636,9 +661,9 @@ async def update_file_metadata(
             MetadataFieldSource.EDITED
         )
 
-    await storage.update_job(job)
+    apply_stock_metadata_autofixes(job_file, stock_platform)
 
-    stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
+    await storage.update_job(job)
 
     return _build_metadata_result(job_file, stock_platform)
 
@@ -971,6 +996,37 @@ def _build_metadata_result(
         error_message=file.error_message,
         validation=validation,
     )
+
+
+def _sync_license_type_with_editorial_choice(
+    file: ProcessingJobFile,
+    stock_platform: StockPlatform,
+    payload: UpdateProcessingJobMetadataRequest,
+) -> None:
+    if 'license_type' in payload.model_fields_set:
+        return
+
+    rules = get_stock_rules(stock_platform)
+    is_editorial = bool(payload.is_editorial)
+    license_type = None
+
+    if is_editorial and 'editorial' in rules.license_types:
+        license_type = 'editorial'
+    elif not is_editorial:
+        license_type = next(
+            (
+                candidate
+                for candidate in rules.license_types
+                if candidate != 'editorial'
+            ),
+            None,
+        )
+
+    if license_type is None or file.license_type == license_type:
+        return
+
+    file.license_type = license_type
+    file.field_sources['license_type'] = MetadataFieldSource.EDITED
 
 
 def _sort_result_files(

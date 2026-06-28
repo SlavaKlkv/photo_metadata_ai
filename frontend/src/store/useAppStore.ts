@@ -26,6 +26,10 @@ const defaultBatchSettings: BatchSettings = {
   },
 };
 
+interface ProviderDiscoveryOptions {
+  silent?: boolean;
+}
+
 export interface AppState {
   jobs: ProcessingJob[];
   sessionSettings: SessionSettings;
@@ -45,6 +49,19 @@ export interface AppState {
 
   // обновить preview конкретного файла после смены стока
   updateJobPreview: (fileId: string, preview: FilePreview) => void;
+  applyMetadataResult: (
+    fileId: string,
+    result: {
+      title?: string;
+      description?: string;
+      keywords?: string[];
+      selected_for_export?: boolean;
+      field_sources?: ProcessingJob["field_sources"];
+      edited_fields?: string[];
+      preview?: FilePreview;
+      error_message?: string | null;
+    },
+  ) => void;
 
   // сменить сток и перезапросить results + stock-options
   switchStockPlatform: (
@@ -59,6 +76,8 @@ export interface AppState {
     error?: string,
   ) => void;
   updateMetadata: (jobId: string, metadata: ProcessingJob["metadata"]) => void;
+  updateJobSelection: (jobId: string, selectedForExport: boolean) => void;
+  updateAllJobsSelection: (selectedForExport: boolean) => void;
   removeJob: (jobId: string) => void;
 
   updateSessionSetting: (
@@ -66,7 +85,7 @@ export interface AppState {
     value: SessionSettings[keyof SessionSettings],
   ) => void;
   setSelectedProvider: (provider: AIProvider | null) => void;
-  discoverProviders: () => Promise<void>;
+  discoverProviders: (options?: ProviderDiscoveryOptions) => Promise<void>;
   updateDraftBatchSetting: <K extends keyof BatchSettings>(
     key: K,
     value: BatchSettings[K],
@@ -96,6 +115,10 @@ export interface AppState {
 
   completeOnboarding: () => void;
   updateProviderApiKey: (provider: string, key: string) => void;
+  saveProviderApiKey: (
+    provider: AIProvider,
+    key: string,
+  ) => Promise<{ success: boolean; error?: string }>;
 
   // regenerate одного файла, используя lockedBatchSettings — не дёргает весь batch
   regeneratingFileId: string | null;
@@ -148,6 +171,25 @@ export const useAppStore = create<AppState>()(
       }));
     },
 
+    updateJobSelection: (jobId, selectedForExport) => {
+      set((state) => ({
+        jobs: state.jobs.map((job) =>
+          job.id === jobId
+            ? { ...job, selected_for_export: selectedForExport }
+            : job,
+        ),
+      }));
+    },
+
+    updateAllJobsSelection: (selectedForExport) => {
+      set((state) => ({
+        jobs: state.jobs.map((job) => ({
+          ...job,
+          selected_for_export: selectedForExport,
+        })),
+      }));
+    },
+
     removeJob: (jobId: string) => {
       set((state) => ({
         jobs: state.jobs.filter((job) => job.id !== jobId),
@@ -172,8 +214,15 @@ export const useAppStore = create<AppState>()(
       }));
     },
 
-    discoverProviders: async () => {
-      set({ providerDiscoveryStatus: "loading", providerDiscoveryError: null });
+    discoverProviders: async (options = {}) => {
+      const isSilent = options.silent === true;
+
+      if (!isSilent) {
+        set({
+          providerDiscoveryStatus: "loading",
+          providerDiscoveryError: null,
+        });
+      }
 
       try {
         const response = await jobsApi.providerDiscovery();
@@ -190,7 +239,9 @@ export const useAppStore = create<AppState>()(
           displayName: item.display_name,
           ready: item.ready,
           status: item.status,
+          source: item.source,
           reason: item.reason,
+          reason_code: item.reason_code,
           hints: item.hints ?? [],
           configured: item.configured ?? false,
           local: item.local ?? false,
@@ -243,6 +294,11 @@ export const useAppStore = create<AppState>()(
         const errorMsg =
           error instanceof Error ? error.message : "Provider discovery failed";
         console.error("[Provider Discovery] Error:", errorMsg, error);
+
+        if (isSilent) {
+          set({ providerDiscoveryError: errorMsg });
+          return;
+        }
 
         set({
           providerDiscoveryStatus: "error",
@@ -407,6 +463,68 @@ export const useAppStore = create<AppState>()(
       }));
     },
 
+    saveProviderApiKey: async (provider, key) => {
+      if (provider !== "gemini" && provider !== "openrouter") {
+        return {
+          success: false,
+          error: "Provider does not support API keys",
+        };
+      }
+
+      const normalizedKey = key.trim();
+
+      if (!normalizedKey) {
+        return {
+          success: false,
+          error: "API key is required",
+        };
+      }
+
+      try {
+        const response = await jobsApi.validateAndSaveProviderApiKey(
+          provider,
+          normalizedKey,
+        );
+
+        if (!response.data?.valid || !response.data?.saved) {
+          return {
+            success: false,
+            error: response.data?.message ?? "Invalid API key",
+          };
+        }
+
+        set((state) => ({
+          sessionSettings: {
+            ...state.sessionSettings,
+            selectedProvider: provider,
+          },
+          manualProviderApiKeys: {
+            ...state.manualProviderApiKeys,
+            [provider]: "",
+          },
+        }));
+
+        await get().discoverProviders({ silent: true });
+
+        return { success: true };
+      } catch (error: unknown) {
+        const responseStatus = (
+          error as { response?: { status?: number } }
+        ).response?.status;
+        const errorMessage =
+          responseStatus !== undefined &&
+          responseStatus >= 400 &&
+          responseStatus < 500
+            ? "invalid key"
+            : "Failed to validate API key";
+
+        return {
+          success: false,
+          error: errorMessage,
+        };
+      }
+    },
+
     setStockOptions: (options) => {
       set({ stockOptions: options });
     },
@@ -416,6 +534,36 @@ export const useAppStore = create<AppState>()(
         jobs: state.jobs.map((job) =>
           job.id === fileId ? { ...job, preview } : job,
         ),
+      }));
+    },
+
+    applyMetadataResult: (fileId, result) => {
+      set((state) => ({
+        jobs: state.jobs.map((job) => {
+          if (job.id !== fileId) return job;
+
+          const title = result.title ?? job.title;
+          const description = result.description ?? job.description;
+          const keywords = result.keywords ?? job.keywords;
+
+          return {
+            ...job,
+            title,
+            description,
+            keywords,
+            selected_for_export:
+              result.selected_for_export ?? job.selected_for_export,
+            field_sources: result.field_sources ?? job.field_sources,
+            edited_fields: result.edited_fields ?? job.edited_fields,
+            preview: result.preview ?? job.preview,
+            error: result.error_message ?? job.error,
+            metadata: {
+              title: title ?? job.metadata?.title ?? "",
+              description: description ?? job.metadata?.description ?? "",
+              keywords: keywords ?? job.metadata?.keywords ?? [],
+            },
+          };
+        }),
       }));
     },
 
@@ -459,8 +607,7 @@ export const useAppStore = create<AppState>()(
       const {
         lockedBatchSettings,
         sessionSettings,
-        updateMetadata,
-        updateJobPreview,
+        applyMetadataResult,
       } = get();
 
       // regenerate доступен только после processing — locked settings обязательны
@@ -485,12 +632,7 @@ export const useAppStore = create<AppState>()(
 
         const newMetadata = response.data?.metadata;
         if (newMetadata) {
-          updateMetadata(fileId, newMetadata);
-
-          // обновить preview для stock-specific полей
-          if (newMetadata.preview) {
-            updateJobPreview(fileId, newMetadata.preview);
-          }
+          applyMetadataResult(fileId, newMetadata);
         }
 
         return { success: true };

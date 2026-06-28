@@ -14,6 +14,7 @@ from app.storage.jobs import storage
 def isolate_runtime_workspace(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(settings, 'WORKSPACE_DIR', tmp_path)
     monkeypatch.setattr(settings, 'DESKTOP_WORKSPACE_DIR', None)
+    monkeypatch.setattr(settings, 'DESKTOP_STORAGE_DIR', tmp_path)
     monkeypatch.setattr(settings, 'DESKTOP_RESULTS_DIR', tmp_path / 'results')
     reset_runtime_directories_cache()
     _reset_job_storage()

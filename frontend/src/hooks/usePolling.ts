@@ -1,9 +1,9 @@
 // frontend/src/hooks/usePolling.ts
 import { useEffect, useRef } from 'react';
-import { useAppStore } from '../store/useAppStore';
-import { useUIStore } from '../store/useUIStore';
-import { jobsApi } from '../services/api/api';
-import { StockPlatform } from '../types';
+import { jobsApi } from 'services/api/api';
+import { useAppStore } from 'store/useAppStore';
+import { useUIStore } from 'store/useUIStore';
+import type { StockPlatform } from 'types';
 
 
 const POLLING_INTERVAL = 2000;

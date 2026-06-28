@@ -1,19 +1,27 @@
 // frontend/src/components/organisms/ResultsTable/ResultsTable.tsx
 import React, { useState } from 'react';
-import { useAppStore } from '../../../store/useAppStore';
-import { useUIStore } from '../../../store/useUIStore';
-import { ResultRow } from '../../molecules/ResultRow/ResultRow';
-import { Checkbox } from '../../atoms/Checkbox/Checkbox';
-import { Panel } from '../../atoms/Panel/Panel';
+import { useAppStore } from 'store/useAppStore';
+import { useUIStore } from 'store/useUIStore';
+import { jobsApi } from 'services/api/api';
+import { ResultRow } from 'components/molecules/ResultRow/ResultRow';
+import { Checkbox } from 'components/atoms/Checkbox/Checkbox';
+import { Panel } from 'components/atoms/Panel/Panel';
 import styles from './ResultsTable.module.scss';
-import { SectionHeader } from '../../molecules/SectionHeader/SectionHeader';
+import { SectionHeader } from 'components/molecules/SectionHeader/SectionHeader';
 
 export const ResultsTable: React.FC = () => {
   const jobs = useAppStore((state) => state.jobs);
-  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  const updateJobSelection = useAppStore((state) => state.updateJobSelection);
+  const updateAllJobsSelection = useAppStore(
+    (state) => state.updateAllJobsSelection,
+  );
+  const currentJobId = useUIStore((state) => state.currentJobId);
   const visibleJobs = jobs; // отображаем все, даже с ошибкой, чтобы можно было выбрать и посмотреть превью и ошибку
+  const selectedCount = visibleJobs.filter(
+    (job) => job.selected_for_export !== false,
+  ).length;
   const allChecked =
-    checkedIds.size === visibleJobs.length && visibleJobs.length > 0;
+    selectedCount === visibleJobs.length && visibleJobs.length > 0;
   // локальный стейт пагинации — не в batch state, сбрасывается при смене данных
   const PAGE_SIZE = 10;
   const [currentPage, setCurrentPage] = useState(1);
@@ -26,17 +34,31 @@ export const ResultsTable: React.FC = () => {
   const setSelectedJobId = useUIStore((state) => state.setSelectedJobId);
   const previews = useAppStore((state) => state.previews);
 
+  const handleCheckAll = async (checked: boolean) => {
+    if (!currentJobId) return;
 
-  const handleCheckAll = (checked: boolean) => {
-    setCheckedIds(checked ? new Set(visibleJobs.map((j) => j.id)) : new Set());
+    updateAllJobsSelection(checked);
+
+    try {
+      await jobsApi.updateSelection(currentJobId, checked);
+    } catch {
+      updateAllJobsSelection(!checked);
+    }
   };
 
-  const handleCheck = (id: string, checked: boolean) => {
-    setCheckedIds((prev) => {
-      const next = new Set(prev);
-      checked ? next.add(id) : next.delete(id);
-      return next;
-    });
+  const handleCheck = async (id: string, checked: boolean) => {
+    if (!currentJobId) return;
+
+    updateJobSelection(id, checked);
+
+    try {
+      const { data } = await jobsApi.updateMetadata(currentJobId, id, {
+        selected_for_export: checked,
+      });
+      updateJobSelection(id, data.selected_for_export ?? checked);
+    } catch {
+      updateJobSelection(id, !checked);
+    }
   };
 
   return (
@@ -69,7 +91,7 @@ export const ResultsTable: React.FC = () => {
             job={job}
             previewUrl={previews[job.id]}
             isSelected={selectedJobId === job.id}
-            isChecked={checkedIds.has(job.id)}
+            isChecked={job.selected_for_export !== false}
             onSelect={setSelectedJobId}
             onCheck={handleCheck}
           />
@@ -79,8 +101,8 @@ export const ResultsTable: React.FC = () => {
       {/* Футер */}
       <div className={styles.footer}>
         <div className={styles.footerLeft}>
-          <span>{checkedIds.size} selected</span>
-          {checkedIds.size < visibleJobs.length && (
+          <span>{selectedCount} selected</span>
+          {selectedCount < visibleJobs.length && (
             <button
               className={styles.selectAll}
               onClick={() => handleCheckAll(true)}
