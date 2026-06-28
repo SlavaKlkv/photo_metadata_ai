@@ -11,15 +11,11 @@ import { Panel } from "../../atoms/Panel/Panel";
 import styles from "./MetadataPreview.module.scss";
 import { SectionHeader } from "../../molecules/SectionHeader/SectionHeader";
 import { Input } from "../../atoms/Input/Input";
-import { FilePreview } from "../../../types";
-
-interface MetadataSaveResult {
-  file_id: string;
-  title?: string;
-  description?: string;
-  keywords?: string[];
-  preview?: FilePreview;
-}
+type ValidationMessage = {
+  field: string;
+  code: string;
+  message: string;
+};
 
 const BOOLEAN_METADATA_FIELDS = new Set([
   "is_editorial",
@@ -30,6 +26,14 @@ const BOOLEAN_METADATA_FIELDS = new Set([
   "mature_content",
   "iptc_embedded_metadata",
 ]);
+
+const PHOTO_VALIDATION_FIELDS = new Set(["image", "photo", "file"]);
+
+const getValidationDisplayField = (field: string) => {
+  if (field === "model_release_available") return "releases";
+
+  return field;
+};
 
 // Вспомогательный компонент для редактируемого поля метаданных
 interface MetadataFieldProps {
@@ -303,18 +307,6 @@ export const MetadataPreview: React.FC = () => {
   // Regenerate доступен только когда batch зафиксирован (после processing)
   const canRegenerate = !!lockedBatchSettings && !!currentJobId;
 
-  const handleMetadataSaved = (result: MetadataSaveResult) => {
-    if (result.preview) {
-      updateJobPreview(result.file_id, result.preview);
-    }
-
-    updateMetadata(result.file_id, {
-      title: result.title ?? "",
-      description: result.description ?? "",
-      keywords: result.keywords ?? [],
-    });
-  };
-
   if (!job) {
     return (
       <Panel className={styles.panel}>
@@ -324,6 +316,41 @@ export const MetadataPreview: React.FC = () => {
   }
 
   const displayIndex = currentIndex >= 0 ? currentIndex + 1 : 1;
+  const previewFields = [
+    ...(job.preview?.common_fields ?? []),
+    ...(job.preview?.stock_specific.fields ?? []),
+  ];
+  const previewFieldKeys = new Set(previewFields.map((field) => field.key));
+  const fieldErrors = job.preview?.errors ?? [];
+  const fieldWarnings = job.preview?.warnings ?? [];
+  const photoErrors = fieldErrors.filter(
+    (error) => PHOTO_VALIDATION_FIELDS.has(getValidationDisplayField(error.field)),
+  );
+  const photoWarnings = fieldWarnings.filter(
+    (warning) =>
+      PHOTO_VALIDATION_FIELDS.has(getValidationDisplayField(warning.field)),
+  );
+
+  const renderValidationMessages = (
+    messages: ValidationMessage[],
+    type: "error" | "warning",
+  ) =>
+    messages.map((message, index) => (
+      <div
+        key={`${message.field}-${message.code}-${index}`}
+        className={
+          type === "error"
+            ? styles.validationError
+            : styles.validationWarning
+        }
+      >
+        <Icon
+          name={type === "error" ? "error-icon" : "info-icon"}
+          className={styles.validationIcon}
+        />
+        <span>{message.message}</span>
+      </div>
+    ));
 
   return (
     <Panel className={styles.panel} direction="column" gap="md">
@@ -387,55 +414,70 @@ export const MetadataPreview: React.FC = () => {
         {/* Filename */}
         <div className={styles.filename}>{job.originalFilename}</div>
 
+        {(photoErrors.length > 0 || photoWarnings.length > 0) && (
+          <div className={styles.photoValidation}>
+            {renderValidationMessages(photoErrors, "error")}
+            {renderValidationMessages(photoWarnings, "warning")}
+          </div>
+        )}
+
         {/* Поля метаданных */}
         <div className={styles.fields}>
           {/* common_fields — всегда показываем */}
-          {job.preview?.common_fields.map((field) => (
-            <MetadataField
-              key={field.key}
-              fieldKey={field.key}
-              label={field.label}
-              value={field.value}
-              isEdited={job.edited_fields?.includes(field.key)}
-              jobId={job.id}
-              currentJobId={currentJobId}
-              stockPlatform={job.preview?.stock_platform}
-            />
-          ))}
+          {job.preview?.common_fields.map((field) => {
+            const errors =
+              job.preview?.errors.filter(
+                (error) => getValidationDisplayField(error.field) === field.key,
+              ) ?? [];
+            const warnings =
+              job.preview?.warnings.filter(
+                (warning) =>
+                  getValidationDisplayField(warning.field) === field.key,
+              ) ?? [];
+
+            return (
+              <MetadataField
+                key={field.key}
+                fieldKey={field.key}
+                label={field.label}
+                value={field.value}
+                isEdited={job.edited_fields?.includes(field.key)}
+                jobId={job.id}
+                currentJobId={currentJobId}
+                errors={errors}
+                warnings={warnings}
+                stockPlatform={job.preview?.stock_platform}
+              />
+            );
+          })}
 
           {/* stock_specific.fields — только для выбранного стока */}
-          {job.preview?.stock_specific.fields.map((field) => (
-            <MetadataField
-              key={field.key}
-              fieldKey={field.key}
-              label={field.label}
-              value={field.value}
-              isEdited={job.edited_fields?.includes(field.key)}
-              jobId={job.id}
-              currentJobId={currentJobId}
-              stockPlatform={job.preview?.stock_platform}
-            />
-          ))}
+          {job.preview?.stock_specific.fields.map((field) => {
+            const errors =
+              job.preview?.errors.filter(
+                (error) => getValidationDisplayField(error.field) === field.key,
+              ) ?? [];
+            const warnings =
+              job.preview?.warnings.filter(
+                (warning) =>
+                  getValidationDisplayField(warning.field) === field.key,
+              ) ?? [];
 
-          {/* Ошибки и предупреждения */}
-          {job.preview?.errors.map((err, index) => (
-            <div
-              key={`${err.field}-${err.code}-${index}`}
-              className={styles.validationError}
-            >
-              <Icon name="error-icon" className={styles.validationIcon} />
-              <span>{err.message}</span>
-            </div>
-          ))}
-          {job.preview?.warnings.map((warn, index) => (
-            <div
-              key={`${warn.field}-${warn.code}-${index}`}
-              className={styles.validationWarning}
-            >
-              <Icon name="info-icon" className={styles.validationIcon} />
-              <span>{warn.message}</span>
-            </div>
-          ))}
+            return (
+              <MetadataField
+                key={field.key}
+                fieldKey={field.key}
+                label={field.label}
+                value={field.value}
+                isEdited={job.edited_fields?.includes(field.key)}
+                jobId={job.id}
+                currentJobId={currentJobId}
+                errors={errors}
+                warnings={warnings}
+                stockPlatform={job.preview?.stock_platform}
+              />
+            );
+          })}
         </div>
       </div>
 

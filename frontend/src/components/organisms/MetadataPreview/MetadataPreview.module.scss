@@ -110,6 +110,13 @@
   gap: var(--spacing-md);
 }
 
+.photoValidation {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  margin-top: calc(var(--spacing-md) * -1);
+}
+
 @media (max-width: 1024px) {
   .scrollableContent {
     overflow: visible;
