@@ -71,6 +71,7 @@ export interface AIProviderApiKeyValidationResponse {
 export interface BatchSettings {
   shootingContext: string;
   stockPlatform: StockPlatform;
+  aiProvider?: AIProvider;
   exportFormats: {
     csv: boolean;
     iptc: boolean;

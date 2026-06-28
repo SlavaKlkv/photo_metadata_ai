@@ -615,14 +615,20 @@ export const useAppStore = create<AppState>()(
         return { success: false, error: "No locked batch settings found" };
       }
 
+      // провайдер ОБЯЗАТЕЛЕН
+      if (!sessionSettings.selectedProvider) {
+        return { success: false, error: "AI provider not selected" };
+      }
+
       set({ regeneratingFileId: fileId });
 
       try {
-        const response = await jobsApi.regenerateFile(currentJobId, fileId, {
-          shooting_context: lockedBatchSettings.shootingContext,
-          stock_platform: lockedBatchSettings.stockPlatform,
-          ai_provider: sessionSettings.selectedProvider ?? "ollama",
-        });
+    // теперь selectedProvider 100% не null
+    const response = await jobsApi.regenerateFile(currentJobId, fileId, {
+      shooting_context: lockedBatchSettings.shootingContext,
+      stock_platform: lockedBatchSettings.stockPlatform,
+      ai_provider: sessionSettings.selectedProvider,
+    });
 
         const newMetadata = response.data?.metadata;
         if (newMetadata) {
@@ -644,6 +650,6 @@ export const useAppStore = create<AppState>()(
       } finally {
         set({ regeneratingFileId: null });
       }
-    },
+    }
   })),
 );

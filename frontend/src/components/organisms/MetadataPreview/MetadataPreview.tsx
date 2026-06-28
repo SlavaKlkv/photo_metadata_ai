@@ -11,6 +11,15 @@ import { Panel } from "../../atoms/Panel/Panel";
 import styles from "./MetadataPreview.module.scss";
 import { SectionHeader } from "../../molecules/SectionHeader/SectionHeader";
 import { Input } from "../../atoms/Input/Input";
+import { FilePreview } from "../../../types";
+
+interface MetadataSaveResult {
+  file_id: string;
+  title?: string;
+  description?: string;
+  keywords?: string[];
+  preview?: FilePreview;
+}
 
 const BOOLEAN_METADATA_FIELDS = new Set([
   "is_editorial",
@@ -53,6 +62,7 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
       ? ""
       : String(value);
   const [editValue, setEditValue] = useState(stringValue);
+  const hasChanged = editValue !== stringValue;
 
   const addToast = useToastStore((state) => state.addToast);
   const applyMetadataResult = useAppStore(
@@ -132,7 +142,7 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
       </div>
 
       {/* Валидация под полем */}
-      {errors.length > 0 && (
+      {!hasChanged && errors.length > 0 && (
         <div className={styles.fieldValidation}>
           {errors.map((err, index) => (
             <div
@@ -146,7 +156,7 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
         </div>
       )}
 
-      {warnings.length > 0 && (
+      {!hasChanged && warnings.length > 0 && (
         <div className={styles.fieldValidation}>
           {warnings.map((warn, index) => (
             <div
@@ -204,6 +214,9 @@ export const MetadataPreview: React.FC = () => {
   const regenerateFile = useAppStore((state) => state.regenerateFile);
   const regeneratingFileId = useAppStore((state) => state.regeneratingFileId);
   const lockedBatchSettings = useAppStore((state) => state.lockedBatchSettings);
+  const updateJobPreview = useAppStore((state) => state.updateJobPreview);
+  const updateMetadata = useAppStore((state) => state.updateMetadata);
+  const sessionSettings = useAppStore((state) => state.sessionSettings);
 
   const stockOptions = useAppStore((state) => state.stockOptions);
 
@@ -250,20 +263,57 @@ export const MetadataPreview: React.FC = () => {
   // Regenerate использует lockedBatchSettings — оригинальные настройки batch,
   // а не текущий draft. Это гарантирует воспроизводимость результата.
   const handleRegenerate = async () => {
-    if (!job || !currentJobId) return;
+    if (!job || !currentJobId || !lockedBatchSettings) return;
 
-    const result = await regenerateFile(job.id, currentJobId);
+    // провайдер ОБЯЗАТЕЛЕН
+    if (!sessionSettings.selectedProvider) {
+      addToast("AI provider not selected", "error");
+      return;
+    }
 
-    if (result.success) {
+    try {
+      const response = await jobsApi.regenerateFile(currentJobId, job.id, {
+        shooting_context: lockedBatchSettings.shootingContext,
+        stock_platform: lockedBatchSettings.stockPlatform,
+        ai_provider: sessionSettings.selectedProvider,
+      });
+
+      const newMetadata = response.data.metadata;
+
+      // обновляем preview и metadata в store
+      if (newMetadata.preview) {
+        updateJobPreview(job.id, newMetadata.preview);
+      }
+
+      // обновляем legacy metadata
+      updateMetadata(job.id, {
+        title: newMetadata.title ?? "",
+        description: newMetadata.description ?? "",
+        keywords: newMetadata.keywords ?? [],
+      });
+
       addToast("Metadata regenerated", "success");
-    } else {
-      addToast(result.error ?? "Failed to regenerate", "error");
+    } catch (error) {
+      addToast("Failed to regenerate", "error");
+      console.error("[Regenerate error]:", error);
     }
   };
 
   const isRegenerating = regeneratingFileId === job?.id;
   // Regenerate доступен только когда batch зафиксирован (после processing)
   const canRegenerate = !!lockedBatchSettings && !!currentJobId;
+
+  const handleMetadataSaved = (result: MetadataSaveResult) => {
+    if (result.preview) {
+      updateJobPreview(result.file_id, result.preview);
+    }
+
+    updateMetadata(result.file_id, {
+      title: result.title ?? "",
+      description: result.description ?? "",
+      keywords: result.keywords ?? [],
+    });
+  };
 
   if (!job) {
     return (
