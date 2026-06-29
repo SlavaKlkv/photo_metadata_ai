@@ -179,9 +179,31 @@ def _build_default_iptc_payload(
         caption_abstract=file.description or '',
         keywords=list(file.keywords),
         supplemental_category=list(file.categories),
-        city=file.location_metadata,
+        city=normalize_iptc_city(file.location_metadata),
         date_created=file.editorial_date if file.is_editorial else None,
     )
+
+
+def normalize_iptc_city(value: str | None) -> str | None:
+    """
+    Возвращает только значение города для IPTC City.
+    """
+    if value is None:
+        return None
+
+    normalized = ' '.join(value.strip().split())
+    if not normalized:
+        return None
+
+    normalized_lower = normalized.lower()
+    for prefix in ('city=', 'location='):
+        if normalized_lower.startswith(prefix):
+            normalized = normalized[len(prefix) :].strip()
+            break
+
+    city = re.split(r'\s*[,;|/]\s*', normalized, maxsplit=1)[0].strip()
+
+    return city or None
 
 
 def _normalize_iptc_list(values: list[str]) -> list[str]:

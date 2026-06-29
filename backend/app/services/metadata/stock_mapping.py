@@ -3,7 +3,10 @@ from dataclasses import dataclass
 
 from app.core.enums import MetadataFieldSource, StockPlatform
 from app.schemas.job import ProcessingJobFile
-from app.services.metadata.metadata_embedding import IPTCEmbeddingPayload
+from app.services.metadata.metadata_embedding import (
+    IPTCEmbeddingPayload,
+    normalize_iptc_city,
+)
 from app.services.metadata.stock_mapping_data import (
     CATEGORY_ALIASES,
     DEFAULT_STOCK_CATEGORIES,
@@ -128,7 +131,7 @@ def build_stock_iptc_payload(
         caption_abstract=caption,
         keywords=list(mapped_metadata.keywords),
         supplemental_category=list(mapped_metadata.categories),
-        city=mapped_metadata.location_metadata,
+        city=normalize_iptc_city(mapped_metadata.location_metadata),
         date_created=(
             mapped_metadata.editorial_date
             if mapped_metadata.is_editorial
