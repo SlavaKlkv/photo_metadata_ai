@@ -68,6 +68,29 @@ export interface AIProviderApiKeyValidationResponse {
   saved: boolean;
 }
 
+export interface DesktopHealthResponse {
+  status: 'ok' | 'degraded' | 'error';
+  runtime_profile: string;
+}
+
+export interface DesktopRuntimeInfo {
+  runtime_profile: string;
+  workspace_dir: string;
+  jobs_dir: string;
+  results_dir: string;
+  temp_dir: string;
+  directories_ready: boolean;
+}
+
+export interface DesktopStartupStatusResponse {
+  status: 'ready' | 'degraded' | 'not_ready';
+  phase: 'pending' | 'checking' | 'completed' | 'failed';
+  has_ready_provider: boolean;
+  message: string;
+  attempts: number;
+  max_attempts: number;
+}
+
 export interface BatchSettings {
   shootingContext: string;
   stockPlatform: StockPlatform;

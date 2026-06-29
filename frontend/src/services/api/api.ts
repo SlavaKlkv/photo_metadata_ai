@@ -4,6 +4,9 @@ import type {
   AIProvider,
   AIProviderApiKeyValidationResponse,
   StockPlatform,
+  DesktopHealthResponse,
+  DesktopRuntimeInfo,
+  DesktopStartupStatusResponse,
 } from 'types';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
@@ -100,6 +103,16 @@ export const jobsApi = {
     apiClient.post<AIProviderApiKeyValidationResponse>(
       `/api/v1/desktop/ai-providers/${provider}/api-key/validate-and-save`,
       { api_key: apiKey },
+    ),
+  desktopHealth: () =>
+    apiClient.get<DesktopHealthResponse>("/api/v1/desktop/health"),
+
+  desktopRuntimeInfo: () =>
+    apiClient.get<DesktopRuntimeInfo>("/api/v1/desktop/runtime"),
+
+  desktopStartupStatus: () =>
+    apiClient.get<DesktopStartupStatusResponse>(
+      "/api/v1/desktop/startup/status",
     ),
   updateDesktopSettings: (settings: { selected_provider: string }) =>
     apiClient.patch("/api/v1/desktop/settings", settings),
