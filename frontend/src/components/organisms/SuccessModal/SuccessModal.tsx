@@ -22,6 +22,7 @@ export const SuccessModal: React.FC = () => {
   const currentJobId = useUIStore((state) => state.currentJobId);
   const exportArtifacts = useUIStore((state) => state.exportArtifacts);
   const setExportArtifacts = useUIStore((state) => state.setExportArtifacts);
+  const draftBatchSettings = useAppStore((state) => state.draftBatchSettings);
 
   const handleBackToResults = () => {
     closeSuccessModal();
@@ -67,13 +68,20 @@ export const SuccessModal: React.FC = () => {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={closeSuccessModal} closeOnBackdrop={false} size="lg">
+    <Modal
+      isOpen={isOpen}
+      onClose={closeSuccessModal}
+      closeOnBackdrop={false}
+      size="lg"
+    >
       <div className={styles.content}>
         <Icon name="img-modal-icon" className={styles.icon} />
         <h2 className={styles.title}>Export completed successfully!</h2>
         <p className={styles.subtitle}>
-          {jobs.length} photos are ready for stock upload. 
-          CSV file generated, IPTC metadata embedded, approved photos exported.
+          {jobs.length} photos are ready for stock upload.
+          {draftBatchSettings.exportFormats.csv && " CSV file generated,"}
+          {draftBatchSettings.exportFormats.iptc && " IPTC metadata embedded,"}
+          approved photos exported.
         </p>
         <div className={styles.actions}>
           <Button variant="secondary" size="md" onClick={handleBackToResults}>
@@ -84,7 +92,17 @@ export const SuccessModal: React.FC = () => {
             Start new batch
           </Button>
 
-          <Button variant="primary" size="md" onClick={handleOpenCsv}>
+          <Button
+            variant="primary"
+            size="md"
+            disabled={!draftBatchSettings.exportFormats.csv}
+            onClick={handleOpenCsv}
+            title={
+              !draftBatchSettings.exportFormats.csv
+                ? "CSV format was not selected for export"
+                : undefined
+            }
+          >
             Open CSV file
           </Button>
 

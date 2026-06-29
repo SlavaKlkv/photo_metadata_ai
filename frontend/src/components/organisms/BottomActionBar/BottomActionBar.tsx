@@ -39,6 +39,16 @@ export const BottomActionBar: React.FC = () => {
 
   const addToast = useToastStore((state) => state.addToast);
 
+  // Проверка: есть ли выбран хотя бы один export format
+  const hasExportFormat =
+    draftBatchSettings.exportFormats.csv ||
+    draftBatchSettings.exportFormats.iptc;
+
+  // Проверка: есть ли validation errors в completed файлах
+  const hasValidationErrors = jobs.some(
+    (job) => job.status === "done" && (job.preview?.errors ?? []).length > 0,
+  );
+
   const currentStep = !isUploaded
     ? 0
     : isProcessing
@@ -68,9 +78,7 @@ export const BottomActionBar: React.FC = () => {
 
     const { draftBatchSettings: batchSnapshot } = useAppStore.getState();
 
-    const selectedExportFormats = Object.entries(
-      batchSnapshot.exportFormats,
-    )
+    const selectedExportFormats = Object.entries(batchSnapshot.exportFormats)
       .filter(([, enabled]) => enabled)
       .map(([format]) => format);
 
@@ -80,7 +88,7 @@ export const BottomActionBar: React.FC = () => {
       await jobsApi.updateSettings(currentJobId, {
         shooting_context: batchSnapshot.shootingContext,
         stock_platform: batchSnapshot.stockPlatform,
-        ai_provider: sessionSettings.selectedProvider || 'ollama',
+        ai_provider: sessionSettings.selectedProvider || "ollama",
         export_formats: selectedExportFormats,
       });
 
@@ -93,7 +101,7 @@ export const BottomActionBar: React.FC = () => {
     } catch (error) {
       unlockBatchSettings();
       setIsProcessing(false);
-      addToast('Failed to start processing', 'error');
+      addToast("Failed to start processing", "error");
     }
   };
 
@@ -103,14 +111,14 @@ export const BottomActionBar: React.FC = () => {
         {STEPS.map((step, index) => (
           <React.Fragment key={step}>
             <div
-              className={`${styles.step} ${index <= currentStep ? styles.active : ''}`}
+              className={`${styles.step} ${index <= currentStep ? styles.active : ""}`}
             >
               <span className={styles.stepNumber}>{index + 1}</span>
               <span className={styles.stepLabel}>{step}</span>
             </div>
             {index < STEPS.length - 1 && (
               <div
-                className={`${styles.line} ${index < currentStep ? styles.activeLine : ''}`}
+                className={`${styles.line} ${index < currentStep ? styles.activeLine : ""}`}
               />
             )}
           </React.Fragment>
@@ -142,9 +150,9 @@ export const BottomActionBar: React.FC = () => {
           }
           title={
             !draftBatchSettings.shootingContext.trim()
-              ? 'Add shoot notes to start processing'
+              ? "Add shoot notes to start processing"
               : !sessionSettings.selectedProvider
-                ? 'Select an available AI provider to start processing'
+                ? "Select an available AI provider to start processing"
                 : undefined
           }
           onClick={handleStartProcessing}
@@ -156,7 +164,16 @@ export const BottomActionBar: React.FC = () => {
           variant="primary"
           size="md"
           icon={<Icon name="download-icon" className={styles.btnIcon} />}
-          disabled={!isExportReady}
+          disabled={!isExportReady || !hasExportFormat || hasValidationErrors}
+          title={
+            !isExportReady
+              ? "Complete processing first"
+              : !hasExportFormat
+                ? "Select at least one export format (CSV or IPTC)"
+                : hasValidationErrors
+                  ? "Fix validation errors in metadata before export"
+                  : undefined
+          }
           onClick={() => {
             setIsExporting(true);
             openExportModal();
