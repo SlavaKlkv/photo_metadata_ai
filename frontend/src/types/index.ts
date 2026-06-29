@@ -14,6 +14,8 @@ export interface ProcessingJob {
   description?: string;
   keywords?: string[];
   selected_for_export?: boolean;
+  effective_ai_provider?: AIProvider | null;
+  effective_ai_model?: string | null;
   field_sources?: Record<string, 'generated' | 'edited'>;
   edited_fields?: string[];
   // stock-specific preview — меняется при смене стока
@@ -28,6 +30,12 @@ export interface ProcessingJob {
 
 // TODO: remove 'mock' before production; 'ollama' = QWEN 2.5 VL via Ollama
 export type AIProvider = 'mock' | 'ollama' | 'gemini' | 'openrouter';
+
+export const AI_PROVIDER_LABELS: Partial<Record<AIProvider, string>> = {
+  ollama: 'QWEN 2.5 VL',
+  gemini: 'Gemini',
+  openrouter: 'OpenRouter',
+};
 
 export type StockPlatform = 'getty_images' | 'shutterstock' | 'adobe_stock';
 

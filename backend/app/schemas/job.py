@@ -75,6 +75,8 @@ class ProcessingJobFile(
     file_id: UUID = Field(default_factory=uuid4)
     status: FileStatus = FileStatus.QUEUED
     error_message: str | None = None
+    effective_ai_provider: AIProvider | None = None
+    effective_ai_model: str | None = None
     regenerate_attempts: list[RegenerateAttempt] = Field(default_factory=list)
     selected_for_export: bool = True
     field_sources: dict[str, MetadataFieldSource] = Field(default_factory=dict)
@@ -93,6 +95,8 @@ class ProcessingJobFileStatus(FileProcessingMixin, FileNameMixin):
     """
 
     error_message: str | None = None
+    effective_ai_provider: AIProvider | None = None
+    effective_ai_model: str | None = None
 
 
 class ProcessingJobStatus(BaseModel):
@@ -181,6 +185,8 @@ class ProcessingJobMetadataResult(
     """
 
     error_message: str | None = None
+    effective_ai_provider: AIProvider | None = None
+    effective_ai_model: str | None = None
     selected_for_export: bool = True
     field_sources: dict[str, MetadataFieldSource] = Field(default_factory=dict)
     edited_fields: list[str] = Field(default_factory=list)

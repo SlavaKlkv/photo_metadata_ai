@@ -103,25 +103,7 @@ class JobStorage:
         db_path.parent.mkdir(parents=True, exist_ok=True)
 
         with self._connect() as connection:
-            _set_sqlite_pragmas(connection)
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS schema_migrations (
-                    version INTEGER PRIMARY KEY,
-                    applied_at TEXT NOT NULL
-                )
-                """
-            )
-            applied_versions = {
-                row[0]
-                for row in connection.execute(
-                    'SELECT version FROM schema_migrations'
-                ).fetchall()
-            }
-
-            if 1 not in applied_versions:
-                self._apply_v1_migration(connection)
-
+            self._ensure_schema(connection)
             connection.commit()
 
         self._initialized = True
@@ -130,6 +112,18 @@ class JobStorage:
             db_path=str(db_path),
             schema_version=JOB_STORAGE_SCHEMA_VERSION,
         )
+
+    def _ensure_schema(self, connection: sqlite3.Connection) -> None:
+        _set_sqlite_pragmas(connection)
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                version INTEGER PRIMARY KEY,
+                applied_at TEXT NOT NULL
+            )
+            """
+        )
+        self._apply_v1_migration(connection)
 
     def _apply_v1_migration(
         self,
@@ -159,6 +153,7 @@ class JobStorage:
         connection = self._connect()
 
         try:
+            self._ensure_schema(connection)
             connection.execute(
                 """
                 INSERT INTO jobs (
@@ -191,6 +186,8 @@ class JobStorage:
         connection = self._connect()
 
         try:
+            self._ensure_schema(connection)
+            connection.commit()
             row = connection.execute(
                 """
                 SELECT payload_json
@@ -211,6 +208,8 @@ class JobStorage:
         connection = self._connect()
 
         try:
+            self._ensure_schema(connection)
+            connection.commit()
             rows = connection.execute(
                 """
                 SELECT payload_json

@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { jobsApi } from 'services/api/api';
 import { useAppStore } from 'store/useAppStore';
 import { useUIStore } from 'store/useUIStore';
-import type { StockPlatform } from 'types';
+import type { AIProvider, StockPlatform } from 'types';
 
 
 const POLLING_INTERVAL = 2000;
@@ -16,6 +16,9 @@ export const usePolling = (jobId: string | null) => {
   const setIsExportReady = useUIStore((state) => state.setIsExportReady);
   const setIsPollingActive = useUIStore((state) => state.setIsPollingActive);
   const setIsProcessing = useUIStore((state) => state.setIsProcessing);
+  const setCurrentProcessingProvider = useUIStore(
+    (state) => state.setCurrentProcessingProvider,
+  );
 
   const updateJobPreview = useAppStore((state) => state.updateJobPreview);
   const setStockOptions = useAppStore((state) => state.setStockOptions);
@@ -37,11 +40,22 @@ export const usePolling = (jobId: string | null) => {
       try {
         const response = await jobsApi.getStatus(jobId);
         const statusData = response.data;
+        const effectiveProvider = statusData.effective_ai_provider;
+
+        if (isSelectableProvider(effectiveProvider)) {
+          setCurrentProcessingProvider(
+            effectiveProvider,
+            statusData.effective_ai_model,
+          );
+        }
 
         if (statusData.files) {
           statusData.files.forEach((file: any) => {
             const status = file.status === "completed" ? "done" : file.status;
-            updateJobStatus(file.file_id, status, file.error_message);
+            updateJobStatus(file.file_id, status, file.error_message, {
+              effective_ai_provider: file.effective_ai_provider,
+              effective_ai_model: file.effective_ai_model,
+            });
           });
         }
 
@@ -55,6 +69,7 @@ export const usePolling = (jobId: string | null) => {
           stopPolling();
           setIsPollingActive(false);
           setIsProcessing(false);
+          setCurrentProcessingProvider(null);
 
           if (
             statusData.status === "failed" ||
@@ -77,7 +92,10 @@ export const usePolling = (jobId: string | null) => {
 
             results.forEach((file: any) => {
               // обновляем статус
-              updateJobStatus(file.file_id, "done", file.error_message);
+              updateJobStatus(file.file_id, "done", file.error_message, {
+                effective_ai_provider: file.effective_ai_provider,
+                effective_ai_model: file.effective_ai_model,
+              });
 
               // плоские поля — legacy metadata для обратной совместимости
               updateMetadata(file.file_id, {
@@ -107,6 +125,7 @@ export const usePolling = (jobId: string | null) => {
         stopPolling();
         setIsPollingActive(false);
         setIsProcessing(false);
+        setCurrentProcessingProvider(null);
         closeProgressModal();
       }
     };
@@ -126,5 +145,11 @@ export const usePolling = (jobId: string | null) => {
     setIsExportReady,
     setIsPollingActive,
     setIsProcessing,
+    setCurrentProcessingProvider,
   ]);
 };
+
+const isSelectableProvider = (provider: unknown): provider is AIProvider =>
+  provider === 'ollama' ||
+  provider === 'gemini' ||
+  provider === 'openrouter';

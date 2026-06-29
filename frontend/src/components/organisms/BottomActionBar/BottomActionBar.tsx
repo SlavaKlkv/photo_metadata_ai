@@ -36,6 +36,9 @@ export const BottomActionBar: React.FC = () => {
   const openExportModal = useUIStore((state) => state.openExportModal);
   const setCurrentJobId = useUIStore((state) => state.setCurrentJobId);
   const setSelectedJobId = useUIStore((state) => state.setSelectedJobId);
+  const setCurrentProcessingProvider = useUIStore(
+    (state) => state.setCurrentProcessingProvider,
+  );
 
   const addToast = useToastStore((state) => state.addToast);
 
@@ -58,6 +61,7 @@ export const BottomActionBar: React.FC = () => {
     setIsProcessing(false);
     setCurrentJobId(null);
     setSelectedJobId(null);
+    setCurrentProcessingProvider(null);
   };
 
   const handleStartProcessing = async () => {
