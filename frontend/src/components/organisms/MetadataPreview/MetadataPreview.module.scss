@@ -234,6 +234,62 @@
   color: var(--accent-main);
 }
 
+.selectWrapper {
+  position: relative;
+  width: 100%;
+}
+
+.select {
+  width: 100%;
+  min-height: 44px;
+  padding: 12px 40px 12px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-tight);
+  cursor: pointer;
+  appearance: none;
+  box-sizing: border-box;
+  transition: border-color var(--transition-normal);
+
+  &:hover:not(:disabled) {
+    border-color: var(--border-hover);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--border-focus);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  option {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+}
+
+.selectError {
+  border-color: var(--error-color, #ef4444);
+}
+
+.selectIcon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
 .fieldInputRegenerating {
   border-color: var(--accent-main) !important;
   color: transparent;

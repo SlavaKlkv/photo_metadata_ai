@@ -4,7 +4,7 @@ import { useAppStore } from "store/useAppStore";
 import { useUIStore } from "store/useUIStore";
 import { useToastStore } from "store/useToastStore";
 import { jobsApi } from "services/api/api";
-import { PreviewFieldValue, StockPlatform } from "types";
+import { PreviewFieldValue, StockOptions, StockPlatform } from "types";
 import { Button } from "../../atoms/Button/Button";
 import { Icon } from "../../atoms/Icon/Icon";
 import { Panel } from "../../atoms/Panel/Panel";
@@ -48,6 +48,7 @@ interface MetadataFieldProps {
   stockPlatform?: StockPlatform;
   isRegenerating?: boolean;
   wasRegenerated?: boolean;
+  fixedOptions?: string[];
 }
 
 const MetadataField: React.FC<MetadataFieldProps> = ({
@@ -62,6 +63,7 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
   stockPlatform,
   isRegenerating = false,
   wasRegenerated = false,
+  fixedOptions = [],
 }) => {
   const isArray = Array.isArray(value);
   const stringValue = isArray
@@ -78,6 +80,8 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
   );
   const isBoolean =
     typeof value === "boolean" || BOOLEAN_METADATA_FIELDS.has(fieldKey);
+  const hasFixedOptions = fixedOptions.length > 0;
+  const selectOptions = buildFixedSelectOptions(fixedOptions, stringValue);
   const inputClassName = `${isRegenerating ? styles.fieldInputRegenerating : ""} ${
     wasRegenerated ? styles.fieldInputRegenerated : ""
   }`;
@@ -119,7 +123,6 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
           {label}
         </label>
 
-        {/* Input это textarea — используем везде */}
         {isBoolean ? (
           <div
             className={`${styles.booleanControl} ${
@@ -147,6 +150,30 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
                 {option.label}
               </button>
             ))}
+          </div>
+        ) : hasFixedOptions ? (
+          <div className={styles.selectWrapper}>
+            <select
+              value={isRegenerating ? "" : editValue}
+              onChange={(e) => {
+                setEditValue(e.target.value);
+                handleSave(e.target.value);
+              }}
+              className={`${styles.select} ${
+                errors.length > 0 ? styles.selectError : ""
+              } ${inputClassName}`}
+              disabled={isRegenerating}
+            >
+              <option value="">
+                {isRegenerating ? "Regenerating..." : "Select..."}
+              </option>
+              {selectOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <Icon name="arrow-down" className={styles.selectIcon} />
           </div>
         ) : (
           <Input
@@ -229,6 +256,44 @@ const getMetadataSaveValue = (
 
   return editValue;
 };
+
+const getFixedFieldOptions = (
+  fieldKey: string,
+  stockOptions: StockOptions | null,
+) => {
+  if (!stockOptions) return [];
+
+  if (fieldKey === "categories" || fieldKey === "category_2") {
+    return stockOptions.categories;
+  }
+
+  if (fieldKey === "license_type") {
+    return stockOptions.license_types;
+  }
+
+  return [];
+};
+
+const buildFixedSelectOptions = (options: string[], currentValue: string) => {
+  const normalizedCurrentValue = currentValue.trim();
+  const hasCurrentValue =
+    normalizedCurrentValue.length > 0 &&
+    !options.some((option) => option === normalizedCurrentValue);
+  const visibleOptions = hasCurrentValue
+    ? [normalizedCurrentValue, ...options]
+    : options;
+
+  return visibleOptions.map((option) => ({
+    value: option,
+    label: formatFixedOptionLabel(option),
+  }));
+};
+
+const formatFixedOptionLabel = (value: string) =>
+  value
+    .split("_")
+    .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
+    .join(" ");
 
 export const MetadataPreview: React.FC = () => {
   const jobs = useAppStore((state) => state.jobs);
@@ -461,6 +526,7 @@ export const MetadataPreview: React.FC = () => {
                 stockPlatform={job.preview?.stock_platform}
                 isRegenerating={isRegenerating}
                 wasRegenerated={wasRegenerated}
+                fixedOptions={getFixedFieldOptions(field.key, stockOptions)}
               />
             );
           })}
@@ -491,6 +557,7 @@ export const MetadataPreview: React.FC = () => {
                 stockPlatform={job.preview?.stock_platform}
                 isRegenerating={isRegenerating}
                 wasRegenerated={wasRegenerated}
+                fixedOptions={getFixedFieldOptions(field.key, stockOptions)}
               />
             );
           })}
