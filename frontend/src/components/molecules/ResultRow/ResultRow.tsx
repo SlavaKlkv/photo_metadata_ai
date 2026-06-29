@@ -1,6 +1,6 @@
 // frontend/src/components/molecules/ResultRow/ResultRow.tsx
 import React from 'react';
-import { ProcessingJob } from '../../../types';
+import { AI_PROVIDER_LABELS, ProcessingJob } from 'types';
 import { Checkbox } from '../../atoms/Checkbox/Checkbox';
 import styles from './ResultRow.module.scss';
 
@@ -54,9 +54,17 @@ export const ResultRow: React.FC<ResultRowProps> = ({
       </div>
 
       <span className={styles.filename}>{job.originalFilename}</span>
-      <span className={styles.title}>
-        {job.metadata?.title ?? '—'}
-      </span>
+      <div className={styles.titleCell}>
+        <span className={styles.title}>
+          {job.metadata?.title ?? '—'}
+        </span>
+        {job.effective_ai_provider && (
+          <span className={styles.providerBadge}>
+            {AI_PROVIDER_LABELS[job.effective_ai_provider] ??
+              job.effective_ai_provider}
+          </span>
+        )}
+      </div>
     </div>
   );
 };

@@ -4,13 +4,17 @@ import styles from './ProgressModal.module.scss';
 import { Modal } from '../../atoms/Modal/Modal';
 import { ProgressBar } from '../../atoms/ProgressBar/ProgressBar';
 import { Button } from '../../atoms/Button/Button';
-import { useAppStore } from '../../../store/useAppStore';
-import { useUIStore } from '../../../store/useUIStore';
+import { useAppStore } from 'store/useAppStore';
+import { useUIStore } from 'store/useUIStore';
+import { AI_PROVIDER_LABELS } from 'types';
 
 export const ProgressModal: React.FC = () => {
   const isOpen = useUIStore((state) => state.isProgressModalOpen);
   const closeModal = useUIStore((state) => state.closeProgressModal);
   const jobs = useAppStore((state) => state.jobs);
+  const currentProcessingProvider = useUIStore(
+    (state) => state.currentProcessingProvider,
+  );
 
   const total = jobs.length;
   const current = jobs.filter(
@@ -38,6 +42,13 @@ export const ProgressModal: React.FC = () => {
             Cancel
           </Button>
         </div>
+        {currentProcessingProvider && (
+          <p className={styles.provider}>
+            Using{' '}
+            {AI_PROVIDER_LABELS[currentProcessingProvider] ??
+              currentProcessingProvider}
+          </p>
+        )}
         <ProgressBar value={displayPercent} animated={displayPercent < 100} />
       </div>
     </Modal>

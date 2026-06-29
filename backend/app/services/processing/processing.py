@@ -12,6 +12,7 @@ from app.schemas.job import (
     ProcessingJobFile,
 )
 from app.services.ai.ai_fallback import (
+    FallbackAttempt,
     FallbackMetadataResult,
     generate_metadata_with_fallback,
     validate_primary_provider_configuration,
@@ -348,6 +349,8 @@ async def _process_file(
                 file_number=file_number,
             )
             metadata = fallback_result.metadata
+            file.effective_ai_provider = fallback_result.provider
+            file.effective_ai_model = fallback_result.model
             await _record_effective_ai_provider(
                 job_id,
                 fallback_result.provider,
@@ -426,13 +429,61 @@ async def _generate_metadata_for_file(
         jpeg_quality=settings.AI_JPEG_QUALITY,
     )
 
+    async def record_attempt_started(attempt: FallbackAttempt) -> None:
+        await _record_effective_ai_provider_attempt(
+            job_id,
+            file,
+            attempt.provider,
+            attempt.model,
+        )
+
     return await generate_metadata_with_fallback(
         selected_provider=selected_provider,
         image_path=preprocessed_image_path,
         shooting_context=shooting_context,
         file_number=file_number,
         stock_platform=stock_platform,
+        on_attempt_started=record_attempt_started,
     )
+
+
+async def _record_effective_ai_provider_attempt(
+    job_id: UUID,
+    file: ProcessingJobFile,
+    provider: AIProvider,
+    model: str | None,
+) -> None:
+    file.effective_ai_provider = provider
+    file.effective_ai_model = model
+
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        return
+
+    stored_file = next(
+        (
+            candidate
+            for candidate in job.files
+            if candidate.file_id == file.file_id
+        ),
+        None,
+    )
+
+    if stored_file is not None:
+        stored_file.effective_ai_provider = provider
+        stored_file.effective_ai_model = model
+
+    if (
+        job.effective_ai_provider == provider
+        and job.effective_ai_model == model
+    ):
+        await storage.update_job(job)
+        return
+
+    job.effective_ai_provider = provider
+    job.effective_ai_model = model
+    await storage.update_job(job)
 
 
 async def _record_effective_ai_provider(

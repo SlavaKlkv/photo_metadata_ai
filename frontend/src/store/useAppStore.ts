@@ -56,6 +56,8 @@ export interface AppState {
       description?: string;
       keywords?: string[];
       selected_for_export?: boolean;
+      effective_ai_provider?: ProcessingJob["effective_ai_provider"];
+      effective_ai_model?: ProcessingJob["effective_ai_model"];
       field_sources?: ProcessingJob["field_sources"];
       edited_fields?: string[];
       preview?: FilePreview;
@@ -74,6 +76,10 @@ export interface AppState {
     jobId: string,
     status: ProcessingJob["status"],
     error?: string,
+    updates?: Pick<
+      ProcessingJob,
+      "effective_ai_provider" | "effective_ai_model"
+    >,
   ) => void;
   updateMetadata: (jobId: string, metadata: ProcessingJob["metadata"]) => void;
   updateJobSelection: (jobId: string, selectedForExport: boolean) => void;
@@ -155,10 +161,11 @@ export const useAppStore = create<AppState>()(
       jobId: string,
       status: ProcessingJob["status"],
       error?: string,
+      updates = {},
     ) => {
       set((state) => ({
         jobs: state.jobs.map((job) =>
-          job.id === jobId ? { ...job, status, error } : job,
+          job.id === jobId ? { ...job, status, error, ...updates } : job,
         ),
       }));
     },
@@ -553,6 +560,10 @@ export const useAppStore = create<AppState>()(
             keywords,
             selected_for_export:
               result.selected_for_export ?? job.selected_for_export,
+            effective_ai_provider:
+              result.effective_ai_provider ?? job.effective_ai_provider,
+            effective_ai_model:
+              result.effective_ai_model ?? job.effective_ai_model,
             field_sources: result.field_sources ?? job.field_sources,
             edited_fields: result.edited_fields ?? job.edited_fields,
             preview: result.preview ?? job.preview,

@@ -362,6 +362,8 @@ async def regenerate_file_metadata(
         regenerate_result.metadata,
         resolved_stock_platform,
     )
+    job_file.effective_ai_provider = regenerate_result.provider
+    job_file.effective_ai_model = regenerate_result.model
     job_file.status = FileStatus.COMPLETED
 
     regenerated_snapshot = _build_metadata_snapshot(job_file)
@@ -476,6 +478,8 @@ async def get_job_status(job_id: UUID):
                 original_filename=file.original_filename,
                 status=file.status,
                 error_message=file.error_message,
+                effective_ai_provider=file.effective_ai_provider,
+                effective_ai_model=file.effective_ai_model,
             )
             for file in job.files
         ],
@@ -967,6 +971,8 @@ def _build_metadata_result(
         filename=file.filename,
         original_filename=file.original_filename,
         status=file.status,
+        effective_ai_provider=file.effective_ai_provider,
+        effective_ai_model=file.effective_ai_model,
         title=mapped_metadata.title,
         description=mapped_metadata.description,
         keywords=mapped_metadata.keywords,

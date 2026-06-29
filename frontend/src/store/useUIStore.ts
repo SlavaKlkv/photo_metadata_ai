@@ -1,6 +1,7 @@
 //frontend/src/store/useUIStore.ts
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
+import type { AIProvider } from 'types';
 
 export interface ExportArtifact {
   export_format: "csv" | "iptc" | "json";
@@ -24,6 +25,8 @@ export interface UIState {
   isExportModalOpen: boolean;
   isSuccessModalOpen: boolean;
   exportArtifacts: ExportArtifact[];
+  currentProcessingProvider: AIProvider | null;
+  currentProcessingModel: string | null;
 
   // Actions
   toggleSettings: () => void;
@@ -42,6 +45,10 @@ export interface UIState {
   openSuccessModal: () => void;
   closeSuccessModal: () => void;
   setExportArtifacts: (artifacts: ExportArtifact[]) => void;
+  setCurrentProcessingProvider: (
+    provider: AIProvider | null,
+    model?: string | null,
+  ) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -61,6 +68,8 @@ export const useUIStore = create<UIState>()(
       isExportModalOpen: false,
       isSuccessModalOpen: false,
       exportArtifacts: [],
+      currentProcessingProvider: null,
+      currentProcessingModel: null,
       
       // actions
       toggleSettings: () =>
@@ -87,6 +96,11 @@ export const useUIStore = create<UIState>()(
       openSuccessModal: () => set({ isSuccessModalOpen: true }),
       closeSuccessModal: () => set({ isSuccessModalOpen: false }),
       setExportArtifacts: (artifacts) => set({ exportArtifacts: artifacts }),
+      setCurrentProcessingProvider: (provider, model = null) =>
+        set({
+          currentProcessingProvider: provider,
+          currentProcessingModel: model,
+        }),
     }),
     { name: 'UIStore' }
   )
