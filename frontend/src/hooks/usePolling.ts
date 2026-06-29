@@ -6,7 +6,7 @@ import { useUIStore } from 'store/useUIStore';
 import type { AIProvider, StockPlatform } from 'types';
 
 
-const POLLING_INTERVAL = 2000;
+const POLLING_INTERVAL = 500;
 
 export const usePolling = (jobId: string | null) => {
   const updateJobStatus = useAppStore((state) => state.updateJobStatus);

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from typing import Awaitable, Callable
 
 import httpx
 import structlog
@@ -28,6 +28,9 @@ ProviderFactory = Callable[[AIProvider, str | None], BaseAIProvider]
 class FallbackAttempt:
     provider: AIProvider
     model: str | None
+
+
+ProviderAttemptCallback = Callable[[FallbackAttempt], Awaitable[None]]
 
 
 @dataclass(frozen=True)
@@ -92,12 +95,16 @@ async def generate_metadata_with_fallback(
     file_number: int | None = None,
     stock_platform: StockPlatform | None = None,
     provider_factory: ProviderFactory = create_provider,
+    on_attempt_started: ProviderAttemptCallback | None = None,
 ) -> FallbackMetadataResult:
     attempts = build_provider_fallback_chain(selected_provider)
     last_error: Exception | None = None
 
     for index, attempt in enumerate(attempts):
         try:
+            if on_attempt_started is not None:
+                await on_attempt_started(attempt)
+
             provider = provider_factory(attempt.provider, attempt.model)
             metadata = await provider.generate_metadata(
                 image_path,

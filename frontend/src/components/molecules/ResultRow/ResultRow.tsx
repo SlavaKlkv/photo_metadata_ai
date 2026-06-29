@@ -1,14 +1,8 @@
 // frontend/src/components/molecules/ResultRow/ResultRow.tsx
 import React from 'react';
-import { AIProvider, ProcessingJob } from 'types';
+import { AI_PROVIDER_LABELS, ProcessingJob } from 'types';
 import { Checkbox } from '../../atoms/Checkbox/Checkbox';
 import styles from './ResultRow.module.scss';
-
-const providerLabels: Partial<Record<AIProvider, string>> = {
-  ollama: 'QWEN',
-  gemini: 'Gemini',
-  openrouter: 'OpenRouter',
-};
 
 interface ResultRowProps {
   job: ProcessingJob;
@@ -66,7 +60,7 @@ export const ResultRow: React.FC<ResultRowProps> = ({
         </span>
         {job.effective_ai_provider && (
           <span className={styles.providerBadge}>
-            {providerLabels[job.effective_ai_provider] ??
+            {AI_PROVIDER_LABELS[job.effective_ai_provider] ??
               job.effective_ai_provider}
           </span>
         )}
