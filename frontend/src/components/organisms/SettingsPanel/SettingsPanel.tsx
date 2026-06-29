@@ -61,6 +61,7 @@ export const SettingsPanel: React.FC = () => {
 
   const handleProviderChange = (provider: AIProvider) => {
     updateSessionSetting('selectedProvider', provider);
+    updateDraftBatchSetting('aiProvider', provider);
     saveSessionSettings();
     jobsApi
       .updateDesktopSettings({ selected_provider: provider })
@@ -211,6 +212,7 @@ export const SettingsPanel: React.FC = () => {
               {providerDiscoveryError ?? "Failed to detect AI providers."}
             </small>
           )}
+
         </div>
       </div>
     </Panel>

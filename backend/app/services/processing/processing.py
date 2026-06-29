@@ -348,6 +348,8 @@ async def _process_file(
                 file_number=file_number,
             )
             metadata = fallback_result.metadata
+            file.effective_ai_provider = fallback_result.provider
+            file.effective_ai_model = fallback_result.model
             await _record_effective_ai_provider(
                 job_id,
                 fallback_result.provider,

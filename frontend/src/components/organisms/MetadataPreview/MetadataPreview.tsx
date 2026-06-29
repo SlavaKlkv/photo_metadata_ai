@@ -501,7 +501,9 @@ export const MetadataPreview: React.FC = () => {
         {/* Поля метаданных */}
         <div className={styles.fields}>
           {/* common_fields — всегда показываем */}
-          {job.preview?.common_fields.map((field) => {
+          {job.preview?.common_fields
+            .filter((field) => field.key !== "filename")
+            .map((field) => {
             const errors =
               job.preview?.errors.filter(
                 (error) => getValidationDisplayField(error.field) === field.key,
