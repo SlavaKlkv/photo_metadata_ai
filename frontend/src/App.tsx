@@ -25,6 +25,10 @@ function App() {
   useEffect(() => {
     const initializeApp = async () => {
       loadSessionSettings();
+
+      // ← ДОБАВИТЬ: artificially delay discovery to see "scanning" state
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+
       await discoverProviders();
     };
 
