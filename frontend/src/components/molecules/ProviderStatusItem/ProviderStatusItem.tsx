@@ -17,6 +17,7 @@ export interface ProviderStatusItemProps {
   apiKeyError?: string | null;
   apiKey?: string | null;
   setupLink?: { label: string; url: string };
+  suppressErrorIcon?: boolean;
 }
 
 const providerIconMap: Record<string, string> = {
@@ -35,28 +36,30 @@ export const ProviderStatusItem: React.FC<ProviderStatusItemProps> = ({
   apiKeyError,
   apiKey,
   setupLink,
+  suppressErrorIcon = false,
 }) => {
   const [inputValue, setInputValue] = useState(apiKey || "");
+  const [hasTouchedInput, setHasTouchedInput] = useState(false);
   const isOllama = provider === "ollama";
   const isCloudProvider = ["gemini", "openrouter"].includes(provider);
   const providerIcon = providerIconMap[provider] ?? "settings-icon";
+
+  const hasNonEmptyInput = inputValue.trim() !== "";
+  const showStatusValidation =
+    hasNonEmptyInput &&
+    (apiKeySaveStatus === "invalid" ||
+      (status === "invalid" && hasTouchedInput));
 
   const cloudSubtitle =
     apiKeySaveStatus === "validating"
       ? "Validating key..."
       : apiKeySaveStatus === "valid"
         ? "API key saved"
-        : apiKeySaveStatus === "invalid"
+        : showStatusValidation
           ? apiKeyError || "Invalid key"
-          : status === "invalid"
-            ? "Invalid key"
-            : "API key not found";
+          : "API key not found";
   const apiKeyErrorMessage =
-    apiKeySaveStatus === "invalid"
-      ? apiKeyError || "invalid key"
-      : status === "invalid"
-        ? apiKeyError || "invalid key"
-        : null;
+    showStatusValidation ? apiKeyError || "invalid key" : null;
 
   // QWEN scanning — отдельный layout с progressBar
   if (isOllama && status === "scanning") {
@@ -136,7 +139,9 @@ export const ProviderStatusItem: React.FC<ProviderStatusItemProps> = ({
         </div>
 
         <div className={styles.rowRight}>
-          <Icon name="error-icon" className={styles.errorIcon} />
+          {!suppressErrorIcon && (
+            <Icon name="error-icon" className={styles.errorIcon} />
+          )}
         </div>
       </div>
 
@@ -161,15 +166,18 @@ export const ProviderStatusItem: React.FC<ProviderStatusItemProps> = ({
           <div className={styles.apiKeyRow}>
             <input
               className={`${styles.apiKeyInput} ${
-                status === "invalid" || apiKeySaveStatus === "invalid"
-                  ? styles.apiKeyInputError
-                  : ""
+                showStatusValidation ? styles.apiKeyInputError : ""
               }`}
               value={inputValue}
               onChange={(e) => {
-                setInputValue(e.target.value);
-                onApiKeyChange?.(e.target.value);
+                const value = e.target.value;
+                setInputValue(value);
+                if (!value.trim()) {
+                  setHasTouchedInput(false);
+                }
+                onApiKeyChange?.(value);
               }}
+              onBlur={() => setHasTouchedInput(true)}
               placeholder="Enter your API key..."
               type="text"
               autoComplete="off"
