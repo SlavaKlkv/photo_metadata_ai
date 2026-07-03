@@ -47,10 +47,17 @@ export const BottomActionBar: React.FC = () => {
     draftBatchSettings.exportFormats.csv ||
     draftBatchSettings.exportFormats.iptc;
 
-  // Проверка: есть ли validation errors в completed файлах
+  // Проверка: есть ли validation errors в выбранных для экспорта файлах
   const hasValidationErrors = jobs.some(
-    (job) => job.status === "done" && (job.preview?.errors ?? []).length > 0,
+    (job) =>
+      job.status === "done" &&
+      job.selected_for_export !== false &&
+      (job.preview?.errors ?? []).length > 0,
   );
+
+  const selectedExportCount = jobs.filter(
+    (job) => job.selected_for_export !== false,
+  ).length;
 
   const currentStep = !isUploaded
     ? 0
@@ -168,15 +175,22 @@ export const BottomActionBar: React.FC = () => {
           variant="primary"
           size="md"
           icon={<Icon name="download-icon" className={styles.btnIcon} />}
-          disabled={!isExportReady || !hasExportFormat || hasValidationErrors}
+          disabled={
+            !isExportReady ||
+            selectedExportCount === 0 ||
+            !hasExportFormat ||
+            hasValidationErrors
+          }
           title={
             !isExportReady
               ? "Complete processing first"
-              : !hasExportFormat
-                ? "Select at least one export format (CSV or IPTC)"
-                : hasValidationErrors
-                  ? "Fix validation errors in metadata before export"
-                  : undefined
+              : selectedExportCount === 0
+                ? "Select at least one photo to export"
+                : !hasExportFormat
+                  ? "Select at least one export format (CSV or IPTC)"
+                  : hasValidationErrors
+                    ? "Fix validation errors in selected photos before export"
+                    : undefined
           }
           onClick={() => {
             setIsExporting(true);

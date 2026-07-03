@@ -46,6 +46,7 @@ interface MetadataFieldProps {
   errors?: Array<{ code: string; message: string }>;
   warnings?: Array<{ code: string; message: string }>;
   stockPlatform?: StockPlatform;
+  stockOptions?: StockOptions | null;
   isRegenerating?: boolean;
   wasRegenerated?: boolean;
   fixedOptions?: string[];
@@ -61,6 +62,7 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
   errors = [],
   warnings = [],
   stockPlatform,
+  stockOptions,
   isRegenerating = false,
   wasRegenerated = false,
   fixedOptions = [],
@@ -85,6 +87,46 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
   const inputClassName = `${isRegenerating ? styles.fieldInputRegenerating : ""} ${
     wasRegenerated ? styles.fieldInputRegenerated : ""
   }`;
+
+  const getKeywordsCount = (text: string) =>
+    text
+      .split(/[,\s]+/)
+      .map((item) => item.trim())
+      .filter(Boolean).length;
+
+  const counterConfig = (() => {
+    if (!stockOptions || !stockPlatform) return null;
+    if (stockOptions.stock_platform !== stockPlatform) return null;
+
+    if (fieldKey === "title") {
+      return {
+        count: editValue.length,
+        limit: stockOptions.title_max_characters,
+        unit: "characters",
+      };
+    }
+
+    if (fieldKey === "description") {
+      return {
+        count: editValue.length,
+        limit: stockOptions.description_max_characters,
+        unit: "characters",
+      };
+    }
+
+    if (fieldKey === "keywords") {
+      return {
+        count: getKeywordsCount(editValue),
+        limit: stockOptions.keywords_max_count,
+        unit: "words",
+      };
+    }
+
+    return null;
+  })();
+
+  const counterExceeded =
+    counterConfig !== null && counterConfig.count > counterConfig.limit;
 
   useEffect(() => {
     setEditValue(stringValue);
@@ -185,6 +227,12 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
             disabled={isRegenerating}
             placeholder={isRegenerating ? "Regenerating..." : undefined}
             className={inputClassName}
+            counter={
+              counterConfig
+                ? `${counterConfig.count}/${counterConfig.limit} ${counterConfig.unit}`
+                : undefined
+            }
+            counterError={counterExceeded}
           />
         )}
       </div>
@@ -526,6 +574,7 @@ export const MetadataPreview: React.FC = () => {
                 errors={errors}
                 warnings={warnings}
                 stockPlatform={job.preview?.stock_platform}
+                stockOptions={stockOptions}
                 isRegenerating={isRegenerating}
                 wasRegenerated={wasRegenerated}
                 fixedOptions={getFixedFieldOptions(field.key, stockOptions)}
@@ -557,6 +606,7 @@ export const MetadataPreview: React.FC = () => {
                 errors={errors}
                 warnings={warnings}
                 stockPlatform={job.preview?.stock_platform}
+                stockOptions={stockOptions}
                 isRegenerating={isRegenerating}
                 wasRegenerated={wasRegenerated}
                 fixedOptions={getFixedFieldOptions(field.key, stockOptions)}
