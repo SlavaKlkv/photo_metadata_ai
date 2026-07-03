@@ -83,7 +83,8 @@ export const ExportModal: React.FC = () => {
     closeExportModal();
   };
 
-  const total = jobs.filter((job) => job.selected_for_export !== false).length;
+  const selectedJobs = jobs.filter((job) => job.selected_for_export === true);
+  const total = selectedJobs.length;
   const current = Math.round((progress / 100) * total);
 
   return (

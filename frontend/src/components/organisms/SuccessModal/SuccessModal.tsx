@@ -67,6 +67,10 @@ export const SuccessModal: React.FC = () => {
     }
   };
 
+  const exportedCount = jobs.filter(
+    (job) => job.selected_for_export === true,
+  ).length;
+
   return (
     <Modal
       isOpen={isOpen}
@@ -78,7 +82,7 @@ export const SuccessModal: React.FC = () => {
         <Icon name="img-modal-icon" className={styles.icon} />
         <h2 className={styles.title}>Export completed successfully!</h2>
         <p className={styles.subtitle}>
-          {jobs.length} photos are ready for stock upload.
+          {exportedCount} photo{exportedCount !== 1 ? 's' : ''} are ready for stock upload.
           {draftBatchSettings.exportFormats.csv && " CSV file generated,"}
           {draftBatchSettings.exportFormats.iptc && " IPTC metadata embedded,"}
           approved photos exported.
