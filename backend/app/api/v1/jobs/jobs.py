@@ -90,10 +90,57 @@ router = APIRouter(
 async def upload_photos(
     files: list[UploadFile] = File(...),
     shooting_context: str | None = Form(None),
+    job_id: UUID | None = Form(None),
 ):
     """
-    Загружает несколько JPEG-файлов и создает задачу обработки.
+    Загружает несколько JPEG-файлов и создает или дополняет задачу обработки.
     """
+    existing_job: ProcessingJob | None = None
+
+    if job_id is not None:
+        existing_job = await storage.get_job(job_id)
+
+        if existing_job is None:
+            raise HTTPException(
+                status_code=404,
+                detail='Job not found',
+            )
+
+        if existing_job.status != JobStatus.QUEUED:
+            raise HTTPException(
+                status_code=400,
+                detail='Cannot add files after processing has started',
+            )
+
+    existing_filenames = {
+        file.original_filename.strip().casefold()
+        for file in (existing_job.files if existing_job is not None else [])
+    }
+    request_filenames: set[str] = set()
+    duplicate_filenames: list[str] = []
+
+    for file in files:
+        original_filename = file.filename or 'uploaded_file'
+        filename_key = original_filename.strip().casefold()
+
+        if (
+            filename_key in existing_filenames
+            or filename_key in request_filenames
+        ):
+            duplicate_filenames.append(original_filename)
+            continue
+
+        request_filenames.add(filename_key)
+
+    if duplicate_filenames:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                'Duplicate files are not allowed: '
+                + ', '.join(sorted(set(duplicate_filenames)))
+            ),
+        )
+
     job_files = []
 
     for file in files:
@@ -116,6 +163,13 @@ async def upload_photos(
                     error_message=str(error),
                 )
             )
+
+    if existing_job is not None:
+        existing_job.files.extend(job_files)
+        if shooting_context is not None:
+            existing_job.shooting_context = shooting_context
+
+        return await storage.update_job(existing_job)
 
     desktop_settings = get_desktop_settings()
     job = ProcessingJob(

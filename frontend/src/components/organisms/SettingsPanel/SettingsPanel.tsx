@@ -7,12 +7,10 @@ import { Panel } from 'components/atoms/Panel/Panel';
 import { Input } from 'components/atoms/Input/Input';
 import { Select } from 'components/atoms/Select/Select';
 import { Checkbox } from 'components/atoms/Checkbox/Checkbox';
-import { Radio } from 'components/atoms/Radio/Radio';
 import styles from './SettingsPanel.module.scss';
 import { SectionHeader } from 'components/molecules/SectionHeader/SectionHeader';
 import {
   AIProvider,
-  ProviderDiscoveryItem,
   StockPlatform,
 } from 'types';
 
@@ -82,6 +80,26 @@ export const SettingsPanel: React.FC = () => {
   const CHAR_LIMIT = 600;
   const charCount = displayedShootingContext.length;
   const isOverLimit = charCount > CHAR_LIMIT;
+  const providerSelectOptions = [
+    {
+      value: "",
+      label:
+        providerDiscoveryStatus === "loading"
+          ? "Detecting providers..."
+          : "Select provider",
+      disabled: true,
+    },
+    ...providerOptions.map((option) => {
+      const isAvailable =
+        providerDiscoveryStatus !== "ready" ||
+        availableProviders.includes(option.value);
+
+      return {
+        ...option,
+        disabled: !isAvailable,
+      };
+    }),
+  ];
 
   const handleFormatChange =
     (key: 'csv' | 'iptc') => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -126,6 +144,40 @@ export const SettingsPanel: React.FC = () => {
           )}
         </div>
 
+        <div className={styles.rowGroup}>
+          <Select
+            label="AI Provider"
+            options={providerSelectOptions}
+            value={selectedProvider ?? ""}
+            onChange={(e) => {
+              const provider = e.target.value as AIProvider | "";
+              if (!provider) return;
+              handleProviderChange(provider);
+            }}
+          />
+
+          {providerDiscoveryStatus === "loading" && (
+            <small className={styles.hintText}>
+              Detecting available AI providers…
+            </small>
+          )}
+
+          {providerDiscoveryStatus === "ready" &&
+            availableProviders.length === 0 && (
+              <small className={styles.errorText}>
+                No AI providers were detected. Provider onboarding will be added
+                later.
+              </small>
+            )}
+
+          {providerDiscoveryStatus === "error" && (
+            <small className={styles.errorText}>
+              {providerDiscoveryError ?? "Failed to detect AI providers."}
+            </small>
+          )}
+
+        </div>
+
         <div className={styles.selectGroup}>
           <Select
             label="Stock Platform"
@@ -165,54 +217,6 @@ export const SettingsPanel: React.FC = () => {
               onChange={handleFormatChange("iptc")}
             />
           </div>
-        </div>
-
-        <div className={styles.rowGroup}>
-          <div className={styles.rowLabel}>AI Provider</div>
-          <div className={styles.providerOptions}>
-            {providerOptions.map((option) => {
-              const isAvailable =
-                providerDiscoveryStatus !== "ready" ||
-                availableProviders.includes(option.value);
-
-              return (
-                <Radio
-                  key={option.value}
-                  id={`ai-provider-${option.value}`}
-                  label={option.label}
-                  checked={selectedProvider === option.value}
-                  disabled={!isAvailable}
-                  onChange={() => handleProviderChange(option.value)}
-                  className={`${styles.providerOption} ${
-                    selectedProvider === option.value
-                      ? styles.selectedOption
-                      : ""
-                  } ${!isAvailable ? styles.disabledOption : ""}`}
-                />
-              );
-            })}
-          </div>
-
-          {providerDiscoveryStatus === "loading" && (
-            <small className={styles.hintText}>
-              Detecting available AI providers…
-            </small>
-          )}
-
-          {providerDiscoveryStatus === "ready" &&
-            availableProviders.length === 0 && (
-              <small className={styles.errorText}>
-                No AI providers were detected. Provider onboarding will be added
-                later.
-              </small>
-            )}
-
-          {providerDiscoveryStatus === "error" && (
-            <small className={styles.errorText}>
-              {providerDiscoveryError ?? "Failed to detect AI providers."}
-            </small>
-          )}
-
         </div>
       </div>
     </Panel>

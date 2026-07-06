@@ -1,5 +1,5 @@
 // frontend/src/components/organisms/MetadataPreview/MetadataPreview.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAppStore } from "store/useAppStore";
 import { useUIStore } from "store/useUIStore";
 import { useToastStore } from "store/useToastStore";
@@ -40,12 +40,12 @@ interface MetadataFieldProps {
   fieldKey: string;
   label: string;
   value: PreviewFieldValue;
-  isEdited?: boolean;
   jobId: string;
   currentJobId: string | null;
   errors?: Array<{ code: string; message: string }>;
   warnings?: Array<{ code: string; message: string }>;
   stockPlatform?: StockPlatform;
+  stockOptions?: StockOptions | null;
   isRegenerating?: boolean;
   wasRegenerated?: boolean;
   fixedOptions?: string[];
@@ -55,23 +55,22 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
   fieldKey,
   label,
   value,
-  isEdited,
   jobId,
   currentJobId,
   errors = [],
   warnings = [],
   stockPlatform,
+  stockOptions = null,
   isRegenerating = false,
   wasRegenerated = false,
   fixedOptions = [],
 }) => {
-  const isArray = Array.isArray(value);
-  const stringValue = isArray
-    ? value.join(", ")
-    : value === null
-      ? ""
-      : String(value);
+  const stringValue = getPreviewFieldStringValue(value);
   const [editValue, setEditValue] = useState(stringValue);
+  const [hasUserChanged, setHasUserChanged] = useState(false);
+  const baselineValueRef = useRef<PreviewFieldValue>(
+    getMetadataSaveValue(fieldKey, stringValue, value),
+  );
   const hasChanged = editValue !== stringValue;
 
   const addToast = useToastStore((state) => state.addToast);
@@ -86,9 +85,64 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
     wasRegenerated ? styles.fieldInputRegenerated : ""
   }`;
 
+  const getKeywordsCount = (text: string) =>
+    text
+      .split(/[,\s]+/)
+      .map((item) => item.trim())
+      .filter(Boolean).length;
+
+  const counterConfig = (() => {
+    if (!stockOptions || !stockPlatform) return null;
+    if (stockOptions.stock_platform !== stockPlatform) return null;
+
+    if (fieldKey === "title") {
+      return {
+        count: editValue.length,
+        limit: stockOptions.title_max_characters,
+        unit: "characters",
+      };
+    }
+
+    if (fieldKey === "description") {
+      return {
+        count: editValue.length,
+        limit: stockOptions.description_max_characters,
+        unit: "characters",
+      };
+    }
+
+    if (fieldKey === "keywords") {
+      return {
+        count: getKeywordsCount(editValue),
+        limit: stockOptions.keywords_max_count,
+        unit: "words",
+      };
+    }
+
+    return null;
+  })();
+
+  const counterExceeded =
+    counterConfig !== null && counterConfig.count > counterConfig.limit;
+  const isEdited =
+    hasUserChanged &&
+    !isPreviewFieldValueEqual(
+      getMetadataSaveValue(fieldKey, editValue, value),
+      baselineValueRef.current,
+    );
+
   useEffect(() => {
     setEditValue(stringValue);
-  }, [stringValue, fieldKey]);
+  }, [stringValue]);
+
+  useEffect(() => {
+    baselineValueRef.current = getMetadataSaveValue(
+      fieldKey,
+      stringValue,
+      value,
+    );
+    setHasUserChanged(false);
+  }, [jobId, fieldKey]);
 
   const handleSave = async (nextEditValue = editValue) => {
     if (!currentJobId || isRegenerating) return;
@@ -99,6 +153,21 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
         nextEditValue,
         value,
       );
+      const currentSaveValue = getMetadataSaveValue(
+        fieldKey,
+        stringValue,
+        value,
+      );
+
+      if (isPreviewFieldValueEqual(saveValue, currentSaveValue)) {
+        setHasUserChanged(
+          !isPreviewFieldValueEqual(
+            currentSaveValue,
+            baselineValueRef.current,
+          ),
+        );
+        return;
+      }
 
       const response = await jobsApi.updateMetadata(currentJobId, jobId, {
         [fieldKey]: saveValue,
@@ -106,6 +175,9 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
       });
 
       applyMetadataResult(jobId, response.data);
+      setHasUserChanged(
+        !isPreviewFieldValueEqual(saveValue, baselineValueRef.current),
+      );
       addToast("Saved", "success");
     } catch {
       addToast("Failed to save", "error");
@@ -143,6 +215,7 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
                 }`}
                 onClick={() => {
                   setEditValue(option.value);
+                  setHasUserChanged(true);
                   handleSave(option.value);
                 }}
                 disabled={isRegenerating}
@@ -157,6 +230,7 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
               value={isRegenerating ? "" : editValue}
               onChange={(e) => {
                 setEditValue(e.target.value);
+                setHasUserChanged(true);
                 handleSave(e.target.value);
               }}
               className={`${styles.select} ${
@@ -178,13 +252,22 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
         ) : (
           <Input
             value={isRegenerating ? "" : editValue}
-            onChange={(e) => setEditValue(e.target.value)}
+            onChange={(e) => {
+              setEditValue(e.target.value);
+              setHasUserChanged(true);
+            }}
             onBlur={() => handleSave()}
             hasError={errors.length > 0}
             variant="metadata"
             disabled={isRegenerating}
             placeholder={isRegenerating ? "Regenerating..." : undefined}
             className={inputClassName}
+            counter={
+              counterConfig
+                ? `${counterConfig.count}/${counterConfig.limit} ${counterConfig.unit}`
+                : undefined
+            }
+            counterError={counterExceeded}
           />
         )}
       </div>
@@ -220,6 +303,27 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
     </div>
   );
 };
+
+const isPreviewFieldValueEqual = (
+  firstValue: PreviewFieldValue,
+  secondValue: PreviewFieldValue,
+) => {
+  if (Array.isArray(firstValue) || Array.isArray(secondValue)) {
+    if (!Array.isArray(firstValue) || !Array.isArray(secondValue)) {
+      return false;
+    }
+
+    return (
+      firstValue.length === secondValue.length &&
+      firstValue.every((item, index) => item === secondValue[index])
+    );
+  }
+
+  return firstValue === secondValue;
+};
+
+const getPreviewFieldStringValue = (value: PreviewFieldValue) =>
+  Array.isArray(value) ? value.join(", ") : value === null ? "" : String(value);
 
 const getMetadataSaveValue = (
   fieldKey: string,
@@ -516,16 +620,16 @@ export const MetadataPreview: React.FC = () => {
 
             return (
               <MetadataField
-                key={field.key}
+                key={`${job.id}:${field.key}`}
                 fieldKey={field.key}
                 label={field.label}
                 value={field.value}
-                isEdited={job.edited_fields?.includes(field.key)}
                 jobId={job.id}
                 currentJobId={currentJobId}
                 errors={errors}
                 warnings={warnings}
                 stockPlatform={job.preview?.stock_platform}
+                stockOptions={stockOptions}
                 isRegenerating={isRegenerating}
                 wasRegenerated={wasRegenerated}
                 fixedOptions={getFixedFieldOptions(field.key, stockOptions)}
@@ -547,16 +651,16 @@ export const MetadataPreview: React.FC = () => {
 
             return (
               <MetadataField
-                key={field.key}
+                key={`${job.id}:${field.key}`}
                 fieldKey={field.key}
                 label={field.label}
                 value={field.value}
-                isEdited={job.edited_fields?.includes(field.key)}
                 jobId={job.id}
                 currentJobId={currentJobId}
                 errors={errors}
                 warnings={warnings}
                 stockPlatform={job.preview?.stock_platform}
+                stockOptions={stockOptions}
                 isRegenerating={isRegenerating}
                 wasRegenerated={wasRegenerated}
                 fixedOptions={getFixedFieldOptions(field.key, stockOptions)}

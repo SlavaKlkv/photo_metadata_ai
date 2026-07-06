@@ -124,8 +124,8 @@ ol {
 
 // ===== SELECTION =====
 ::selection {
-  background: var(--accent-color);
-  color: white;
+  background: var(--selection-bg);
+  color: var(--selection-text);
 }
 
 // ===== FOCUS VISIBLE (для доступности) =====
