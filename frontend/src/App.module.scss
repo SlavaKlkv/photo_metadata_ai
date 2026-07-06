@@ -1,42 +1,155 @@
-@import './styles/variables';
+//frontend/src/App.module.scss
+@import './styles/variables.module.scss';
 
 .app {
+  height: 100vh; /* было min-height */
+  background: var(--bg-primary);
+  color: var(--text-primary);
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  background-color: #f5f5f5;
 }
 
-.header {
-  background-color: $primary;
-  color: white;
-  padding: $spacing-lg;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+.container {
+  height: 100%; /* занимает всю высоту app */
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+}
 
+.bodyShell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  height: 100%;
+  min-height: 0;
+}
+
+.bodyHeader {
+  padding: 20px 24px;
+  border: 1px solid var(--border-color);
+  border-radius: 24px;
+  background: var(--bg-secondary);
+}
+
+.titleBlock {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.titleText {
   h1 {
     margin: 0;
-    font-size: 2rem;
-    font-weight: $font-weight-bold;
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-bold);
+  }
+
+  p {
+    margin: 4px 0 0;
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
   }
 }
 
-.main {
-  flex: 1;
-  padding: $spacing-lg;
-  max-width: 1200px;
-  margin: 0 auto;
-  width: 100%;
+.logo {
+  font-size: 32px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
-.footer {
-  background-color: #333;
-  color: white;
-  text-align: center;
-  padding: $spacing-md;
-  margin-top: auto;
+.bodyContent {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+}
 
-  p {
-    margin: 0;
-    font-size: 0.875rem;
+.grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: var(--spacing-lg);
+  align-items: stretch;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.reviewGrid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 330fr 566fr 448fr;
+  gap: var(--spacing-lg);
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* При 1180px уже переходим на flex, не grid с одной колонкой */
+@media (max-width: 1180px) {
+  .bodyContent {
+    overflow: auto; /* разрешить скролл */
+    min-height: auto;
+  }
+
+  .reviewGrid {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    overflow: visible; /* скролл будет на родителе .bodyContent */
+    gap: var(--spacing-lg);
+  }
+
+  /* дочерние Panel займут естественный размер */
+  .reviewGrid > div {
+    height: auto;
+    min-height: auto;
+    overflow: visible;
+  }
+}
+
+.bodyFooter {
+  padding: 18px 24px;
+  border: 1px solid var(--border-color);
+  border-radius: 24px;
+  background: var(--bg-secondary);
+}
+
+@media (max-width: 1024px) {
+  .container {
+    padding: 20px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    order: 2;
+  }
+
+  .content {
+    order: 1;
+  }
+
+  /* ← ДОБАВИТЬ этот блок */
+  .reviewGrid {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    overflow: visible;
+    gap: var(--spacing-lg);
   }
 }

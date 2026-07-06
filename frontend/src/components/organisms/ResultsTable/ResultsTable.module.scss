@@ -1,0 +1,109 @@
+//frontend/src/components/organisms/ResultsTable/ResultsTable.module.scss
+/* ResultsTable organism styles */
+@import '../../../styles/variables.module.scss';
+
+.panel {
+  height: 100%;
+}
+
+.settingsPanel {
+  height: 100%;
+  min-height: 0;
+}
+
+.tableHeader {
+  display: grid;
+  grid-template-columns: 32px 56px 1fr 1fr;
+  gap: var(--spacing-md);
+  padding: 0 var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.checkboxCell {
+  display: flex;
+  align-items: center;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  flex: 1;
+  min-height: 0; /* для корректной работы overflow внутри flex-контейнера */
+  overflow-y: auto;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0; /* не сжимается — pagination всегда виден */
+}
+
+.footerLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.pageBtn {
+  background: none;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-normal);
+
+  &:hover:not(:disabled) {
+    border-color: var(--border-hover);
+    color: var(--text-primary);
+  }
+
+  &:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+}
+
+.pageBtnActive {
+  background: var(--accent-main);
+  color: var(--text-primary);
+  border-color: var(--accent-main);
+}
+
+.ellipsis {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  padding: 0 2px;
+}
+
+.selectAll {
+  background: none;
+  border: none;
+  color: var(--accent-main);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  padding: 0;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}

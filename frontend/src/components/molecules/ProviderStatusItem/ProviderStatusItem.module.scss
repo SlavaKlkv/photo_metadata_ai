@@ -1,0 +1,185 @@
+// Styles for ProviderStatusItem component
+@import '../../../styles/variables.module.scss';
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: var(--bg-tretiary);
+  border-radius: var(--radius-md);
+}
+
+/* Иконка провайдера */
+.providerIcon {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-foreground);
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon {
+  width: 20px;
+  height: 20px;
+  color: var(--text-primary);
+}
+
+/* QWEN scanning layout */
+.scanning {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.scanningBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.scanningTitle {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+/* Row layout — Gemini/OpenRouter и все остальные состояния */
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.rowText {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.rowTitle {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.rowSubtitle {
+  margin: 0;
+  font-size: var(--font-size-xs, 12px);
+  color: var(--text-placeholder);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowRight {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* Spinner — анимируем существующий load-icon */
+.spinner {
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Found */
+.checkIcon {
+  width: 20px;
+  height: 20px;
+  color: #10b981;
+}
+
+/* Error */
+.errorIcon {
+  width: 20px;
+  height: 20px;
+  color: var(--error-color, #ef4444);
+}
+
+/* API key input */
+.apiKeyRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.apiKeyInput {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  background: var(--bg-tretiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color var(--transition-fast);
+
+  &::placeholder {
+    color: var(--text-placeholder);
+  }
+
+  &:focus {
+    border-color: var(--accent-main);
+  }
+}
+
+.apiKeySaveButton {
+  height: 40px;
+  white-space: nowrap;
+}
+
+.apiKeyInputError {
+  border-color: var(--error-color, #ef4444);
+}
+
+.apiKeyErrorText {
+  margin: -2px 0 0;
+  color: var(--error-color, #ef4444);
+  font-size: var(--font-size-xs, 12px);
+  line-height: 1.4;
+}
+
+/* Footer под input для cloud провайдеров */
+.inputFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.externalLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-sm);
+  color: var(--accent-link);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.externalLinkIcon {
+  width: 12px;
+  height: 12px;
+}

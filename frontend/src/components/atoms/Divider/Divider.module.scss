@@ -1,0 +1,28 @@
+/* Divider atom styles */
+@import '../../../styles/variables.module.scss';
+
+.divider {
+  border: none;
+  margin: 0;
+  background-color: var(--border-color);
+  flex-shrink: 0;
+
+  &.horizontal {
+    width: 100%;
+    height: 1px;
+
+    &.sm { margin: var(--spacing-sm) 0; }
+    &.md { margin: var(--spacing-md) 0; }
+    &.lg { margin: var(--spacing-lg) 0; }
+  }
+
+  &.vertical {
+    width: 1px;
+    height: 100%;
+    align-self: stretch;
+
+    &.sm { margin: 0 var(--spacing-sm); }
+    &.md { margin: 0 var(--spacing-md); }
+    &.lg { margin: 0 var(--spacing-lg); }
+  }
+}

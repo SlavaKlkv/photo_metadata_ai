@@ -3,23 +3,33 @@ from pathlib import Path
 from uuid import uuid4
 
 import aiofiles
-from fastapi import HTTPException, UploadFile
+import structlog
+from fastapi import UploadFile
 from PIL import Image, UnidentifiedImageError
 from starlette.concurrency import run_in_threadpool
 
+from app.core.config import settings
 from app.core.constants import (
     ALLOWED_IMAGE_SUFFIXES,
     ALLOWED_IMAGE_TYPES,
-    MAX_FILE_SIZE_BYTES,
-    UPLOAD_DIR,
 )
+from app.core.exceptions import UploadValidationError
+from app.core.runtime import ensure_runtime_directories, resolve_path_in_base
+from app.utils.sanitizers import sanitize_filename
+
+logger = structlog.get_logger(__name__)
 
 
 def verify_image(content: bytes) -> None:
     """
-    Проверяет, что файл является валидным изображением.
+    Проверяет, что файл является валидным JPEG-изображением.
     """
-    Image.open(BytesIO(content)).verify()
+    with Image.open(BytesIO(content)) as image:
+        image_format = (image.format or '').upper()
+        image.verify()
+
+    if image_format != 'JPEG':
+        raise UploadValidationError('File is not a valid JPEG image')
 
 
 async def validate_upload_file(file: UploadFile, content: bytes) -> None:
@@ -27,31 +37,58 @@ async def validate_upload_file(file: UploadFile, content: bytes) -> None:
     Выполняет валидацию загружаемого файла.
     """
     if file.content_type not in ALLOWED_IMAGE_TYPES:
-        raise HTTPException(
-            status_code=400,
-            detail='Only JPG and PNG files are allowed',
+        logger.warning(
+            'upload_validation_failed',
+            filename=file.filename,
+            content_type=file.content_type,
+            reason='invalid_content_type',
+        )
+        raise UploadValidationError(
+            'Only JPEG files are allowed '
+            f'(received content type: {file.content_type})',
         )
 
     suffix = Path(file.filename or '').suffix.lower()
 
     if suffix not in ALLOWED_IMAGE_SUFFIXES:
-        raise HTTPException(
-            status_code=400,
-            detail='Only JPG and PNG files are allowed',
+        logger.warning(
+            'upload_validation_failed',
+            filename=file.filename,
+            suffix=suffix,
+            reason='invalid_file_suffix',
+        )
+        raise UploadValidationError(
+            'Only JPEG files are allowed '
+            f'(received extension: {suffix or "none"})',
         )
 
-    if len(content) > MAX_FILE_SIZE_BYTES:
-        raise HTTPException(
-            status_code=400,
-            detail='File size exceeds 10 MB',
+    max_file_size_bytes = settings.MAX_UPLOAD_FILE_SIZE_MB * 1024 * 1024
+
+    if len(content) > max_file_size_bytes:
+        logger.warning(
+            'upload_validation_failed',
+            filename=file.filename,
+            file_size=len(content),
+            max_file_size=max_file_size_bytes,
+            reason='file_too_large',
+        )
+        raise UploadValidationError(
+            'File size exceeds '
+            f'{settings.MAX_UPLOAD_FILE_SIZE_MB} MB ({len(content)} bytes)',
         )
 
     try:
         await run_in_threadpool(verify_image, content)
+    except UploadValidationError:
+        raise
     except (UnidentifiedImageError, OSError, SyntaxError):
-        raise HTTPException(
-            status_code=400,
-            detail='Invalid or corrupted image file',
+        logger.warning(
+            'upload_validation_failed',
+            filename=file.filename,
+            reason='invalid_or_corrupted_image',
+        )
+        raise UploadValidationError(
+            'Invalid or corrupted JPEG image',
         )
 
 
@@ -61,17 +98,41 @@ async def save_upload_file(file: UploadFile) -> str:
     """
     original_filename = file.filename or 'uploaded_file'
     suffix = Path(original_filename).suffix.lower()
+    safe_filename_stem = sanitize_filename(original_filename)
 
     content = await file.read()
+    logger.info(
+        'file_upload_started',
+        filename=original_filename,
+        file_size=len(content),
+    )
 
     await validate_upload_file(file, content)
 
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    runtime_directories = ensure_runtime_directories()
+    upload_dir = runtime_directories.uploads_dir
 
-    saved_filename = f'{uuid4()}{suffix}'
-    saved_file_path = UPLOAD_DIR / saved_filename
+    saved_filename = f'{uuid4()}_{safe_filename_stem}{suffix}'
+    try:
+        saved_file_path = resolve_path_in_base(upload_dir, saved_filename)
+    except ValueError as error:
+        logger.warning(
+            'upload_validation_failed',
+            filename=original_filename,
+            reason='unsafe_file_path',
+            error=str(error),
+        )
+        raise UploadValidationError(
+            'Unsafe file path',
+        ) from error
 
     async with aiofiles.open(saved_file_path, 'wb') as output_file:
         await output_file.write(content)
+    logger.info(
+        'file_upload_completed',
+        filename=original_filename,
+        saved_filename=saved_filename,
+        saved_file_path=str(saved_file_path),
+    )
 
     return saved_filename

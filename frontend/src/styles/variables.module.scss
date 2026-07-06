@@ -1,0 +1,109 @@
+// SCSS Variables
+
+:root {
+  // ===== COLORS (Dark Theme из макета) =====
+  --bg-primary: #16161B;        // Основной тёмный фон
+  --bg-secondary: #1B1B22;      // Вторичный фон (панели, карты)
+  --bg-tretiary: #24242E;       // Третичный фон (интерактивные элементы)
+  --bg-foreground: #363645;      // Цвет для текста и иконок на тёмном фоне
+  --text-primary: #F4F4F6;       // Основной текст
+  --text-secondary: #F4F4F6;    // Второстепенный текст. 
+  --text-placeholder: #8D8DA5;   // Цвет текста в плейсхолдерах
+
+  //===== BORDERS =====
+  --border-color: #262836;       // Цвет границ панелей
+  --border-default: #5A5A72;     // Цвет границ для обычных элементов
+  --border-hover: #8D8DA5;       // Цвет границ при наведении
+  --border-active: #F4F4F6;      // Цвет границ при активном состоянии
+  --border-focus: #A9A9BC;    // Цвет границ для отключённых 
+  --border-disabled: #3D3D4B;   // Цвет границ для отключённых элементов
+
+  // ===== BUTTONS =====
+  --bt-default-primary: #5A5AED;       // Цвет фона для основных кнопок
+  --bt-hover-primary: #9191F3;         // Цвет фона при наведении
+  --bt-active-primary: #9191F3;        // Цвет фона при активном состоянии
+  --bt-disabled-primary: #24242E;      // Цвет фона для отключённых кнопок
+
+  --bt-default-secondary: #363645;       // Цвет фона для основных кнопок
+  --bt-hover-secondary: #5A5A72;         // Цвет фона при наведении
+  --bt-active-secondary: #24242E;        // Цвет фона при активном состоянии
+  --bt-disabled-secondary: #24242E;      // Цвет фона для отключённых кнопок
+
+  --bt-default-text: #F4F4F6;     // Цвет текста на кнопках
+  --bt-active-text: #A9A9BC;      // Цвет текста на активных кнопках
+  --bt-disabled-text: #5A5A72;    // Цвет текста на отключённых кнопках
+  
+  // ===== ACCENTS =====
+  --accent-main: #5A5AED;       // Основной цвет (синий)
+  --accent-color: var(--accent-main); // Совместимость с общими UI-состояниями
+  --accent-light: #7171EE;       // Светлый вариант
+  --accent-link: #9191F3; 
+  --accent-dark: #3A3A5F;        // Тёмный вариант
+  --selection-bg: var(--accent-main);
+  --selection-text: #FFFFFF;
+  --success-color: #4caf50;      // Зелёный (успех)
+  --error-color: #ff6b6b;        // Красный (ошибка)
+  --warning-color: #ffa500;      // Оранжевый (предупреждение)
+
+  // ===== row =====
+  --row-bg: #303030;        // Цвет фона для превью строки #1B1B22
+  --row-hover-bg: #24242E;  // Цвет фона при наведении 
+  --row-active-bg: #363645; // Цвет фона при активном состоянии
+
+  // ===== LABELS =====
+  --label-default-primary: #474748;     // Цвет лейблов
+  --label-hover-primary: #5D5D5E;       // Цвет лейблов при наведении
+  --label-active-primary: #3C3C3C;      // Цвет лейблов при активном состоянии
+  --label-default-secondary: #3A3A3A;     // Цвет лейблов
+  --label-hover-secondary: #4E4E4E;       // Цвет лейблов при наведении
+  --label-active-secondary: #353535;     // Цвет лейблов при активном состоянии
+
+  // ===== SPACING (8px grid system) =====
+  --spacing-xs: 4px;             // Мини отступы
+  --spacing-sm: 8px;             // Маленькие
+  --spacing-md: 16px;            // Средние
+  --spacing-lg: 24px;            // Большие
+  --spacing-xl: 32px;            // Очень большие
+  --spacing-2xl: 48px;           // Огромные
+  
+  // ===== TYPOGRAPHY =====
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Courier New', monospace;
+  
+  --font-size-xs: 11px;          // Мелкий текст (helper, errors)
+  --font-size-sm: 12px;          // Маленький (лейблы)
+  --font-size-base: 14px;        // Основной
+  --font-size-lg: 16px;          // Большой
+  --font-size-xl: 18px;          // Очень большой
+  --font-size-2xl: 20px;         // Заголовки
+  --font-size-3xl: 24px;         // Большие заголовки
+  
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+  
+  // ===== BORDER RADIUS =====
+  --radius-sm: 4px;              // Небольшие элементы
+  --radius-md: 8px;              // Обычные элементы
+  --radius-lg: 12px;             // Панели, карты
+  --radius-full: 9999px;         // Круглые кнопки
+
+  
+  // ===== TRANSITIONS =====
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.3s ease;
+  --transition-slow: 0.5s ease;
+  
+  // ===== Z-INDEX =====
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 998;
+  --z-modal: 999;
+  --z-tooltip: 1070;
+}

@@ -1,0 +1,105 @@
+/* Button atom styles */
+@import '../../../styles/variables.module.scss';
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: inherit;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  white-space: nowrap;
+  box-sizing: border-box;
+  text-align: center;
+  
+  &:focus-visible {
+    outline: none;
+    border-color: var(--border-focus);
+  }
+  
+  &:disabled {
+    cursor: not-allowed;
+  }
+  
+  // SIZES
+  &.sm {
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+  
+  &.md {
+    padding: 12px 20px;
+    font-size: 14px;
+  }
+  
+  &.lg {
+    padding: 16px 24px;
+    font-size: 16px;
+  }
+  
+  // VARIANTS
+  &.primary {
+    background: var(--bt-default-primary);
+    color: var(--bt-default-text);
+    border-color: transparent;
+    
+    &:hover:not(:disabled) {
+      background: var(--bt-hover-primary);
+      transform: translateY(-1px);
+    }
+    
+    &:active:not(:disabled) {
+      background: var(--bt-active-primary);
+      color: var(--bt-active-text);
+      transform: translateY(0);
+    }
+    
+    &:disabled {
+      background: var(--bt-disabled-primary);
+      color: var(--bt-disabled-text);
+      border-color: var(--border-disabled);
+    }
+  }
+  
+  &.secondary {
+    background: var(--bt-default-secondary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+    
+    &:hover:not(:disabled) {
+      background: var(--bt-hover-secondary);
+      border-color: var(--border-hover);
+    }
+    
+    &:active:not(:disabled) {
+      background: var(--bt-active-secondary);
+      border-color: var(--border-active);
+    }
+    
+    &:disabled {
+      background: var(--bt-disabled-secondary);
+      color: var(--bt-disabled-text);
+      border-color: var(--border-disabled);
+    }
+  }
+  
+  &.ghost {
+    background: transparent;
+    color: var(--text-primary);
+    border-color: var(--border-color);
+    
+    &:hover:not(:disabled) {
+      background: var(--bg-tretiary);
+    }
+  }
+  
+  .icon {
+    display: inline-flex;
+    align-items: center;
+    color: currentColor;
+  }
+}

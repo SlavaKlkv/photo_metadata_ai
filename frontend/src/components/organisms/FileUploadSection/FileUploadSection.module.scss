@@ -1,0 +1,96 @@
+/* FileUploadSection organism styles */
+@import '../../../styles/variables.module.scss';
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+}
+
+.uploadArea {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  width: 100%;
+  padding: 56px 32px;
+  border: 2px dashed var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--transition-normal), background var(--transition-normal), transform var(--transition-normal);
+}
+
+.uploadArea:hover {
+  border-color: var(--border-hover);
+}
+
+.active {
+  border-color: var(--accent-main);
+  background: var(--bg-tretiary);
+  transform: translateY(-1px);
+}
+
+.uploadIcon {
+  width: 100px;
+  height: 100px;
+  padding: 20px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-main);
+  flex-shrink: 0;
+}
+
+.uploadText {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.uploadText h3 {
+  margin: 0;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+}
+
+.uploadText p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-base);
+}
+
+.uploadText span {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.input {
+  display: none;
+}
+
+.cardsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.cardIcon {
+  width: 24px;
+  height: 24px;
+}
+
+@media (max-width: 900px) {
+  .uploadArea {
+    padding: 44px 24px;
+  }
+
+  .cardsGrid {
+    grid-template-columns: 1fr;
+  }
+}
