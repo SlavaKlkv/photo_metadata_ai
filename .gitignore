@@ -32,14 +32,3 @@ yarn-error.log*
 Thumbs.db
 
 backend/uploads/
-
-# Runtime Artifacts
-/jobs/
-/results/
-/temp/
-backend/jobs/
-backend/results/
-backend/temp/
-desktop_settings.json
-ai_provider_api_keys.json
-marketplace_credentials.json
