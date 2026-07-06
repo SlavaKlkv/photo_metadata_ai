@@ -75,7 +75,7 @@ export const Input = React.forwardRef<HTMLTextAreaElement, InputProps>(
         ) : null}
       </div>
     );
-  }
+  },
 );
 
 Input.displayName = 'Input';

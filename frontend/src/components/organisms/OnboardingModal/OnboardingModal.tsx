@@ -31,6 +31,7 @@ export const OnboardingModal: React.FC = () => {
 
   // Simulated progress for QWEN during scanning
   const [qwenProgress, setQwenProgress] = useState(0);
+  const [isScanningVisible, setIsScanningVisible] = useState(false);
   const [apiKeyValidationStatuses, setApiKeyValidationStatuses] = useState<
     Partial<Record<AIProvider, ApiKeyValidationStatus>>
   >({});
@@ -43,6 +44,8 @@ export const OnboardingModal: React.FC = () => {
   const apiKeyValidationSequences = useRef<Partial<Record<AIProvider, number>>>(
     {},
   );
+  const scanDelayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scanStartTime = useRef<number | null>(null);
 
   useEffect(() => {
     return () => {
@@ -56,21 +59,52 @@ export const OnboardingModal: React.FC = () => {
 
   useEffect(() => {
     if (providerDiscoveryStatus === "loading") {
+      scanStartTime.current = Date.now();
+      setIsScanningVisible(true);
       setQwenProgress(0);
+
       const interval = setInterval(() => {
         setQwenProgress((prev) => {
           if (prev >= 95) return prev;
           return prev + Math.random() * 30;
         });
       }, 300);
-      return () => clearInterval(interval);
+
+      return () => {
+        clearInterval(interval);
+        if (scanDelayTimer.current) {
+          clearTimeout(scanDelayTimer.current);
+          scanDelayTimer.current = null;
+        }
+      };
     }
 
     if (providerDiscoveryStatus === "ready") {
       setQwenProgress(100);
+      const elapsed = scanStartTime.current
+        ? Date.now() - scanStartTime.current
+        : 0;
+      const remaining = Math.max(5000 - elapsed, 0);
+
+      if (remaining > 0) {
+        scanDelayTimer.current = setTimeout(() => {
+          setIsScanningVisible(false);
+          scanDelayTimer.current = null;
+        }, remaining);
+      } else {
+        setIsScanningVisible(false);
+      }
+
+      return () => {
+        if (scanDelayTimer.current) {
+          clearTimeout(scanDelayTimer.current);
+          scanDelayTimer.current = null;
+        }
+      };
     }
 
-    // явный return для всех остальных path
+    setIsScanningVisible(false);
+
     return undefined;
   }, [providerDiscoveryStatus]);
 
@@ -88,10 +122,11 @@ export const OnboardingModal: React.FC = () => {
   }
 
   const hasAtLeastOneProvider = availableProviders.length > 0;
-  const isScanning = providerDiscoveryStatus === "loading";
+  const isScanning = isScanningVisible;
   const isSuccess =
-    providerDiscoveryStatus === "ready" && hasAtLeastOneProvider;
-  const isError = providerDiscoveryStatus === "ready" && !hasAtLeastOneProvider;
+    providerDiscoveryStatus === "ready" && !isScanning && hasAtLeastOneProvider;
+  const isError =
+    providerDiscoveryStatus === "ready" && !isScanning && !hasAtLeastOneProvider;
 
   const handleGetStarted = () => {
     completeOnboarding();
@@ -188,7 +223,6 @@ export const OnboardingModal: React.FC = () => {
         <div className={styles.providers}>
           {providerDiscoveryItems
             .filter((item) => item.provider === "ollama")
-            .filter((item) => isScanning || !isSuccess || item.ready)
             .map((item) => (
               <div key={item.provider} className={styles.providerCard}>
                 <ProviderStatusItem
@@ -204,6 +238,7 @@ export const OnboardingModal: React.FC = () => {
                   }
                   apiKeyError={apiKeyValidationErrors[item.provider]}
                   setupLink={item.setup_links?.[0]}
+                  suppressErrorIcon={isSuccess}
                 />
               </div>
             ))}
@@ -221,6 +256,7 @@ export const OnboardingModal: React.FC = () => {
                 }
                 apiKeyError={apiKeyValidationErrors[item.provider]}
                 setupLink={item.api_key_links?.[0]}
+                suppressErrorIcon={isSuccess}
               />
             ))}
           </div>
@@ -241,7 +277,7 @@ export const OnboardingModal: React.FC = () => {
             variant="primary"
             size="md"
             onClick={handleGetStarted}
-            disabled={isScanning} // TODO: для принудительного включения кнопки вернуть {isScanning || isError}
+            disabled={isScanning} // для принудительного включения кнопки вернуть {isScanning || isError}
             className={styles.actionBtn}
           >
             {isScanning && "Scanning..."}

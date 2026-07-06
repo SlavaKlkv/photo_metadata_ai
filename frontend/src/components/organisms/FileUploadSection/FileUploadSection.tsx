@@ -169,17 +169,26 @@ export const FileUploadSection: React.FC = () => {
   };
 
   const hasUploads = jobsCount > 0;
-  const headline = hasUploads
-    ? `${jobsCount} photos uploaded successfully!`
-    : "Drag & drop photos here";
-  const description = hasUploads
-    ? "Ready for AI processing"
-    : "or click to browse";
-  const metadataHint = isUploading
-    ? "This may take a moment."
-    : hasUploads
-      ? "You can add more photos"
-      : "Upload JPEG photos to begin";
+  const headline = hasUploads ? (
+    `${jobsCount} photos uploaded successfully!`
+  ) : (
+    "Drag & drop photos here"
+  );
+  const description = hasUploads ? (
+    <span className={styles.placeholderText}>Ready for AI processing</span>
+  ) : (
+    <>
+      <span className={styles.placeholderText}>or click to </span>
+      <span className={styles.accentText}>browse</span>
+    </>
+  );
+  const metadataHint = isUploading ? (
+    <span className={styles.placeholderText}>This may take a moment.</span>
+  ) : hasUploads ? (
+    <span className={styles.placeholderText}>You can add more photos</span>
+  ) : (
+    <span className={styles.placeholderText}>Upload JPEG photos to begin</span>
+  );
   const iconName = hasUploads ? "img-modal-icon" : "img-icon";
 
   const cards = [

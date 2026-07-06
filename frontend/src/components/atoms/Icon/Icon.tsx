@@ -24,7 +24,8 @@ import { ReactComponent as GeminiIcon } from '../../../assets/icons/gemini-icon.
 import { ReactComponent as LinkIcon } from '../../../assets/icons/link-icon.svg';
 import { ReactComponent as OpenRouterIcon } from '../../../assets/icons/openrouter-icon.svg';
 import { ReactComponent as QwenIcon } from '../../../assets/icons/qwen-icon.svg';
-import {ReactComponent as CheckboxIcon} from '../../../assets/icons/checkbox-icon.svg';
+import { ReactComponent as CheckboxIcon } from '../../../assets/icons/checkbox-icon.svg';
+import styles from './Icon.module.scss';
 
 export type IconName =
   | 'ai-setup-icon'
@@ -87,8 +88,10 @@ const icons: Record<IconName, ComponentType<SVGProps<SVGSVGElement>>> = {
   'qwen-icon': QwenIcon,
 };
 
-export const Icon = ({ name, ...props }: IconProps) => {
+export const Icon = ({ name, className, ...props }: IconProps) => {
   const Svg = icons[name];
-  return <Svg {...props} />;
+  const svgClassName = [styles.icon, className].filter(Boolean).join(' ');
+
+  return <Svg className={svgClassName} {...props} />;
 };
 

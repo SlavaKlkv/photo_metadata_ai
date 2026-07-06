@@ -126,12 +126,10 @@ export const SettingsPanel: React.FC = () => {
             hasError={isOverLimit}
             disabled={isPromptLocked}
             variant="context"
+            fillHeight
+            counter={`${charCount}/${CHAR_LIMIT}`}
+            counterError={isOverLimit}
           />
-          <div
-            className={`${styles.charCounter} ${isOverLimit ? styles.counterError : ""}`}
-          >
-            {charCount}/{CHAR_LIMIT}
-          </div>
           {isOverLimit && (
             <small className={styles.errorText}>
               Please shorten the description to under {CHAR_LIMIT} characters.
