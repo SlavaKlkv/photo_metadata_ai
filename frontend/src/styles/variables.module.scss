@@ -35,9 +35,12 @@
   
   // ===== ACCENTS =====
   --accent-main: #5A5AED;       // Основной цвет (синий)
+  --accent-color: var(--accent-main); // Совместимость с общими UI-состояниями
   --accent-light: #7171EE;       // Светлый вариант
   --accent-link: #9191F3; 
   --accent-dark: #3A3A5F;        // Тёмный вариант
+  --selection-bg: var(--accent-main);
+  --selection-text: #FFFFFF;
   --success-color: #4caf50;      // Зелёный (успех)
   --error-color: #ff6b6b;        // Красный (ошибка)
   --warning-color: #ffa500;      // Оранжевый (предупреждение)
@@ -104,4 +107,3 @@
   --z-modal: 999;
   --z-tooltip: 1070;
 }
-

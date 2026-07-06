@@ -6,6 +6,7 @@ import styles from './Select.module.scss';
 export interface SelectOption {
   value: string;
   label: string;
+  disabled?: boolean;
 }
 
 export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'children'> {
@@ -24,7 +25,11 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
           {icon && <span className={styles.leftIcon}>{icon}</span>}
           <select ref={ref} className={styles.select} {...props}>
             {options.map((option) => (
-              <option key={option.value} value={option.value}>
+              <option
+                key={option.value}
+                value={option.value}
+                disabled={option.disabled}
+              >
                 {option.label}
               </option>
             ))}

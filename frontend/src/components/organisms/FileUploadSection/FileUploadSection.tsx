@@ -18,10 +18,14 @@ export const FileUploadSection: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
 
+  const existingJobs = useAppStore((state) => state.jobs);
   const addJobs = useAppStore((state) => state.addJobs);
   const jobsCount = useAppStore((state) => state.jobs.length);
   const setIsUploaded = useUIStore((state) => state.setIsUploaded);
   const setCurrentJobId = useUIStore((state) => state.setCurrentJobId);
+  const currentJobId = useUIStore((state) => state.currentJobId);
+  const isProcessing = useUIStore((state) => state.isProcessing);
+  const isExportReady = useUIStore((state) => state.isExportReady);
   const addToast = useToastStore((state) => state.addToast);
   const [isUploading, setIsUploading] = useState(false);
   const addPreviews = useAppStore((state) => state.addPreviews);
@@ -57,6 +61,7 @@ export const FileUploadSection: React.FC = () => {
         status: validation.valid ? ("queued" as const) : ("error" as const),
         error: validation.error,
         metadata: undefined,
+        selected_for_export: true,
       };
     });
   };
@@ -64,6 +69,27 @@ export const FileUploadSection: React.FC = () => {
   const uploadFiles = async (files: File[]) => {
     const validFiles = files.filter((file) => validateFile(file).valid);
     const invalidFiles = files.filter((file) => !validateFile(file).valid);
+    const existingFilenames = new Set(
+      existingJobs.map((job) => job.originalFilename.trim().toLowerCase()),
+    );
+    const selectedFilenames = new Set<string>();
+    const uniqueFiles: File[] = [];
+    const duplicateFiles: File[] = [];
+
+    validFiles.forEach((file) => {
+      const filenameKey = file.name.trim().toLowerCase();
+
+      if (
+        existingFilenames.has(filenameKey) ||
+        selectedFilenames.has(filenameKey)
+      ) {
+        duplicateFiles.push(file);
+        return;
+      }
+
+      selectedFilenames.add(filenameKey);
+      uniqueFiles.push(file);
+    });
 
     if (invalidFiles.length > 0) {
       addToast(
@@ -72,12 +98,22 @@ export const FileUploadSection: React.FC = () => {
       );
     }
 
-    if (validFiles.length === 0) return;
+    if (duplicateFiles.length > 0) {
+      addToast(
+        `${duplicateFiles.length} duplicate file${duplicateFiles.length > 1 ? "s" : ""} skipped`,
+        "error",
+      );
+    }
+
+    if (uniqueFiles.length === 0) return;
 
     const formData = new FormData();
-    validFiles.forEach((file) => formData.append("files", file));
+    uniqueFiles.forEach((file) => formData.append("files", file));
     if (draftBatchSettings.shootingContext) {
       formData.append("shooting_context", draftBatchSettings.shootingContext);
+    }
+    if (currentJobId && !isProcessing && !isExportReady) {
+      formData.append("job_id", currentJobId);
     }
 
     try {
@@ -90,14 +126,16 @@ export const FileUploadSection: React.FC = () => {
       });
 
       const previewMap: Record<string, string> = {};
-      response.data.files.forEach((f: { file_id: string }, index: number) => {
+      const uploadedFiles = response.data.files.slice(-uniqueFiles.length);
+
+      uploadedFiles.forEach((f: { file_id: string }, index: number) => {
         // порядок сохраняется — маппим по индексу
-        previewMap[f.file_id] = URL.createObjectURL(validFiles[index]);
+        previewMap[f.file_id] = URL.createObjectURL(uniqueFiles[index]);
       });
       addPreviews(previewMap);
 
-      const fileIds = response.data.files.map((f) => f.file_id);
-      const jobs = createJobs(validFiles, fileIds);
+      const fileIds = uploadedFiles.map((f) => f.file_id);
+      const jobs = createJobs(uniqueFiles, fileIds);
       addJobs(jobs);
       setCurrentJobId(response.data.job_id);
       setIsUploaded(true);
@@ -164,7 +202,7 @@ export const FileUploadSection: React.FC = () => {
       icon: <Icon name="load-icon" className={styles.cardIcon} />,
       title: "Stock-Optimized",
       description:
-        "Our AI analyzes each photo and generates accurate, stock-ready metadata.",
+        "Tailor titles, keywords, and categories for stock marketplace requirements.",
     },
     {
       icon: <Icon name="doc-icon" className={styles.cardIcon} />,

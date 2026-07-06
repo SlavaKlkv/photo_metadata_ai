@@ -68,7 +68,7 @@ export const SuccessModal: React.FC = () => {
   };
 
   const exportedCount = jobs.filter(
-    (job) => job.selected_for_export === true,
+    (job) => job.selected_for_export !== false,
   ).length;
 
   return (

@@ -1,7 +1,9 @@
+from io import BytesIO
 from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 
 from app.api.v1.jobs import jobs as jobs_api
 from app.core.enums import (
@@ -11,6 +13,7 @@ from app.core.enums import (
     MetadataFieldSource,
     StockPlatform,
 )
+from app.core.runtime import get_runtime_directories
 from app.main import app
 from app.schemas.job import ProcessingJob, ProcessingJobFile
 from app.services.ai.ai_fallback import FallbackMetadataResult
@@ -362,6 +365,138 @@ def test_regenerate_saves_attempt_history_and_keeps_other_files_unchanged(
     assert stored_second_file['title'] == second_original_title
 
 
+def test_upload_appends_files_to_queued_job_and_updates_context():
+    job = ProcessingJob(
+        shooting_context='Old context',
+        files=[
+            ProcessingJobFile(
+                filename='existing.jpg',
+                original_filename='existing.jpg',
+            )
+        ],
+    )
+    storage._jobs[job.job_id] = job
+
+    files = [
+        (
+            'files',
+            ('first-new.jpg', _build_tiny_jpeg_bytes(), 'image/jpeg'),
+        ),
+        (
+            'files',
+            ('second-new.jpg', _build_tiny_jpeg_bytes(), 'image/jpeg'),
+        ),
+    ]
+
+    with TestClient(app) as client:
+        response = client.post(
+            '/api/v1/jobs/upload',
+            data={
+                'job_id': str(job.job_id),
+                'shooting_context': 'Updated context',
+            },
+            files=files,
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload['job_id'] == str(job.job_id)
+    assert payload['shooting_context'] == 'Updated context'
+    assert [file['original_filename'] for file in payload['files']] == [
+        'existing.jpg',
+        'first-new.jpg',
+        'second-new.jpg',
+    ]
+    assert [file['status'] for file in payload['files']] == [
+        'queued',
+        'queued',
+        'queued',
+    ]
+    assert len(storage._jobs[job.job_id].files) == 3
+
+
+def test_upload_returns_404_for_missing_append_target_without_saving_file():
+    upload_dir = get_runtime_directories().uploads_dir
+
+    with TestClient(app) as client:
+        response = client.post(
+            '/api/v1/jobs/upload',
+            data={'job_id': str(uuid4())},
+            files={
+                'files': (
+                    'orphan.jpg',
+                    _build_tiny_jpeg_bytes(),
+                    'image/jpeg',
+                ),
+            },
+        )
+
+    assert response.status_code == 404
+    assert response.json()['detail'] == 'Job not found'
+    assert list(upload_dir.iterdir()) == []
+
+
+def test_upload_rejects_append_after_processing_started_without_mutating_job():
+    job = ProcessingJob(
+        status=JobStatus.PROCESSING,
+        files=[
+            ProcessingJobFile(
+                filename='existing.jpg',
+                original_filename='existing.jpg',
+            )
+        ],
+    )
+    storage._jobs[job.job_id] = job
+    upload_dir = get_runtime_directories().uploads_dir
+
+    with TestClient(app) as client:
+        response = client.post(
+            '/api/v1/jobs/upload',
+            data={'job_id': str(job.job_id)},
+            files={
+                'files': (
+                    'blocked.jpg',
+                    _build_tiny_jpeg_bytes(),
+                    'image/jpeg',
+                ),
+            },
+        )
+
+    assert response.status_code == 400
+    assert response.json()['detail'] == (
+        'Cannot add files after processing has started'
+    )
+    assert len(storage._jobs[job.job_id].files) == 1
+    assert storage._jobs[job.job_id].files[0].original_filename == (
+        'existing.jpg'
+    )
+    assert list(upload_dir.iterdir()) == []
+
+
+def test_upload_rejects_duplicate_filenames_without_saving_files():
+    upload_dir = get_runtime_directories().uploads_dir
+
+    files = [
+        (
+            'files',
+            ('duplicate.jpg', _build_tiny_jpeg_bytes(), 'image/jpeg'),
+        ),
+        (
+            'files',
+            ('duplicate.jpg', _build_tiny_jpeg_bytes(), 'image/jpeg'),
+        ),
+    ]
+
+    with TestClient(app) as client:
+        response = client.post('/api/v1/jobs/upload', files=files)
+
+    assert response.status_code == 400
+    assert response.json()['detail'] == (
+        'Duplicate files are not allowed: duplicate.jpg'
+    )
+    assert list(upload_dir.iterdir()) == []
+
+
 def _build_completed_job(
     *,
     status: JobStatus = JobStatus.COMPLETED,
@@ -416,3 +551,9 @@ def _build_completed_file(
             'license_type': MetadataFieldSource.GENERATED,
         },
     )
+
+
+def _build_tiny_jpeg_bytes() -> bytes:
+    buffer = BytesIO()
+    Image.new('RGB', (1, 1), color='white').save(buffer, format='JPEG')
+    return buffer.getvalue()

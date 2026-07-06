@@ -196,12 +196,25 @@ def normalize_iptc_city(value: str | None) -> str | None:
         return None
 
     normalized_lower = normalized.lower()
+    explicit_city = False
     for prefix in ('city=', 'location='):
         if normalized_lower.startswith(prefix):
+            explicit_city = prefix == 'city='
             normalized = normalized[len(prefix) :].strip()
             break
 
-    city = re.split(r'\s*[,;|/]\s*', normalized, maxsplit=1)[0].strip()
+    location_parts = [
+        part.strip()
+        for part in re.split(r'\s*[,;|/]\s*', normalized)
+        if part.strip()
+    ]
+    if not location_parts:
+        return None
+
+    if not explicit_city and len(location_parts) == 1:
+        return None
+
+    city = location_parts[0]
 
     return city or None
 
