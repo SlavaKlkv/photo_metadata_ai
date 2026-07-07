@@ -18,14 +18,17 @@
 .inputGroup {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--spacing-sm);
   flex: 1;
   min-height: 0;
 }
 
 .label {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-normal);
+  color: var(--text-placeholder);
+  line-height: var(--line-height-tight);
 }
 
 .counterError {
@@ -38,8 +41,14 @@
 }
 
 .hintText {
-  color: var(--text-secondary);
-  font-size: var(--font-size-sm);
+  margin: 0;
+  padding: 0;
+  color: var(--text-placeholder);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-tight);
+  display: block;
+  width: 100%;
+  white-space: normal;
 }
 
 .checkboxRow {
@@ -55,9 +64,19 @@
   gap: 8px;
 }
 
+.selectGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  width: 100%;
+}
+
 .rowLabel {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-normal);
+  color: var(--text-placeholder);
+  line-height: var(--line-height-tight);
 }
 
 .providerOptions {

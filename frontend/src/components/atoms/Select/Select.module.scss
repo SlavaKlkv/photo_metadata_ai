@@ -8,9 +8,10 @@
 }
 
 .label {
-  color: var(--text-primary);
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-medium);
+  color: var(--text-placeholder);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-tight);
 }
 
 .selectWrapper {
@@ -76,4 +77,5 @@
 .helper {
   color: var(--text-secondary);
   font-size: var(--font-size-sm);
+  line-height: var(--line-height-tight);
 }

@@ -1,4 +1,5 @@
-.header {
+.header,
+.appHeader {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -8,6 +9,10 @@
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+.appHeader .topRow {
+  gap: 12px;
 }
 
 .headerIcon {
@@ -20,9 +25,25 @@
   flex-shrink: 0;
 }
 
+.appHeader .headerIcon {
+  width: 36px;
+  height: 36px;
+}
+
 .icon {
   width: 24px;
   height: 24px;
+}
+
+.appHeader .icon {
+  width: 36px;
+  height: 36px;
+}
+
+.appHeader .headerText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
 }
 
 .title {
@@ -34,6 +55,7 @@
 
 .subtitle {
   margin: 0;
+  padding-top: var(--spacing-xs);
   font-size: var(--font-size-base);
   color: var(--text-placeholder);
   line-height: var(--line-height-tight);
