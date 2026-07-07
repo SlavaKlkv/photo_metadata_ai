@@ -13,7 +13,7 @@
   height: 100%; /* занимает всю высоту app */
   max-width: 1440px;
   margin: 0 auto;
-  padding: 24px;
+  padding: var(--spacing-lg);
   display: flex;
   flex-direction: column;
 }
@@ -27,9 +27,9 @@
 }
 
 .bodyHeader {
-  padding: 20px 24px;
+  padding: var(--spacing-md) var(--spacing-lg);
   border: 1px solid var(--border-color);
-  border-radius: 24px;
+  border-radius: var(--radius-lg);
   background: var(--bg-secondary);
 }
 
@@ -47,14 +47,14 @@
   }
 
   p {
-    margin: 4px 0 0;
+    margin: var(--spacing-xs) 0 0;
     font-size: var(--font-size-sm);
     color: var(--text-secondary);
   }
 }
 
 .logo {
-  font-size: 32px;
+  font-size: var(--font-size-4xl);
   display: flex;
   align-items: center;
   flex-shrink: 0;
@@ -121,9 +121,9 @@
 }
 
 .bodyFooter {
-  padding: 18px 24px;
+  padding: var(--spacing-md) var(--spacing-lg);
   border: 1px solid var(--border-color);
-  border-radius: 24px;
+  border-radius: var(--radius-lg);
   background: var(--bg-secondary);
 }
 

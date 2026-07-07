@@ -3,7 +3,6 @@ import React, { useEffect } from 'react';
 import { useUIStore } from './store/useUIStore';
 import { usePolling } from './hooks/usePolling';
 import styles from './App.module.scss';
-import { Icon } from './components/atoms/Icon/Icon';
 import { FileUploadSection } from './components/organisms/FileUploadSection/FileUploadSection';
 import { SettingsPanel } from './components/organisms/SettingsPanel/SettingsPanel';
 import { ProgressModal } from './components/organisms/ProgressModal/ProgressModal';
@@ -13,6 +12,7 @@ import { MetadataPreview } from './components/organisms/MetadataPreview/Metadata
 import { ExportModal } from './components/organisms/ExportModal/ExportModal';
 import { SuccessModal } from './components/organisms/SuccessModal/SuccessModal';
 import { OnboardingModal } from './components/organisms/OnboardingModal/OnboardingModal';
+import { SectionHeader } from './components/molecules/SectionHeader/SectionHeader';
 import { useAppStore } from './store/useAppStore';
 
 function App() {
@@ -42,13 +42,13 @@ function App() {
       <main className={styles.container}>
         <section className={styles.bodyShell}>
           <div className={styles.bodyHeader}>
-            <div className={styles.titleBlock}>
-              <Icon name="logo" className={styles.logo} />
-              <div className={styles.titleText}>
-                <h1>Photo Metadata AI</h1>
-                <p>Prepare your photos for stock platforms in minutes</p>
-              </div>
-            </div>
+            <SectionHeader
+              icon="logo"
+              title="Photo Metadata AI"
+              subtitle="Prepare your photos for stock platforms in minutes"
+              titleTag="h1"
+              variant="app"
+            />
           </div>
 
           <div className={styles.bodyContent}>
