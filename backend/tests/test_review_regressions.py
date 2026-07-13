@@ -1,8 +1,10 @@
-from io import BytesIO
+import csv
+from io import BytesIO, StringIO
 from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from iptcinfo3 import IPTCInfo
 from PIL import Image
 
 from app.api.v1.jobs import jobs as jobs_api
@@ -19,6 +21,8 @@ from app.schemas.job import ProcessingJob, ProcessingJobFile
 from app.services.ai.ai_fallback import FallbackMetadataResult
 from app.services.ai.ai_provider import AIMetadataResponse
 from app.services.export.csv import generate_metadata_csv
+from app.services.metadata.metadata_embedding import embed_metadata_into_jpg
+from app.services.metadata.stock_mapping import build_stock_iptc_payload
 from app.storage.jobs import storage
 
 
@@ -78,6 +82,22 @@ def test_review_patch_persists_edits_and_remaps_preview():
     assert stock_fields['Category']['value'] == 'Animals'
 
 
+def test_results_endpoint_uses_requested_stock_platform_over_job_default():
+    job = _build_completed_job()
+    job.stock_platform = StockPlatform.SHUTTERSTOCK
+
+    with TestClient(app) as client:
+        response = client.get(
+            f'/api/v1/jobs/{job.job_id}/results',
+            params={'stock_platform': 'getty_images'},
+        )
+
+    assert response.status_code == 200
+    result = response.json()['results'][0]
+    assert result['preview']['stock_platform'] == 'getty_images'
+    assert result['license_type'] == 'creative'
+
+
 def test_review_patch_editorial_false_clears_editorial_required_errors():
     job = _build_completed_job()
     job.stock_platform = StockPlatform.GETTY_IMAGES
@@ -121,6 +141,211 @@ def test_csv_export_uses_latest_metadata_and_skips_unselected_files():
     assert 'second.jpg' in csv_content
     assert 'Latest selected title' in csv_content
     assert 'latest, selected, metadata' in csv_content
+
+
+def test_shutterstock_csv_formats_categories_with_comma_separator():
+    job = _build_completed_job()
+    file = job.files[0]
+    file.categories = ['Transportation', 'Animals/Wildlife']
+
+    rows = list(
+        csv.DictReader(
+            StringIO(generate_metadata_csv(job, StockPlatform.SHUTTERSTOCK))
+        )
+    )
+
+    assert rows[0]['Categories'] == 'Transportation, Animals/Wildlife'
+
+
+def test_iptc_export_writes_readable_stock_mapped_metadata():
+    job = _build_completed_job()
+    file = job.files[0]
+    file.filename = 'iptc-readback.jpg'
+    file.title = 'Readable IPTC title'
+    file.description = 'Readable IPTC description'
+    file.keywords = ['travel', 'cityscape', 'london']
+    file.categories = ['Travel', 'Nature']
+    file.category_2 = 'Nature'
+    file.license_type = 'editorial'
+    file.is_editorial = True
+    file.editorial_caption = 'London, England - Editorial caption'
+    file.editorial_date = '2026-07-13'
+    file.location_metadata = 'London, England, United Kingdom'
+    file.model_release_available = False
+    file.releases = ['model-release.pdf']
+
+    image_path = get_runtime_directories().uploads_dir / file.filename
+    image_path.write_bytes(_build_tiny_jpeg_bytes())
+    payload = build_stock_iptc_payload(file, StockPlatform.GETTY_IMAGES)
+
+    embed_metadata_into_jpg(file, payload=payload, file_path=image_path)
+
+    iptc_info = IPTCInfo(
+        str(image_path),
+        force=True,
+        inp_charset='utf_8',
+    )
+
+    assert _iptc_text(iptc_info['object name']) == 'Readable IPTC title'
+    assert _iptc_text(iptc_info['caption/abstract']) == (
+        'London, England - Editorial caption'
+    )
+    keywords = _iptc_list(iptc_info['keywords'])
+    assert keywords[:3] == ['travel', 'cityscape', 'london']
+    assert _iptc_list(iptc_info['supplemental category']) == [
+        'Travel',
+        'Nature',
+    ]
+    assert _iptc_text(iptc_info['city']) == 'London'
+    assert _iptc_text(iptc_info['province/state']) == 'England'
+    assert _iptc_text(iptc_info['country/primary location name']) == (
+        'United Kingdom'
+    )
+    assert _iptc_text(iptc_info['date created']) == '20260713'
+    assert _iptc_text(iptc_info['special instructions']) == (
+        'license=editorial; releases=model-release.pdf; editorial=yes; '
+        'editorial_date=2026-07-13; '
+        'location=London, England, United Kingdom'
+    )
+
+
+@pytest.mark.parametrize(
+    'stock_platform',
+    [
+        StockPlatform.GETTY_IMAGES,
+        StockPlatform.SHUTTERSTOCK,
+        StockPlatform.ADOBE_STOCK,
+    ],
+)
+def test_iptc_payload_preserves_country_only_location_for_every_stock(
+    stock_platform: StockPlatform,
+):
+    job = _build_completed_job()
+    file = job.files[0]
+    file.location_metadata = 'France'
+
+    payload = build_stock_iptc_payload(file, stock_platform)
+
+    assert payload.city is None
+    assert payload.province_state is None
+    assert payload.country_name == 'France'
+
+
+def test_getty_csv_contains_all_stock_specific_preview_fields():
+    job = _build_completed_job()
+    file = job.files[0]
+    file.categories = ['Travel', 'Nature']
+    file.category_2 = 'Nature'
+    file.license_type = 'editorial'
+    file.is_editorial = True
+    file.editorial_caption = 'London, England - Historic landmark'
+    file.editorial_date = '2026-07-13'
+    file.location_metadata = 'London, England, United Kingdom'
+    file.releases = ['model-release.pdf']
+
+    rows = list(
+        csv.DictReader(
+            StringIO(generate_metadata_csv(job, StockPlatform.GETTY_IMAGES))
+        )
+    )
+
+    assert list(rows[0]) == [
+        'Filename',
+        'Title',
+        'Description',
+        'Keywords',
+        'Category 1',
+        'Category 2',
+        'License Type',
+        'Editorial',
+        'Editorial Caption',
+        'Editorial Date',
+        'Location',
+        'Releases',
+    ]
+    assert rows[0]['Category 1'] == 'Travel'
+    assert rows[0]['Category 2'] == 'Nature'
+    assert rows[0]['License Type'] == 'editorial'
+    assert rows[0]['Editorial Caption'] == (
+        'London, England - Historic landmark'
+    )
+    assert rows[0]['Editorial Date'] == '2026-07-13'
+
+
+def test_adobe_csv_contains_all_stock_specific_preview_fields():
+    job = _build_completed_job()
+    file = job.files[0]
+    file.editorial_caption = 'Editorial caption'
+    file.ai_generated_content_disclosure = True
+    file.is_illustration = False
+    file.mature_content = True
+
+    rows = list(
+        csv.DictReader(
+            StringIO(generate_metadata_csv(job, StockPlatform.ADOBE_STOCK))
+        )
+    )
+
+    assert list(rows[0]) == [
+        'Filename',
+        'Title',
+        'Description',
+        'Keywords',
+        'Category',
+        'Editorial',
+        'Editorial Caption',
+        'Location',
+        'Releases',
+        'AI Disclosure',
+        'Illustration',
+        'Mature Content',
+    ]
+    assert rows[0]['Editorial Caption'] == 'Editorial caption'
+    assert rows[0]['AI Disclosure'] == 'Yes'
+    assert rows[0]['Illustration'] == 'No'
+    assert rows[0]['Mature Content'] == 'Yes'
+
+
+def test_export_download_uses_requested_stock_platform_without_mutating_job():
+    job = _build_completed_job()
+    job.stock_platform = StockPlatform.SHUTTERSTOCK
+
+    with TestClient(app) as client:
+        response = client.get(
+            f'/api/v1/jobs/{job.job_id}/export',
+            params={'csv': 'true', 'stock_platform': 'adobe_stock'},
+        )
+
+    assert response.status_code == 200
+    assert 'text/csv' in response.headers.get('content-type', '')
+    assert f'{job.job_id}_adobe_stock.csv' in response.headers.get(
+        'content-disposition',
+        '',
+    )
+    assert response.text.startswith(
+        'Filename,Title,Description,Keywords,Category,Editorial,'
+        'Editorial Caption,Location,Releases,AI Disclosure,Illustration,'
+        'Mature Content'
+    )
+    assert storage._jobs[job.job_id].stock_platform == (
+        StockPlatform.SHUTTERSTOCK
+    )
+
+
+def test_start_export_updates_job_to_requested_stock_platform():
+    job = _build_completed_job()
+    job.stock_platform = StockPlatform.SHUTTERSTOCK
+
+    with TestClient(app) as client:
+        response = client.post(
+            f'/api/v1/jobs/{job.job_id}/export',
+            params={'csv': 'true', 'stock_platform': 'adobe_stock'},
+        )
+
+    assert response.status_code == 200
+    assert storage._jobs[job.job_id].stock_platform == (
+        StockPlatform.ADOBE_STOCK
+    )
 
 
 def test_results_endpoint_returns_paginated_stably_sorted_page():
@@ -338,7 +563,7 @@ def test_regenerate_saves_attempt_history_and_keeps_other_files_unchanged(
                 f'/api/v1/jobs/{job.job_id}/files/'
                 f'{first_file.file_id}/regenerate'
             ),
-            json={'ai_provider': 'ollama'},
+            json={'ai_provider': 'ollama', 'stock_platform': 'getty_images'},
         )
         job_response = client.get(f'/api/v1/jobs/{job.job_id}')
 
@@ -356,6 +581,9 @@ def test_regenerate_saves_attempt_history_and_keeps_other_files_unchanged(
     assert stored_first_file['regenerate_attempts'][0]['ai_provider'] == (
         'gemini'
     )
+    assert stored_first_file['regenerate_attempts'][0]['stock_platform'] == (
+        'getty_images'
+    )
     assert (
         stored_first_file['regenerate_attempts'][0]['previous_metadata'][
             'title'
@@ -363,6 +591,7 @@ def test_regenerate_saves_attempt_history_and_keeps_other_files_unchanged(
         == 'Edited title before regenerate'
     )
     assert stored_second_file['title'] == second_original_title
+    assert job_response.json()['stock_platform'] == 'getty_images'
 
 
 def test_upload_appends_files_to_queued_job_and_updates_context():
@@ -557,3 +786,17 @@ def _build_tiny_jpeg_bytes() -> bytes:
     buffer = BytesIO()
     Image.new('RGB', (1, 1), color='white').save(buffer, format='JPEG')
     return buffer.getvalue()
+
+
+def _iptc_text(value: object) -> str:
+    if isinstance(value, bytes):
+        return value.decode('utf_8')
+
+    return str(value)
+
+
+def _iptc_list(values: object) -> list[str]:
+    if not isinstance(values, list):
+        return [_iptc_text(values)]
+
+    return [_iptc_text(value) for value in values]

@@ -53,6 +53,7 @@ export const jobsApi = {
     formats: {
       csv?: boolean;
       iptc?: boolean;
+      stock_platform?: StockPlatform;
     },
   ) =>
     apiClient.post(`/api/v1/jobs/${jobId}/export`, null, {

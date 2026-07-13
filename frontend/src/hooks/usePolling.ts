@@ -82,7 +82,10 @@ export const usePolling = (jobId: string | null) => {
 
           try {
             const [resultsResponse, optionsResponse] = await Promise.all([
-              jobsApi.getResults(jobId),
+              jobsApi.getResultsByStock(
+                jobId,
+                draftBatchSettings.stockPlatform as StockPlatform,
+              ),
               jobsApi.getStockOptions(
                 draftBatchSettings.stockPlatform as StockPlatform,
               ),

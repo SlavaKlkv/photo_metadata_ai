@@ -429,6 +429,7 @@ async def regenerate_file_metadata(
         regenerated_metadata=regenerated_snapshot,
     )
     job_file.regenerate_attempts.append(regenerate_attempt)
+    job.stock_platform = resolved_stock_platform
     job.effective_ai_provider = regenerate_result.provider
     job.effective_ai_model = regenerate_result.model
 
@@ -775,6 +776,10 @@ async def start_job_export(
         default=False,
         description='Include IPTC export format',
     ),
+    stock_platform: StockPlatform | None = Query(
+        default=None,
+        description='Export metadata mapped to selected stock platform',
+    ),
 ):
     """
     Запускает подготовку экспорта задачи в выбранных форматах.
@@ -815,13 +820,15 @@ async def start_job_export(
             detail='No selected completed files available for export',
         )
 
-    stock_platform = job.stock_platform or StockPlatform.SHUTTERSTOCK
+    export_stock_platform = (
+        stock_platform or job.stock_platform or StockPlatform.SHUTTERSTOCK
+    )
     validation_errors: list[dict[str, object]] = []
 
     for file in completed_files:
         validation_result = validate_file_metadata_for_stock(
             file,
-            stock_platform,
+            export_stock_platform,
         )
 
         if validation_result.errors:
@@ -843,11 +850,12 @@ async def start_job_export(
                 'message': (
                     'Export is blocked because metadata has validation errors.'
                 ),
-                'stock_platform': stock_platform.value,
+                'stock_platform': export_stock_platform.value,
                 'files': validation_errors,
             },
         )
 
+    job.stock_platform = export_stock_platform
     job.export_status = ExportStatus.QUEUED
     job.export_progress = 0
     job.export_formats = selected_export_formats
@@ -914,6 +922,12 @@ async def export_job(
         default=False,
         description='Download IPTC export artifacts',
     ),
+    stock_platform: StockPlatform | None = Query(
+        default=None,
+        description=(
+            'Download export artifacts mapped to selected stock platform'
+        ),
+    ),
 ):
     """
     Возвращает экспорт задачи в выбранных форматах.
@@ -939,7 +953,10 @@ async def export_job(
         )
 
     previous_export_formats = list(job.export_formats)
+    previous_stock_platform = job.stock_platform
     job.export_formats = selected_export_formats
+    if stock_platform is not None:
+        job.stock_platform = stock_platform
 
     try:
         export_artifacts = await run_in_threadpool(
@@ -954,6 +971,7 @@ async def export_job(
         ) from error
     finally:
         job.export_formats = previous_export_formats
+        job.stock_platform = previous_stock_platform
 
     filtered_artifacts = [
         artifact

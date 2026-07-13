@@ -18,6 +18,9 @@ export const ExportModal: React.FC = () => {
   const exportFormats = useAppStore(
     (state) => state.draftBatchSettings.exportFormats,
   );
+  const stockPlatform = useAppStore(
+    (state) => state.draftBatchSettings.stockPlatform,
+  );
 
   const setExportArtifacts = useUIStore((state) => state.setExportArtifacts);
 
@@ -36,6 +39,7 @@ export const ExportModal: React.FC = () => {
         await jobsApi.startExport(currentJobId, {
           csv: exportFormats.csv,
           iptc: exportFormats.iptc,
+          stock_platform: stockPlatform,
         });
 
         let exportCompleted = false;

@@ -94,7 +94,7 @@ def _build_csv_row(
     keywords = _format_keywords(mapped_metadata.keywords)
     title = mapped_metadata.title or ''
     description = mapped_metadata.description or ''
-    categories_value = _format_list(mapped_metadata.categories)
+    categories_value = _format_categories(mapped_metadata.categories)
     primary_category = (
         mapped_metadata.categories[0] if mapped_metadata.categories else ''
     )
@@ -122,8 +122,12 @@ def _build_csv_row(
             title,
             description,
             keywords,
-            categories_value,
+            primary_category,
+            mapped_metadata.category_2 or '',
+            mapped_metadata.license_type or '',
             editorial,
+            mapped_metadata.editorial_caption or '',
+            mapped_metadata.editorial_date or '',
             location,
             releases,
         ]
@@ -136,8 +140,12 @@ def _build_csv_row(
             keywords,
             primary_category,
             editorial,
+            mapped_metadata.editorial_caption or '',
             location,
             releases,
+            _format_bool(mapped_metadata.ai_generated_content_disclosure),
+            _format_bool(mapped_metadata.is_illustration),
+            _format_bool(mapped_metadata.mature_content),
         ]
 
     logger.warning(
@@ -165,6 +173,13 @@ def _format_list(values: list[str]) -> str:
     Форматирует список в одну CSV-ячейку.
     """
     return ' | '.join(value for value in values if value.strip())
+
+
+def _format_categories(values: list[str]) -> str:
+    """
+    Форматирует категории в одну CSV-ячейку.
+    """
+    return ', '.join(value.strip() for value in values if value.strip())
 
 
 def _format_keywords(keywords: list[str]) -> str:

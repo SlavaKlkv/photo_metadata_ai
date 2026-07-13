@@ -14,12 +14,23 @@ logger = structlog.get_logger(__name__)
 
 
 @dataclass(frozen=True)
+class IPTCLocation:
+    sublocation: str | None = None
+    city: str | None = None
+    province_state: str | None = None
+    country_name: str | None = None
+
+
+@dataclass(frozen=True)
 class IPTCEmbeddingPayload:
     object_name: str
     caption_abstract: str
     keywords: list[str]
     supplemental_category: list[str]
+    sublocation: str | None = None
     city: str | None = None
+    province_state: str | None = None
+    country_name: str | None = None
     date_created: str | None = None
     special_instructions: str | None = None
 
@@ -144,8 +155,23 @@ def _embed_iptc_metadata(
 
         _set_iptc_optional_text(
             iptc_info,
+            'sub-location',
+            payload.sublocation,
+        )
+        _set_iptc_optional_text(
+            iptc_info,
             'city',
             payload.city,
+        )
+        _set_iptc_optional_text(
+            iptc_info,
+            'province/state',
+            payload.province_state,
+        )
+        _set_iptc_optional_text(
+            iptc_info,
+            'country/primary location name',
+            payload.country_name,
         )
         _set_iptc_optional_text(
             iptc_info,
@@ -174,32 +200,41 @@ def _embed_iptc_metadata(
 def _build_default_iptc_payload(
     file: ProcessingJobFile,
 ) -> IPTCEmbeddingPayload:
+    location = normalize_iptc_location(file.location_metadata)
+
     return IPTCEmbeddingPayload(
         object_name=file.title or '',
         caption_abstract=file.description or '',
         keywords=list(file.keywords),
         supplemental_category=list(file.categories),
-        city=normalize_iptc_city(file.location_metadata),
+        sublocation=location.sublocation,
+        city=location.city,
+        province_state=location.province_state,
+        country_name=location.country_name,
         date_created=file.editorial_date if file.is_editorial else None,
     )
 
 
-def normalize_iptc_city(value: str | None) -> str | None:
+def normalize_iptc_location(value: str | None) -> IPTCLocation:
     """
-    Возвращает только значение города для IPTC City.
+    Раскладывает строку локации по стандартным IPTC location-полям.
     """
     if value is None:
-        return None
+        return IPTCLocation()
 
     normalized = ' '.join(value.strip().split())
     if not normalized:
-        return None
+        return IPTCLocation()
 
     normalized_lower = normalized.lower()
-    explicit_city = False
-    for prefix in ('city=', 'location='):
+    explicit_field: str | None = None
+    for prefix, field in (
+        ('city=', 'city'),
+        ('country=', 'country'),
+        ('location=', 'location'),
+    ):
         if normalized_lower.startswith(prefix):
-            explicit_city = prefix == 'city='
+            explicit_field = field
             normalized = normalized[len(prefix) :].strip()
             break
 
@@ -209,14 +244,40 @@ def normalize_iptc_city(value: str | None) -> str | None:
         if part.strip()
     ]
     if not location_parts:
-        return None
+        return IPTCLocation()
 
-    if not explicit_city and len(location_parts) == 1:
-        return None
+    if len(location_parts) == 1:
+        if explicit_field == 'city':
+            return IPTCLocation(city=location_parts[0])
 
-    city = location_parts[0]
+        return IPTCLocation(country_name=location_parts[0])
 
-    return city or None
+    if len(location_parts) == 2:
+        return IPTCLocation(
+            city=location_parts[0],
+            country_name=location_parts[1],
+        )
+
+    if len(location_parts) == 3:
+        return IPTCLocation(
+            city=location_parts[0],
+            province_state=location_parts[1],
+            country_name=location_parts[2],
+        )
+
+    return IPTCLocation(
+        sublocation=', '.join(location_parts[:-3]),
+        city=location_parts[-3],
+        province_state=location_parts[-2],
+        country_name=location_parts[-1],
+    )
+
+
+def normalize_iptc_city(value: str | None) -> str | None:
+    """
+    Возвращает значение города для обратной совместимости.
+    """
+    return normalize_iptc_location(value).city
 
 
 def _normalize_iptc_list(values: list[str]) -> list[str]:

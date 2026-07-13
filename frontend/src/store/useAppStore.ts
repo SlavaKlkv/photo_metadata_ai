@@ -611,12 +611,15 @@ export const useAppStore = create<AppState>()(
       }
     },
 
-    // Regenerate одного файла используя lockedBatchSettings.
-    // lockedBatchSettings гарантирует что используется оригинальный shooting context,
-    // а не текущий draft — даже если пользователь его уже поменял.
+    // Regenerate одного файла использует исходный shooting context,
+    // но текущую выбранную stock platform для нового preview/export mapping.
     regenerateFile: async (fileId, currentJobId) => {
-      const { lockedBatchSettings, sessionSettings, applyMetadataResult } =
-        get();
+      const {
+        lockedBatchSettings,
+        draftBatchSettings,
+        sessionSettings,
+        applyMetadataResult,
+      } = get();
 
       // regenerate доступен только после processing — locked settings обязательны
       if (!lockedBatchSettings) {
@@ -633,7 +636,7 @@ export const useAppStore = create<AppState>()(
       try {
         const response = await jobsApi.regenerateFile(currentJobId, fileId, {
           shooting_context: lockedBatchSettings.shootingContext,
-          stock_platform: lockedBatchSettings.stockPlatform,
+          stock_platform: draftBatchSettings.stockPlatform,
           ai_provider: sessionSettings.selectedProvider,
         });
 

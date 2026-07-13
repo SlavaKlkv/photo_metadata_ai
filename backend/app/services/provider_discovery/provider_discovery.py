@@ -87,7 +87,7 @@ async def _discover_ollama_provider() -> ProviderDiscoveryItem:
         )
         return ProviderDiscoveryItem(
             provider='ollama',
-            display_name='Ollama qwen2.5vl',
+            display_name='QWEN 2.5 VL',
             ready=False,
             status='not_ready',
             reason_code='ollama_runtime_unavailable',
@@ -113,7 +113,7 @@ async def _discover_ollama_provider() -> ProviderDiscoveryItem:
         )
         return ProviderDiscoveryItem(
             provider='ollama',
-            display_name='Ollama qwen2.5vl',
+            display_name='QWEN 2.5 VL',
             ready=False,
             status='not_ready',
             reason_code='ollama_model_missing',
@@ -131,7 +131,7 @@ async def _discover_ollama_provider() -> ProviderDiscoveryItem:
     )
     return ProviderDiscoveryItem(
         provider='ollama',
-        display_name='Ollama qwen2.5vl',
+        display_name='QWEN 2.5 VL',
         ready=True,
         status='ready',
         configured=True,
