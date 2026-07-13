@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { jobsApi } from 'services/api/api';
 import { useAppStore } from 'store/useAppStore';
 import { useUIStore } from 'store/useUIStore';
-import type { AIProvider, StockPlatform } from 'types';
+import type { AIProvider, ProcessingJob, StockPlatform } from 'types';
 
 
 const POLLING_INTERVAL = 500;
@@ -51,7 +51,7 @@ export const usePolling = (jobId: string | null) => {
 
         if (statusData.files) {
           statusData.files.forEach((file: any) => {
-            const status = file.status === "completed" ? "done" : file.status;
+            const status = normalizeFileStatus(file.status);
             updateJobStatus(file.file_id, status, file.error_message, {
               effective_ai_provider: file.effective_ai_provider,
               effective_ai_model: file.effective_ai_model,
@@ -72,7 +72,6 @@ export const usePolling = (jobId: string | null) => {
           setCurrentProcessingProvider(null);
 
           if (
-            statusData.status === "failed" ||
             statusData.status === "error" ||
             statusData.status === "cancelled"
           ) {
@@ -94,11 +93,16 @@ export const usePolling = (jobId: string | null) => {
             const results = resultsResponse.data?.results ?? [];
 
             results.forEach((file: any) => {
-              // обновляем статус
-              updateJobStatus(file.file_id, "done", file.error_message, {
+              const status = normalizeFileStatus(file.status);
+
+              updateJobStatus(file.file_id, status, file.error_message, {
                 effective_ai_provider: file.effective_ai_provider,
                 effective_ai_model: file.effective_ai_model,
               });
+
+              if (status !== "done") {
+                return;
+              }
 
               // плоские поля — legacy metadata для обратной совместимости
               updateMetadata(file.file_id, {
@@ -156,3 +160,19 @@ const isSelectableProvider = (provider: unknown): provider is AIProvider =>
   provider === 'ollama' ||
   provider === 'gemini' ||
   provider === 'openrouter';
+
+const normalizeFileStatus = (status: unknown): ProcessingJob['status'] => {
+  if (status === 'completed' || status === 'done') {
+    return 'done';
+  }
+
+  if (status === 'failed' || status === 'cancelled' || status === 'error') {
+    return 'error';
+  }
+
+  if (status === 'processing') {
+    return 'processing';
+  }
+
+  return 'queued';
+};
