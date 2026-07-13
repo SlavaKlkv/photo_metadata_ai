@@ -106,6 +106,15 @@ async def validate_ai_provider_api_key(
 ) -> bool:
     _ensure_supported_provider(provider)
 
+    if not _is_valid_api_key_header_value(api_key):
+        logger.info(
+            'ai_provider_api_key_validation_failed',
+            provider=provider.value,
+            reason_code=f'{provider.value}_api_key_invalid',
+            error_type='invalid_format',
+        )
+        return False
+
     if provider == AIProvider.GEMINI:
         return await _validate_gemini_api_key(api_key)
 
@@ -291,3 +300,9 @@ def _normalize_api_key(value: object) -> str | None:
 
     normalized = value.strip()
     return normalized or None
+
+
+def _is_valid_api_key_header_value(value: str) -> bool:
+    return bool(value) and all(
+        0x21 <= ord(character) <= 0x7E for character in value
+    )
