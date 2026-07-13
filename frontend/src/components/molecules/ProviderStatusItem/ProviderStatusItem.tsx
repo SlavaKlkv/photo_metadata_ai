@@ -55,9 +55,7 @@ export const ProviderStatusItem: React.FC<ProviderStatusItemProps> = ({
       ? "Validating key..."
       : apiKeySaveStatus === "valid"
         ? "API key saved"
-        : showStatusValidation
-          ? apiKeyError || "Invalid key"
-          : "API key not found";
+        : "API key not found";
   const apiKeyErrorMessage =
     showStatusValidation ? apiKeyError || "invalid key" : null;
 
