@@ -514,20 +514,10 @@ export const useAppStore = create<AppState>()(
         await get().discoverProviders({ silent: true });
 
         return { success: true };
-      } catch (error: unknown) {
-        const responseStatus = (
-          error as { response?: { status?: number } }
-        ).response?.status;
-        const errorMessage =
-          responseStatus !== undefined &&
-          responseStatus >= 400 &&
-          responseStatus < 500
-            ? "invalid key"
-            : "Failed to validate API key";
-
+      } catch {
         return {
           success: false,
-          error: errorMessage,
+          error: "Failed to validate API key",
         };
       }
     },
