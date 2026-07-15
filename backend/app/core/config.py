@@ -8,6 +8,10 @@ from app.core.enums import AIProvider
 
 RuntimeProfile = Literal['server', 'desktop']
 
+# Во frozen-бинарнике PyInstaller `__file__` указывает внутрь распакованного
+# бандла, рядом нет `.env.example`, поэтому PROJECT_ROOT откатывается к
+# BACKEND_DIR и `.env` не читается — упакованное приложение полагается
+# только на значения по умолчанию полей Settings.
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 PROJECT_ROOT_CANDIDATE = BACKEND_DIR.parent
 PROJECT_ROOT = (

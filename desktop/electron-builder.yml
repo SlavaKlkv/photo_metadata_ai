@@ -1,0 +1,37 @@
+appId: com.slavaklkv.photometadataai
+productName: Photo Metadata AI
+directories:
+  output: out
+  buildResources: build
+
+files:
+  - src/**/*
+  - package.json
+
+# Universal2-бинарник backend (arm64+x86_64, склеен lipo)
+# подкладывается скриптом scripts/build-mac.sh
+extraResources:
+  - from: resources/backend/
+    to: backend/
+
+mac:
+  category: public.app-category.photography
+  target:
+    - target: dmg
+      arch: [universal]
+    - target: zip
+      arch: [universal]
+  icon: build/icon.icns
+  # Бинарник backend уже universal2 (склеен lipo в build-mac.sh),
+  # поэтому при merge x64/arm64-слайсов он одинаковый в обоих
+  x64ArchFiles: Contents/Resources/backend/photo-metadata-backend
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  notarize:
+    teamId: ${env.APPLE_TEAM_ID}
+
+publish:
+  provider: github
+  owner: SlavaKlkv
+  repo: photo_metadata_ai
