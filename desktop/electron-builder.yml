@@ -25,12 +25,13 @@ mac:
   # Бинарник backend уже universal2 (склеен lipo в build-mac.sh),
   # поэтому при merge x64/arm64-слайсов он одинаковый в обоих
   x64ArchFiles: Contents/Resources/backend/photo-metadata-backend
-  hardenedRuntime: true
-  entitlements: build/entitlements.mac.plist
-  entitlementsInherit: build/entitlements.mac.plist
-  notarize:
-    teamId: ${env.APPLE_TEAM_ID}
+  # Дистрибуция намеренно неподписанная: учётных данных Apple Developer
+  # нет и не будет. Подпись/нотаризация/hardened runtime не настроены,
+  # update flow ручной (скачать новый .dmg и заменить приложение).
+  identity: null
 
+# publish используется только для загрузки артефактов в GitHub Releases
+# (сама загрузка не требует подписи)
 publish:
   provider: github
   owner: SlavaKlkv

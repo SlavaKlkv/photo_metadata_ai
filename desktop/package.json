@@ -11,9 +11,6 @@
     "dev": "electron .",
     "build:mac": "electron-builder --mac"
   },
-  "dependencies": {
-    "electron-updater": "^6.3.9"
-  },
   "devDependencies": {
     "electron": "^33.2.0",
     "electron-builder": "^25.1.8"
