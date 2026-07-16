@@ -19,20 +19,10 @@ const {
 // избавляет от CORS (см. frontend/src/services/api/api.ts).
 const APP_URL = 'http://localhost:8000';
 
-// electron-updater нельзя require'ить на верхнем уровне: его геттер
-// autoUpdater сразу конструирует MacUpdater и читает app.getVersion(),
-// что роняет процесс при загрузке модуля. Подключаем лениво и только
-// в упакованном приложении — в dev обновления не имеют смысла.
-function getAutoUpdater() {
-  if (!app.isPackaged) {
-    return null;
-  }
-  try {
-    return require('electron-updater').autoUpdater;
-  } catch {
-    return null;
-  }
-}
+// Авто-обновления нет намеренно: electron-updater на macOS работает
+// только с подписанным приложением, а дистрибуция неподписанная.
+// Update flow ручной: скачать новый .dmg и заменить приложение —
+// данные пользователя живут вне бандла и переживают замену.
 
 let backendProcess = null;
 let backendExited = false;
@@ -97,13 +87,6 @@ function createMainWindow() {
   mainWindow.loadURL(APP_URL);
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    // Проверка обновлений после первой отрисовки, неблокирующе.
-    // Без публикации в GitHub Releases просто молча ничего не найдёт.
-    const autoUpdater = getAutoUpdater();
-    if (autoUpdater) {
-      autoUpdater.on('update-downloaded', () => promptRestart());
-      autoUpdater.checkForUpdatesAndNotify().catch(() => {});
-    }
   });
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -148,25 +131,6 @@ function showBackendFailureAndQuit(logPath) {
       `Подробности в логе: ${logPath}`
   );
   app.quit();
-}
-
-function promptRestart() {
-  if (!mainWindow) {
-    return;
-  }
-  const choice = dialog.showMessageBoxSync(mainWindow, {
-    type: 'info',
-    buttons: ['Перезапустить сейчас', 'Позже'],
-    defaultId: 0,
-    cancelId: 1,
-    title: 'Обновление готово',
-    message:
-      'Новая версия Photo Metadata AI загружена. ' +
-      'Перезапустить приложение для установки?',
-  });
-  if (choice === 0) {
-    getAutoUpdater().quitAndInstall();
-  }
 }
 
 app.whenReady().then(async () => {

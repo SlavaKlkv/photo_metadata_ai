@@ -9,7 +9,7 @@ Electron-оболочка, упаковывающая FastAPI-бэкенд (PyIn
   на `/`), Electron просто открывает `http://127.0.0.1:8000` — один
   origin, без CORS.
 - Electron управляет только жизненным циклом: запуск бэкенда, ожидание
-  health, окно, завершение процесса при выходе, авто-обновление.
+  health, окно, завершение процесса при выходе.
 - Данные пользователя живут вне бандла приложения и переживают
   обновления: `~/Library/Application Support/Photo Metadata AI`
   (задачи, настройки, SQLite) и `~/Documents/Photo Metadata AI/results`.
@@ -43,8 +43,7 @@ cd desktop && npm install && npm run dev
 фронтенд, бэкенд-бинарник и приложение:
 
 ```bash
-# неподписанная локальная сборка
-CSC_IDENTITY_AUTO_DISCOVERY=false desktop/scripts/build-mac.sh
+desktop/scripts/build-mac.sh
 ```
 
 Артефакты появляются в `desktop/out/` (`.dmg`, `.zip`,
@@ -66,23 +65,33 @@ uv run --project backend python desktop/scripts/smoke-test.py \
 При наличии `OPENROUTER_API_KEY` или `GEMINI_API_KEY` в окружении
 дополнительно прогоняет process → results → export.
 
-## Подпись и нотаризация
+## Дистрибуция (без подписи)
 
-Без переменных окружения ниже electron-builder собирает неподписанное
-приложение и пропускает нотаризацию (ошибкой это не является).
+Приложение распространяется неподписанным — учётных данных
+Apple Developer нет, подпись и нотаризация не используются
+(`identity: null` в `electron-builder.yml`).
 
-| Переменная | Назначение |
-| --- | --- |
-| `CSC_LINK` | Путь/base64 сертификата Developer ID (.p12) |
-| `CSC_KEY_PASSWORD` | Пароль сертификата |
-| `CSC_IDENTITY_AUTO_DISCOVERY=false` | Явно отключить подпись (локальные сборки) |
-| `APPLE_ID` | Apple ID для нотаризации |
-| `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password |
-| `APPLE_TEAM_ID` | Team ID (используется в `notarize.teamId`) |
+При первом открытии скачанного приложения Gatekeeper покажет
+предупреждение. Как открыть:
 
-Публикация обновлений: `npx electron-builder --mac --publish always`
-(нужен `GH_TOKEN`); auto-update читает GitHub Releases репозитория
-`SlavaKlkv/photo_metadata_ai`.
+1. Правый клик на `.app` → **Открыть** → в диалоге снова **Открыть**,
+   либо
+2. Системные настройки → **Конфиденциальность и безопасность** →
+   кнопка **Всё равно открыть**, либо
+3. в терминале снять карантин-атрибут:
+   `xattr -dr com.apple.quarantine "/Applications/Photo Metadata AI.app"`.
+
+### Обновление (ручной flow)
+
+Авто-обновления нет: electron-updater на macOS работает только
+с подписанным приложением. Обновление выполняется вручную —
+скачать новый `.dmg`, перетащить приложение в `Applications`
+поверх старого. Данные пользователя (задачи, настройки, результаты)
+живут вне бандла и полностью переживают замену.
+
+Публикация артефактов в GitHub Releases:
+`cd desktop && npx electron-builder --mac --publish always`
+(нужен `GH_TOKEN`).
 
 ## Логи
 
@@ -90,8 +99,8 @@ uv run --project backend python desktop/scripts/smoke-test.py \
 
 ## Известные ограничения v1
 
-- Реальная нотаризация ещё не выполнялась; entitlements
-  (`build/entitlements.mac.plist`) — best-effort, требуют проверки
-  на первой подписанной сборке.
+- Приложение неподписанное: при первом открытии нужен обход
+  Gatekeeper (см. «Дистрибуция»), авто-обновление невозможно,
+  о новых версиях приложение не уведомляет.
 - Порт 8000 фиксирован; второй экземпляр приложения не запустится,
   пока занят порт.
