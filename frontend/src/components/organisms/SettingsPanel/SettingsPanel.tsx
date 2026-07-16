@@ -152,6 +152,7 @@ export const SettingsPanel: React.FC = () => {
               if (!provider) return;
               handleProviderChange(provider);
             }}
+            disabled={isPromptLocked}
           />
 
           {providerDiscoveryStatus === "loading" && (
