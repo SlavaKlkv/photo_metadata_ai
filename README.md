@@ -100,6 +100,15 @@ cd frontend
 npm run build
 ```
 
+### Desktop: полная сборка macOS-приложения
+
+```bash
+cd desktop
+./scripts/build-mac.sh
+```
+
+Готовые `.app` и `.dmg` будут сохранены в `desktop/out/`.
+
 ### Тесты с проверкой покрытия
 
 #### Backend
