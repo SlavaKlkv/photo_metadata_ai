@@ -90,9 +90,20 @@ uv run ruff format
 uv run ruff check --fix
 ```
 
-## [backend] Запуск тестов
+## Запуск тестов
+
+Backend
+
 ```bash
+cd backend
 uv run pytest
+```
+
+Frontend
+
+```bash
+cd frontend
+npm test -- --runInBand
 ```
 
 ## Установка новых зависимостей

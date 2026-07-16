@@ -102,9 +102,13 @@ class JobStorage:
         db_path = self._resolve_db_path()
         db_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with self._connect() as connection:
+        connection = self._connect()
+
+        try:
             self._ensure_schema(connection)
             connection.commit()
+        finally:
+            connection.close()
 
         self._initialized = True
         logger.info(
