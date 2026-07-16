@@ -164,8 +164,8 @@ export const SettingsPanel: React.FC = () => {
           {providerDiscoveryStatus === "ready" &&
             availableProviders.length === 0 && (
               <small className={styles.errorText}>
-                No AI providers were detected. Provider onboarding will be added
-                later.
+                No AI providers were detected. Click “AI Setup” in the
+                top-right corner to connect one.
               </small>
             )}
 

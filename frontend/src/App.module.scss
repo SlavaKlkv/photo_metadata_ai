@@ -31,6 +31,15 @@
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+.aiSetupButton {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .titleBlock {

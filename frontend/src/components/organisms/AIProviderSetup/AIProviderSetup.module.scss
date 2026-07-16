@@ -1,0 +1,17 @@
+@import '../../../styles/variables.module.scss';
+
+/* Группа провайдеров — каждая секция отдельная карточка */
+.providers {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.providerCard {
+  background: var(--bg-tretiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}

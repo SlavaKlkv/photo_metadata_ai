@@ -12,7 +12,10 @@ import { MetadataPreview } from './components/organisms/MetadataPreview/Metadata
 import { ExportModal } from './components/organisms/ExportModal/ExportModal';
 import { SuccessModal } from './components/organisms/SuccessModal/SuccessModal';
 import { OnboardingModal } from './components/organisms/OnboardingModal/OnboardingModal';
+import { AISetupModal } from './components/organisms/AISetupModal/AISetupModal';
 import { SectionHeader } from './components/molecules/SectionHeader/SectionHeader';
+import { Button } from './components/atoms/Button/Button';
+import { Icon } from './components/atoms/Icon/Icon';
 import { useAppStore } from './store/useAppStore';
 
 function App() {
@@ -21,6 +24,10 @@ function App() {
   const isPollingActive = useUIStore((state) => state.isPollingActive);
   const loadSessionSettings = useAppStore((state) => state.loadSessionSettings);
   const discoverProviders = useAppStore((state) => state.discoverProviders);
+  const hasAcceptedOnboarding = useAppStore(
+    (state) => state.hasAcceptedOnboarding,
+  );
+  const openAiSetup = useUIStore((state) => state.openAiSetup);
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -49,6 +56,17 @@ function App() {
               titleTag="h1"
               variant="app"
             />
+            {hasAcceptedOnboarding && (
+              <Button
+                variant="secondary"
+                size="md"
+                icon={<Icon name="ai-setup-icon" />}
+                onClick={openAiSetup}
+                className={styles.aiSetupButton}
+              >
+                AI Setup
+              </Button>
+            )}
           </div>
 
           <div className={styles.bodyContent}>
@@ -80,6 +98,7 @@ function App() {
       <ExportModal />
       <SuccessModal />
       <OnboardingModal />
+      <AISetupModal />
     </div>
   );
 }

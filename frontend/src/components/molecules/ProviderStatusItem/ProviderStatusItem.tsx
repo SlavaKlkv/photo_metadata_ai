@@ -1,5 +1,5 @@
 // ProviderStatusItem molecule component
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Icon } from "../../atoms/Icon/Icon";
 import { ProgressBar } from "../../atoms/ProgressBar/ProgressBar";
 import type { AIProvider } from "types";
@@ -33,16 +33,41 @@ export const ProviderStatusItem: React.FC<ProviderStatusItemProps> = ({
   progress,
   onApiKeyChange,
   apiKeySaveStatus = "idle",
-  apiKeyError,
   apiKey,
   setupLink,
   suppressErrorIcon = false,
 }) => {
   const [inputValue, setInputValue] = useState(apiKey || "");
   const [hasTouchedInput, setHasTouchedInput] = useState(false);
+  // Режим замены уже сохранённого ключа (для found-провайдеров)
+  const [isReplacingKey, setIsReplacingKey] = useState(false);
   const isOllama = provider === "ollama";
   const isCloudProvider = ["gemini", "openrouter"].includes(provider);
   const providerIcon = providerIconMap[provider] ?? "settings-icon";
+
+  // После успешного сохранения нового ключа сворачиваем режим замены,
+  // дав пользователю увидеть подтверждение
+  useEffect(() => {
+    if (!isReplacingKey || apiKeySaveStatus !== "valid") {
+      return undefined;
+    }
+
+    const timer = setTimeout(() => {
+      setIsReplacingKey(false);
+      setInputValue("");
+      setHasTouchedInput(false);
+      onApiKeyChange?.("");
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [isReplacingKey, apiKeySaveStatus]);
+
+  const handleCancelReplace = () => {
+    setIsReplacingKey(false);
+    setInputValue("");
+    setHasTouchedInput(false);
+    onApiKeyChange?.("");
+  };
 
   const hasNonEmptyInput = inputValue.trim() !== "";
   const showStatusValidation =
@@ -56,8 +81,7 @@ export const ProviderStatusItem: React.FC<ProviderStatusItemProps> = ({
       : apiKeySaveStatus === "valid"
         ? "API key saved"
         : "API key not found";
-  const apiKeyErrorMessage =
-    showStatusValidation ? apiKeyError || "invalid key" : null;
+  const apiKeyErrorMessage = showStatusValidation ? "invalid key" : null;
 
   // QWEN scanning — отдельный layout с progressBar
   if (isOllama && status === "scanning") {
@@ -97,8 +121,69 @@ export const ProviderStatusItem: React.FC<ProviderStatusItemProps> = ({
     );
   }
 
+  // Input + ссылка для cloud провайдеров (общий блок для
+  // первичного ввода и замены сохранённого ключа)
+  const apiKeyEditor = (
+    <>
+      <div className={styles.apiKeyRow}>
+        <input
+          className={`${styles.apiKeyInput} ${
+            showStatusValidation ? styles.apiKeyInputError : ""
+          }`}
+          value={inputValue}
+          onChange={(e) => {
+            const value = e.target.value;
+            setInputValue(value);
+            if (!value.trim()) {
+              setHasTouchedInput(false);
+            }
+            onApiKeyChange?.(value);
+          }}
+          onBlur={() => setHasTouchedInput(true)}
+          placeholder={
+            status === "found" ? "Enter new API key..." : "Enter your API key..."
+          }
+          type="text"
+          autoComplete="off"
+          spellCheck={false}
+        />
+        {apiKeySaveStatus === "validating" && (
+          <Icon name="load-icon" className={styles.spinner} />
+        )}
+        {apiKeySaveStatus === "valid" && (
+          <Icon name="checkmark-icon" className={styles.checkIcon} />
+        )}
+      </div>
+      {apiKeyErrorMessage && (
+        <p className={styles.apiKeyErrorText}>{apiKeyErrorMessage}</p>
+      )}
+
+      {setupLink && (
+        <div className={styles.inputFooter}>
+          <a
+            href={setupLink.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.externalLink}
+          >
+            {setupLink.label}
+            <Icon name="link-icon" className={styles.externalLinkIcon} />
+          </a>
+        </div>
+      )}
+    </>
+  );
+
   // Found state
   if (status === "found") {
+    const foundSubtitle = isOllama
+      ? "Ready for processing"
+      : isReplacingKey && apiKeySaveStatus === "validating"
+        ? "Validating key..."
+        : isReplacingKey && apiKeySaveStatus === "valid"
+          ? "API key saved"
+          : "API key found";
+
     return (
       <div className={styles.item}>
         <div className={styles.row}>
@@ -107,14 +192,27 @@ export const ProviderStatusItem: React.FC<ProviderStatusItemProps> = ({
           </span>
           <div className={styles.rowText}>
             <p className={styles.rowTitle}>{displayName}</p>
-            <p className={styles.rowSubtitle}>
-              {isOllama ? "Ready for processing" : "API key found"}
-            </p>
+            <p className={styles.rowSubtitle}>{foundSubtitle}</p>
           </div>
           <div className={styles.rowRight}>
+            {isCloudProvider && (
+              <button
+                type="button"
+                className={styles.replaceKeyBtn}
+                onClick={
+                  isReplacingKey
+                    ? handleCancelReplace
+                    : () => setIsReplacingKey(true)
+                }
+              >
+                {isReplacingKey ? "Cancel" : "Replace key"}
+              </button>
+            )}
             <Icon name="checkmark-icon" className={styles.checkIcon} />
           </div>
         </div>
+
+        {isReplacingKey && apiKeyEditor}
       </div>
     );
   }
@@ -159,54 +257,7 @@ export const ProviderStatusItem: React.FC<ProviderStatusItemProps> = ({
       )}
 
       {/* Input + ссылка для cloud провайдеров */}
-      {isCloudProvider && (
-        <>
-          <div className={styles.apiKeyRow}>
-            <input
-              className={`${styles.apiKeyInput} ${
-                showStatusValidation ? styles.apiKeyInputError : ""
-              }`}
-              value={inputValue}
-              onChange={(e) => {
-                const value = e.target.value;
-                setInputValue(value);
-                if (!value.trim()) {
-                  setHasTouchedInput(false);
-                }
-                onApiKeyChange?.(value);
-              }}
-              onBlur={() => setHasTouchedInput(true)}
-              placeholder="Enter your API key..."
-              type="text"
-              autoComplete="off"
-              spellCheck={false}
-            />
-            {apiKeySaveStatus === "validating" && (
-              <Icon name="load-icon" className={styles.spinner} />
-            )}
-            {apiKeySaveStatus === "valid" && (
-              <Icon name="checkmark-icon" className={styles.checkIcon} />
-            )}
-          </div>
-          {apiKeyErrorMessage && (
-            <p className={styles.apiKeyErrorText}>{apiKeyErrorMessage}</p>
-          )}
-
-          {setupLink && (
-            <div className={styles.inputFooter}>
-              <a
-                href={setupLink.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.externalLink}
-              >
-                {setupLink.label}
-                <Icon name="link-icon" className={styles.externalLinkIcon} />
-              </a>
-            </div>
-          )}
-        </>
-      )}
+      {isCloudProvider && apiKeyEditor}
     </div>
   );
 };
