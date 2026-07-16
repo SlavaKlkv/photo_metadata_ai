@@ -83,27 +83,44 @@ ReDoc
 http://localhost:8000/redoc
 ```
 
-## [backend] Форматирование и линтинг (ruff)
+## Проверки
+
+### Backend: форматирование и линтинг (ruff)
 
 ```bash
+cd backend
 uv run ruff format
 uv run ruff check --fix
 ```
 
-## Запуск тестов
-
-Backend
-
-```bash
-cd backend
-uv run pytest
-```
-
-Frontend
+### Frontend: production-сборка
 
 ```bash
 cd frontend
-npm test -- --runInBand
+npm run build
+```
+
+### Тесты с проверкой покрытия
+
+#### Backend
+
+```bash
+cd backend
+uv run pytest --cov=app --cov-report=term-missing
+```
+
+#### Frontend
+
+```bash
+cd frontend
+npm test -- --coverage --runInBand
+```
+
+#### Desktop
+
+```bash
+cd desktop
+npm test -- --coverage
 ```
 
 ## Установка новых зависимостей
