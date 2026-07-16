@@ -57,3 +57,11 @@ backend/desktop_build/build-*/
 # переисключаем из общего паттерна build/
 !desktop/build/
 desktop/build/icon.icns
+
+# Local test caches and reports
+backend/.uv-cache/
+backend/.coverage
+frontend/.npm-cache/
+frontend/coverage/
+desktop/.npm-cache/
+desktop/coverage/
