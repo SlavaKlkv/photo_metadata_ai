@@ -12,7 +12,7 @@ export interface ExportArtifact {
 }
 
 export interface UIState {
-  isSettingsOpen: boolean;
+  isAiSetupOpen: boolean;
   isFileListOpen: boolean;
   isProcessing: boolean;
   isProgressModalOpen: boolean;
@@ -29,7 +29,8 @@ export interface UIState {
   currentProcessingModel: string | null;
 
   // Actions
-  toggleSettings: () => void;
+  openAiSetup: () => void;
+  closeAiSetup: () => void;
   toggleFileList: () => void;
   setIsProcessing: (isProcessing: boolean) => void;
   openProgressModal: () => void;
@@ -55,7 +56,7 @@ export const useUIStore = create<UIState>()(
   devtools(
     (set) => ({
       // initial state
-      isSettingsOpen: false,
+      isAiSetupOpen: false,
       isFileListOpen: true,
       isProcessing: false,
       isProgressModalOpen: false,
@@ -72,8 +73,8 @@ export const useUIStore = create<UIState>()(
       currentProcessingModel: null,
       
       // actions
-      toggleSettings: () =>
-        set((state) => ({ isSettingsOpen: !state.isSettingsOpen })),
+      openAiSetup: () => set({ isAiSetupOpen: true }),
+      closeAiSetup: () => set({ isAiSetupOpen: false }),
       toggleFileList: () =>
         set((state) => ({ isFileListOpen: !state.isFileListOpen })),
       setIsProcessing: (isProcessing) =>
