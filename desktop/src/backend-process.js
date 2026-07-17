@@ -23,22 +23,37 @@ const BACKEND_CWD = path.join(PROJECT_ROOT, 'backend');
  * цикл разработки, сборка PyInstaller не нужна).
  */
 function spawnBackend() {
+  // Версия приложения (desktop/package.json — единственный источник
+  // истины) передаётся backend'у для проверки обновлений; без неё
+  // endpoint /api/v1/desktop/updates отключён.
+  const backendEnv = {
+    ...process.env,
+    DESKTOP_APP_VERSION: app.getVersion(),
+  };
+
   if (app.isPackaged) {
     const packagedBinary = path.join(
       process.resourcesPath,
       'backend',
       'photo-metadata-backend'
     );
-    return spawn(packagedBinary, [], { stdio: ['ignore', 'pipe', 'pipe'] });
+    return spawn(packagedBinary, [], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: backendEnv,
+    });
   }
 
   if (fs.existsSync(DEV_BINARY)) {
-    return spawn(DEV_BINARY, [], { stdio: ['ignore', 'pipe', 'pipe'] });
+    return spawn(DEV_BINARY, [], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: backendEnv,
+    });
   }
 
   return spawn('uv', ['run', 'python', '-m', 'app.desktop_main'], {
     cwd: BACKEND_CWD,
     stdio: ['ignore', 'pipe', 'pipe'],
+    env: backendEnv,
   });
 }
 

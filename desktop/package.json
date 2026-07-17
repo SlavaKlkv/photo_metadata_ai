@@ -1,7 +1,7 @@
 {
   "name": "photo-metadata-ai-desktop",
   "productName": "Photo Metadata AI",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Photo Metadata AI — macOS desktop shell",
   "main": "src/main.js",
   "private": true,
@@ -15,7 +15,7 @@
   },
   "devDependencies": {
     "electron": "^33.2.0",
-    "electron-builder": "^25.1.8",
+    "electron-builder": "^26.15.3",
     "jest": "^29.7.0"
   }
 }

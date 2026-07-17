@@ -12,7 +12,7 @@ jest.mock('fs', () => ({
   existsSync: jest.fn(),
 }));
 jest.mock('electron', () => ({
-  app: { isPackaged: false },
+  app: { isPackaged: false, getVersion: jest.fn(() => '1.0.0') },
 }));
 
 const {
@@ -23,6 +23,7 @@ const {
 beforeEach(() => {
   jest.clearAllMocks();
   app.isPackaged = false;
+  app.getVersion.mockReturnValue('1.0.0');
   fs.existsSync.mockReturnValue(false);
 });
 
@@ -35,6 +36,7 @@ test('uses source backend in development when binary is absent', () => {
     expect.objectContaining({
       cwd: expect.stringMatching(/backend$/),
       stdio: ['ignore', 'pipe', 'pipe'],
+      env: expect.objectContaining({ DESKTOP_APP_VERSION: '1.0.0' }),
     })
   );
 });
@@ -47,7 +49,10 @@ test('uses built development binary when available', () => {
   expect(childProcess.spawn).toHaveBeenCalledWith(
     expect.stringMatching(/backend\/dist\/photo-metadata-backend$/),
     [],
-    { stdio: ['ignore', 'pipe', 'pipe'] }
+    expect.objectContaining({
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: expect.objectContaining({ DESKTOP_APP_VERSION: '1.0.0' }),
+    })
   );
 });
 
@@ -65,8 +70,20 @@ test('uses packaged backend from resources', () => {
   expect(childProcess.spawn).toHaveBeenCalledWith(
     '/Applications/Test.app/Contents/Resources/backend/photo-metadata-backend',
     [],
-    { stdio: ['ignore', 'pipe', 'pipe'] }
+    expect.objectContaining({
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: expect.objectContaining({ DESKTOP_APP_VERSION: '1.0.0' }),
+    })
   );
+});
+
+test('passes app version reported by Electron, not a hardcoded one', () => {
+  app.getVersion.mockReturnValue('2.3.4');
+
+  spawnBackend();
+
+  const options = childProcess.spawn.mock.calls[0][2];
+  expect(options.env.DESKTOP_APP_VERSION).toBe('2.3.4');
 });
 
 test('kills orphaned backend and ignores pkill no-match error', () => {

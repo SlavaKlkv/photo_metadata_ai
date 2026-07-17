@@ -10,6 +10,7 @@ jest.mock('../services/api/api', () => ({
     getResultsByStock: jest.fn(),
     getStockOptions: jest.fn(),
     regenerateFile: jest.fn(),
+    checkForUpdates: jest.fn(),
   },
 }));
 
@@ -212,4 +213,77 @@ test('loads, saves and completes onboarding', async () => {
     selected_provider: 'openrouter',
   });
   expect(localStorage.getItem('onboarding_completed')).toBe('true');
+});
+
+const availableUpdate = {
+  status: 'ok' as const,
+  update_available: true,
+  current_version: '1.0.0',
+  latest_version: '1.1.0',
+  release_url: 'https://github.com/example/releases/tag/v1.1.0',
+  download_url: 'https://github.com/example/releases/download/v1.1.0/app.dmg',
+};
+
+test('shows an available update that has not been dismissed', async () => {
+  mockedJobsApi.checkForUpdates.mockResolvedValue({
+    data: availableUpdate,
+  } as never);
+
+  await useAppStore.getState().checkForUpdates();
+
+  expect(useAppStore.getState()).toMatchObject({
+    updateInfo: availableUpdate,
+    isUpdateBannerVisible: true,
+  });
+  expect(mockedJobsApi.checkForUpdates).toHaveBeenCalledWith();
+});
+
+test.each([
+  { ...availableUpdate, status: 'unavailable' as const },
+  { ...availableUpdate, status: 'disabled' as const },
+  { ...availableUpdate, update_available: false },
+])('does not show a banner for a non-actionable response', async (data) => {
+  mockedJobsApi.checkForUpdates.mockResolvedValue({ data } as never);
+
+  await useAppStore.getState().checkForUpdates();
+
+  expect(useAppStore.getState()).toMatchObject({
+    updateInfo: data,
+    isUpdateBannerVisible: false,
+  });
+});
+
+test('silently ignores update check failures', async () => {
+  mockedJobsApi.checkForUpdates.mockRejectedValue(new Error('offline'));
+
+  await expect(
+    useAppStore.getState().checkForUpdates(),
+  ).resolves.toBeUndefined();
+  expect(useAppStore.getState()).toMatchObject({
+    updateInfo: null,
+    isUpdateBannerVisible: false,
+  });
+});
+
+test('keeps a dismissed version hidden', async () => {
+  localStorage.setItem('update_dismissed_version', '1.1.0');
+  mockedJobsApi.checkForUpdates.mockResolvedValue({
+    data: availableUpdate,
+  } as never);
+
+  await useAppStore.getState().checkForUpdates();
+
+  expect(useAppStore.getState().isUpdateBannerVisible).toBe(false);
+});
+
+test('dismisses the current version and persists the choice', () => {
+  useAppStore.setState({
+    updateInfo: availableUpdate,
+    isUpdateBannerVisible: true,
+  });
+
+  useAppStore.getState().dismissUpdateBanner();
+
+  expect(localStorage.getItem('update_dismissed_version')).toBe('1.1.0');
+  expect(useAppStore.getState().isUpdateBannerVisible).toBe(false);
 });

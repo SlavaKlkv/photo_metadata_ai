@@ -5,6 +5,7 @@ import type {
   AIProviderApiKeyValidationResponse,
   StockPlatform,
   DesktopHealthResponse,
+  DesktopUpdateCheckResponse,
   DesktopRuntimeInfo,
   DesktopStartupStatusResponse,
 } from 'types';
@@ -107,6 +108,9 @@ export const jobsApi = {
     ),
   desktopHealth: () =>
     apiClient.get<DesktopHealthResponse>("/api/v1/desktop/health"),
+
+  checkForUpdates: () =>
+    apiClient.get<DesktopUpdateCheckResponse>("/api/v1/desktop/updates"),
 
   desktopRuntimeInfo: () =>
     apiClient.get<DesktopRuntimeInfo>("/api/v1/desktop/runtime"),

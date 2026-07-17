@@ -10,6 +10,7 @@ import {
   StockOptions,
   FilePreview,
   StockPlatform,
+  DesktopUpdateCheckResponse,
 } from "../types";
 import { jobsApi } from "../services/api/api";
 
@@ -44,8 +45,12 @@ export interface AppState {
   hasAcceptedOnboarding: boolean;
   manualProviderApiKeys: Record<string, string>;
   stockOptions: StockOptions | null;
+  updateInfo: DesktopUpdateCheckResponse | null;
+  isUpdateBannerVisible: boolean;
 
   setStockOptions: (options: StockOptions) => void;
+  checkForUpdates: () => Promise<void>;
+  dismissUpdateBanner: () => void;
 
   // обновить preview конкретного файла после смены стока
   updateJobPreview: (fileId: string, preview: FilePreview) => void;
@@ -150,6 +155,35 @@ export const useAppStore = create<AppState>()(
     hasAcceptedOnboarding: false,
     manualProviderApiKeys: {},
     stockOptions: null,
+    updateInfo: null,
+    isUpdateBannerVisible: false,
+
+    checkForUpdates: async () => {
+      try {
+        const response = await jobsApi.checkForUpdates();
+        const updateInfo = response.data;
+        const dismissedVersion = localStorage.getItem(
+          "update_dismissed_version",
+        );
+        const isUpdateBannerVisible =
+          updateInfo.status === "ok" &&
+          updateInfo.update_available &&
+          updateInfo.latest_version !== null &&
+          dismissedVersion !== updateInfo.latest_version;
+
+        set({ updateInfo, isUpdateBannerVisible });
+      } catch {
+        // Проверка обновлений не должна мешать запуску приложения.
+      }
+    },
+
+    dismissUpdateBanner: () => {
+      const latestVersion = get().updateInfo?.latest_version;
+      if (latestVersion) {
+        localStorage.setItem("update_dismissed_version", latestVersion);
+      }
+      set({ isUpdateBannerVisible: false });
+    },
 
     addJobs: (newJobs: ProcessingJob[]) => {
       set((state) => ({

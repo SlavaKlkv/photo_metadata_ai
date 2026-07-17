@@ -65,3 +65,6 @@ frontend/.npm-cache/
 frontend/coverage/
 desktop/.npm-cache/
 desktop/coverage/
+
+# AI
+.claude/
