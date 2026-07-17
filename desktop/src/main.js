@@ -1,11 +1,19 @@
 'use strict';
 
-const { app, BrowserWindow, Menu, dialog } = require('electron');
+const { app, BrowserWindow, Menu, dialog, shell } = require('electron');
 
 const {
   spawnBackend,
   killOrphanedBackends,
 } = require('./backend-process');
+const {
+  checkForUpdatesFromMenu,
+  fetchDesktopUpdate,
+} = require('./app-updates');
+const {
+  buildApplicationMenuTemplate,
+} = require('./application-menu');
+const { installExternalLinkHandler } = require('./external-links');
 const { waitForBackend } = require('./health-check');
 const { pipeBackendLogs } = require('./logging');
 const {
@@ -19,10 +27,12 @@ const {
 // избавляет от CORS (см. frontend/src/services/api/api.ts).
 const APP_URL = 'http://localhost:8000';
 
-// Авто-обновления нет намеренно: electron-updater на macOS работает
-// только с подписанным приложением, а дистрибуция неподписанная.
-// Update flow ручной: скачать новый .dmg и заменить приложение —
-// данные пользователя живут вне бандла и переживают замену.
+// Авто-установки обновлений нет намеренно: electron-updater на macOS
+// работает только с подписанным приложением, а дистрибуция
+// неподписанная. Вместо этого backend проверяет GitHub Releases
+// (/api/v1/desktop/updates), frontend показывает баннер, а сам update
+// flow ручной: скачать новый .dmg и заменить приложение — данные
+// пользователя живут вне бандла и переживают замену.
 
 let backendProcess = null;
 let backendExited = false;
@@ -80,6 +90,7 @@ function createMainWindow() {
       nodeIntegration: false,
     },
   });
+  installExternalLinkHandler(mainWindow.webContents);
   if (state.isMaximized) {
     mainWindow.maximize();
   }
@@ -94,33 +105,23 @@ function createMainWindow() {
 }
 
 function installApplicationMenu() {
-  const template = [
-    { role: 'appMenu' },
-    { role: 'fileMenu' },
-    { role: 'editMenu' },
-    { role: 'viewMenu' },
-    {
-      label: 'Window',
-      submenu: [
-        { role: 'minimize' },
-        { role: 'zoom' },
-        { type: 'separator' },
-        {
-          // Не Alt+цифра: на macOS Option+цифра порождает спецсимвол
-          // (зависит от раскладки), и такой акселератор не срабатывает
-          label: 'Reset Window Size',
-          accelerator: 'Ctrl+Cmd+0',
-          click: () => {
-            if (mainWindow) {
-              resetWindowState(mainWindow);
-            }
-          },
-        },
-        { type: 'separator' },
-        { role: 'front' },
-      ],
+  const template = buildApplicationMenuTemplate({
+    appName: app.name,
+    onCheckForUpdates: () =>
+      void checkForUpdatesFromMenu({
+        requestUpdate: () => fetchDesktopUpdate(APP_URL),
+        showMessageBox: (options) =>
+          mainWindow
+            ? dialog.showMessageBox(mainWindow, options)
+            : dialog.showMessageBox(options),
+        openExternal: (url) => shell.openExternal(url),
+      }),
+    onResetWindowSize: () => {
+      if (mainWindow) {
+        resetWindowState(mainWindow);
+      }
     },
-  ];
+  });
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 

@@ -87,3 +87,9 @@ test('uses safe desktop action endpoints', () => {
     '/api/v1/desktop/jobs/job-1/open-results-folder',
   );
 });
+
+test('uses the desktop update check endpoint', () => {
+  jobsApi.checkForUpdates();
+
+  expect(mockClient.get).toHaveBeenCalledWith('/api/v1/desktop/updates');
+});

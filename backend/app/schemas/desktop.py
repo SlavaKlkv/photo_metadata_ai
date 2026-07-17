@@ -30,6 +30,15 @@ class DesktopActionResponse(BaseModel):
     path: str | None = None
 
 
+class DesktopUpdateCheckResponse(BaseModel):
+    status: Literal['ok', 'unavailable', 'disabled']
+    update_available: bool
+    current_version: str | None = None
+    latest_version: str | None = None
+    release_url: str | None = None
+    download_url: str | None = None
+
+
 class DesktopSettingsResponse(BaseModel):
     selected_provider: AIProvider
     effective_provider: AIProvider

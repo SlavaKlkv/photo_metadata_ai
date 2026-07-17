@@ -52,6 +52,15 @@ class Settings(BaseSettings):
     DESKTOP_STARTUP_AI_CHECK_RETRY_ATTEMPTS: int = 2
     DESKTOP_STARTUP_AI_CHECK_RETRY_DELAY_SECONDS: float = 0.5
 
+    # Версию приложения задаёт только Electron-оболочка при запуске
+    # backend-процесса; без неё проверка обновлений отключена.
+    DESKTOP_APP_VERSION: str | None = None
+    UPDATES_GITHUB_LATEST_RELEASE_URL: str = (
+        'https://api.github.com/repos/SlavaKlkv/photo_metadata_ai'
+        '/releases/latest'
+    )
+    UPDATES_CHECK_TIMEOUT_SECONDS: float = 5.0
+
     MAX_UPLOAD_FILE_SIZE_MB: int = Field(default=50, ge=1)
     AI_RESIZE_LONG_SIDE_PX: int = Field(default=1280, ge=1)
     AI_JPEG_QUALITY: int = Field(default=85, ge=1, le=100)

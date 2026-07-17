@@ -81,6 +81,15 @@ export interface DesktopHealthResponse {
   runtime_profile: string;
 }
 
+export interface DesktopUpdateCheckResponse {
+  status: 'ok' | 'unavailable' | 'disabled';
+  update_available: boolean;
+  current_version: string | null;
+  latest_version: string | null;
+  release_url: string | null;
+  download_url: string | null;
+}
+
 export interface DesktopRuntimeInfo {
   runtime_profile: string;
   workspace_dir: string;

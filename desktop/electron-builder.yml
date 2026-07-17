@@ -21,7 +21,8 @@ mac:
       arch: [universal]
     - target: zip
       arch: [universal]
-  icon: build/icon.icns
+  # electron-builder сам конвертирует исходный PNG 1024x1024 в ICNS.
+  icon: build/icon.png
   # Бинарник backend уже universal2 (склеен lipo в build-mac.sh),
   # поэтому при merge x64/arm64-слайсов он одинаковый в обоих
   x64ArchFiles: Contents/Resources/backend/photo-metadata-backend

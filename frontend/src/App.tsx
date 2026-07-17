@@ -13,6 +13,7 @@ import { ExportModal } from './components/organisms/ExportModal/ExportModal';
 import { SuccessModal } from './components/organisms/SuccessModal/SuccessModal';
 import { OnboardingModal } from './components/organisms/OnboardingModal/OnboardingModal';
 import { AISetupModal } from './components/organisms/AISetupModal/AISetupModal';
+import { UpdateBanner } from './components/organisms/UpdateBanner/UpdateBanner';
 import { SectionHeader } from './components/molecules/SectionHeader/SectionHeader';
 import { Button } from './components/atoms/Button/Button';
 import { Icon } from './components/atoms/Icon/Icon';
@@ -24,6 +25,7 @@ function App() {
   const isPollingActive = useUIStore((state) => state.isPollingActive);
   const loadSessionSettings = useAppStore((state) => state.loadSessionSettings);
   const discoverProviders = useAppStore((state) => state.discoverProviders);
+  const checkForUpdates = useAppStore((state) => state.checkForUpdates);
   const hasAcceptedOnboarding = useAppStore(
     (state) => state.hasAcceptedOnboarding,
   );
@@ -32,6 +34,7 @@ function App() {
   useEffect(() => {
     const initializeApp = async () => {
       loadSessionSettings();
+      void checkForUpdates();
 
       // ← ДОБАВИТЬ: artificially delay discovery to see "scanning" state
       await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -99,6 +102,7 @@ function App() {
       <SuccessModal />
       <OnboardingModal />
       <AISetupModal />
+      <UpdateBanner />
     </div>
   );
 }

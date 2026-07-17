@@ -20,6 +20,7 @@ from app.schemas.desktop import (
     DesktopRuntimeInfo,
     DesktopSettingsResponse,
     DesktopStartupStatusResponse,
+    DesktopUpdateCheckResponse,
     UpdateDesktopSettingsRequest,
 )
 from app.schemas.provider_discovery import ProvidersDiscoveryResponse
@@ -30,6 +31,7 @@ from app.services.desktop.app_settings import (
     get_desktop_settings,
     update_desktop_settings,
 )
+from app.services.desktop.app_updates import check_for_updates
 from app.services.desktop.desktop_open import (
     get_job_result_file_path,
     get_job_results_dir,
@@ -81,6 +83,14 @@ async def update_settings(payload: UpdateDesktopSettingsRequest):
     Обновляет настройки десктопного окружения.
     """
     return update_desktop_settings(payload.selected_provider)
+
+
+@router.get('/updates', response_model=DesktopUpdateCheckResponse)
+async def check_desktop_updates(force: bool = False):
+    """
+    Проверяет наличие новой версии приложения в GitHub Releases.
+    """
+    return await check_for_updates(force_refresh=force)
 
 
 @router.get('/startup/status', response_model=DesktopStartupStatusResponse)
