@@ -31,6 +31,24 @@ mac:
   # update flow ручной (скачать новый .dmg и заменить приложение).
   identity: null
 
+# Фон со стрелкой «приложение -> Applications» генерируется скриптом
+# scripts/generate-dmg-background.py; позиции иконок согласованы
+# с картинкой.
+dmg:
+  background: build/dmg-background.tiff
+  window:
+    width: 540
+    height: 380
+  iconSize: 100
+  contents:
+    - x: 140
+      y: 190
+      type: file
+    - x: 400
+      y: 190
+      type: link
+      path: /Applications
+
 # publish используется только для загрузки артефактов в GitHub Releases
 # (сама загрузка не требует подписи)
 publish:
