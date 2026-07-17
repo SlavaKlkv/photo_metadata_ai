@@ -18,6 +18,8 @@ from app.services.ai.ai_provider import (
     get_ai_provider,
 )
 from app.services.ai.constants import FALLBACK_CHAINS
+from app.services.desktop.ai_provider_api_keys import get_ai_provider_api_key
+from app.services.desktop.constants import SUPPORTED_AI_API_KEY_PROVIDERS
 
 logger = structlog.get_logger(__name__)
 
@@ -40,6 +42,17 @@ class FallbackMetadataResult:
     model: str | None
 
 
+def is_provider_added(provider: AIProvider) -> bool:
+    """
+    Провайдер считается добавленным, если для него не нужен API-ключ
+    или ключ сохранён в desktop-хранилище либо окружении.
+    """
+    if provider not in SUPPORTED_AI_API_KEY_PROVIDERS:
+        return True
+
+    return get_ai_provider_api_key(provider) is not None
+
+
 def build_provider_fallback_chain(
     selected_provider: AIProvider,
 ) -> list[FallbackAttempt]:
@@ -52,6 +65,13 @@ def build_provider_fallback_chain(
             continue
 
         seen.add(provider)
+
+        # Выбранный провайдер остаётся в цепочке даже без ключа, чтобы
+        # пользователь получил понятную ошибку конфигурации; fallback
+        # выполняется только на добавленных провайдеров.
+        if provider != selected_provider and not is_provider_added(provider):
+            continue
+
         attempts.append(
             FallbackAttempt(
                 provider=provider,
@@ -132,7 +152,11 @@ async def generate_metadata_with_fallback(
                     reason_code=get_provider_error_reason_code(error),
                     file_number=file_number,
                 )
-                raise
+                # Ошибка конфигурации выбранного провайдера отдаётся
+                # пользователю как есть; на fallback-попытках она не должна
+                # прерывать перебор остальных добавленных провайдеров.
+                if index == 0:
+                    raise
 
             last_error = error
             reason_code = get_provider_error_reason_code(error)
