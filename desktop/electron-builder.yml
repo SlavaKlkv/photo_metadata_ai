@@ -38,14 +38,14 @@ dmg:
   background: build/dmg-background.tiff
   window:
     width: 540
-    height: 380
+    height: 340
   iconSize: 100
   contents:
     - x: 140
-      y: 190
+      y: 170
       type: file
     - x: 400
-      y: 190
+      y: 170
       type: link
       path: /Applications
 

@@ -17,12 +17,18 @@ from PIL import Image, ImageDraw
 
 BUILD_DIR = Path(__file__).resolve().parents[1] / 'build'
 
-WIDTH, HEIGHT = 540, 380
+WIDTH, HEIGHT = 540, 340
+# Подписи Finder рисует чёрным и перекрасить их нельзя, поэтому
+# при тёмном фоне под ними рисуются светлые плашки.
 BACKGROUND = '#17151f'  # цвет loading-окна приложения (main.js)
 ACCENT = '#b3a6f7'
+LABEL_PLATE = '#a7a3bb'
 
-# Центр между иконками (140 и 400 по x, 190 по y).
-ARROW_Y = 190
+# Центр между иконками (140 и 400 по x, 170 по y).
+ICON_XS = (140, 400)
+LABEL_PLATE_Y = 236      # центр строки подписи под иконкой 100px
+LABEL_PLATE_SIZES = ((200, 28), (120, 28))  # под длину подписей
+ARROW_Y = 170
 ARROW_X_START, ARROW_X_END = 225, 315
 SHAFT_WIDTH = 8
 HEAD_LENGTH = 26
@@ -53,6 +59,17 @@ def draw_background(scale: int) -> Image.Image:
         ],
         fill=ACCENT,
     )
+
+    for icon_x, (plate_w, plate_h) in zip(ICON_XS, LABEL_PLATE_SIZES):
+        cx = icon_x * scale
+        cy = LABEL_PLATE_Y * scale
+        half_w = plate_w * scale // 2
+        half_h = plate_h * scale // 2
+        draw.rounded_rectangle(
+            [(cx - half_w, cy - half_h), (cx + half_w, cy + half_h)],
+            radius=plate_h * scale // 2,
+            fill=LABEL_PLATE,
+        )
     return image
 
 
