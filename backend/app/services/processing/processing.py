@@ -76,6 +76,10 @@ def apply_generated_metadata_to_file(
     file.category_2 = metadata.category_2
     file.license_type = metadata.license_type
     file.location_metadata = metadata.location_metadata
+    file.location_sublocation = metadata.location_sublocation
+    file.location_city = metadata.location_city
+    file.location_province_state = metadata.location_province_state
+    file.location_country = metadata.location_country
     file.editorial_date = metadata.editorial_date
     file.is_editorial = metadata.is_editorial
     file.editorial_caption = metadata.editorial_caption

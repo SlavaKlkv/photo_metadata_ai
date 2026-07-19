@@ -209,6 +209,48 @@ def test_iptc_export_writes_readable_stock_mapped_metadata():
     )
 
 
+def test_iptc_payload_uses_structured_location_over_string_order():
+    job = _build_completed_job()
+    file = job.files[0]
+    # Строка намеренно в "неудобном" порядке: без структуры позиционный
+    # разбор ошибочно положил бы Scotland в город, а Switzerland в страну.
+    file.location_metadata = 'Scotland, England, Switzerland'
+    file.location_sublocation = None
+    file.location_city = 'Edinburgh'
+    file.location_province_state = 'Scotland'
+    file.location_country = 'United Kingdom'
+
+    payload = build_stock_iptc_payload(file, StockPlatform.GETTY_IMAGES)
+
+    assert payload.city == 'Edinburgh'
+    assert payload.province_state == 'Scotland'
+    assert payload.country_name == 'United Kingdom'
+
+
+def test_manual_location_edit_clears_structured_components():
+    job = _build_completed_job()
+    file = job.files[0]
+    file.location_city = 'Edinburgh'
+    file.location_province_state = 'Scotland'
+    file.location_country = 'United Kingdom'
+
+    with TestClient(app) as client:
+        response = client.patch(
+            f'/api/v1/jobs/{job.job_id}/files/{file.file_id}/metadata',
+            json={'location_metadata': 'Paris, France'},
+        )
+
+    assert response.status_code == 200
+    assert file.location_metadata == 'Paris, France'
+    assert file.location_city is None
+    assert file.location_province_state is None
+    assert file.location_country is None
+
+    payload = build_stock_iptc_payload(file, StockPlatform.GETTY_IMAGES)
+    assert payload.city == 'Paris'
+    assert payload.country_name == 'France'
+
+
 @pytest.mark.parametrize(
     'stock_platform',
     [

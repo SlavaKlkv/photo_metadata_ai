@@ -5,7 +5,8 @@ from app.core.enums import MetadataFieldSource, StockPlatform
 from app.schemas.job import ProcessingJobFile
 from app.services.metadata.metadata_embedding import (
     IPTCEmbeddingPayload,
-    normalize_iptc_location,
+    IPTCLocation,
+    resolve_iptc_location,
 )
 from app.services.metadata.stock_mapping_data import (
     CATEGORY_ALIASES,
@@ -121,7 +122,11 @@ def build_stock_iptc_payload(
     stock_platform: StockPlatform,
 ) -> IPTCEmbeddingPayload:
     mapped_metadata = build_stock_mapped_metadata(file, stock_platform)
-    location = normalize_iptc_location(mapped_metadata.location_metadata)
+    location = (
+        resolve_iptc_location(file)
+        if mapped_metadata.location_metadata
+        else IPTCLocation()
+    )
     caption = mapped_metadata.description or ''
 
     if mapped_metadata.is_editorial and mapped_metadata.editorial_caption:
