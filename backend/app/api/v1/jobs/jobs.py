@@ -671,6 +671,10 @@ async def update_file_metadata(
         job_file.field_sources['license_type'] = MetadataFieldSource.EDITED
     if 'location_metadata' in payload.model_fields_set:
         job_file.location_metadata = payload.location_metadata
+        job_file.location_sublocation = None
+        job_file.location_city = None
+        job_file.location_province_state = None
+        job_file.location_country = None
         job_file.field_sources['location_metadata'] = (
             MetadataFieldSource.EDITED
         )

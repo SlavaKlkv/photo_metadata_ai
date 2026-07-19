@@ -39,6 +39,10 @@ class AIMetadataResponse:
         category_2: str | None = None,
         license_type: str | None = None,
         location_metadata: str | None = None,
+        location_sublocation: str | None = None,
+        location_city: str | None = None,
+        location_province_state: str | None = None,
+        location_country: str | None = None,
         editorial_date: str | None = None,
         is_editorial: bool = False,
         editorial_caption: str | None = None,
@@ -59,6 +63,10 @@ class AIMetadataResponse:
         self.category_2 = category_2
         self.license_type = license_type
         self.location_metadata = location_metadata
+        self.location_sublocation = location_sublocation
+        self.location_city = location_city
+        self.location_province_state = location_province_state
+        self.location_country = location_country
         self.editorial_date = editorial_date
         self.is_editorial = is_editorial
         self.editorial_caption = editorial_caption
@@ -530,11 +538,70 @@ def _parse_provider_metadata_json(
     return metadata
 
 
+def _extract_location_components(
+    metadata: dict,
+) -> tuple[str | None, str | None, str | None, str | None]:
+    """
+    Достаёт структурированные компоненты локации из ответа AI.
+
+    Поддерживает вложенный объект ``location`` со стандартными IPTC-полями.
+    """
+    location = metadata.get('location')
+
+    if not isinstance(location, dict):
+        return (None, None, None, None)
+
+    def _component(*keys: str) -> str | None:
+        for key in keys:
+            value = _extract_optional_string(location.get(key))
+
+            if value is not None:
+                return value
+
+        return None
+
+    return (
+        _component('sublocation', 'sub_location'),
+        _component('city'),
+        _component('province_state', 'province', 'state'),
+        _component('country', 'country_name'),
+    )
+
+
+def _compose_location_string(
+    *components: str | None,
+) -> str | None:
+    """
+    Собирает человекочитаемую строку локации из известных компонентов.
+    """
+    parts = [component for component in components if component]
+
+    if not parts:
+        return None
+
+    return ', '.join(parts)
+
+
 def _build_metadata_response(
     *,
     metadata: dict,
     prompt_render: PromptTemplateRender,
 ) -> AIMetadataResponse:
+    (
+        location_sublocation,
+        location_city,
+        location_province_state,
+        location_country,
+    ) = _extract_location_components(metadata)
+    location_metadata = _extract_optional_string(
+        metadata.get('location_metadata')
+    ) or _compose_location_string(
+        location_sublocation,
+        location_city,
+        location_province_state,
+        location_country,
+    )
+
     return AIMetadataResponse(
         title=metadata.get('title') or '',
         description=metadata.get('description') or '',
@@ -542,9 +609,11 @@ def _build_metadata_response(
         categories=_extract_string_list(metadata.get('categories')),
         category_2=_extract_optional_string(metadata.get('category_2')),
         license_type=_extract_optional_string(metadata.get('license_type')),
-        location_metadata=_extract_optional_string(
-            metadata.get('location_metadata')
-        ),
+        location_metadata=location_metadata,
+        location_sublocation=location_sublocation,
+        location_city=location_city,
+        location_province_state=location_province_state,
+        location_country=location_country,
         editorial_date=_extract_optional_string(
             metadata.get('editorial_date')
         ),

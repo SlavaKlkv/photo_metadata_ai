@@ -78,6 +78,10 @@ class StockSpecificMetadataMixin(BaseModel):
     category_2: str | None = None
     license_type: str | None = None
     location_metadata: str | None = None
+    location_sublocation: str | None = None
+    location_city: str | None = None
+    location_province_state: str | None = None
+    location_country: str | None = None
     editorial_date: str | None = None
     is_editorial: bool = False
     editorial_caption: str | None = None
@@ -101,6 +105,10 @@ class StockSpecificMetadataMixin(BaseModel):
         'category_2',
         'license_type',
         'location_metadata',
+        'location_sublocation',
+        'location_city',
+        'location_province_state',
+        'location_country',
         'editorial_date',
         'editorial_caption',
     )
