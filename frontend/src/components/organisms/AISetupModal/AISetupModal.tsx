@@ -14,6 +14,9 @@ import styles from './AISetupModal.module.scss';
 export const AISetupModal: React.FC = () => {
   const isAiSetupOpen = useUIStore((state) => state.isAiSetupOpen);
   const closeAiSetup = useUIStore((state) => state.closeAiSetup);
+  const isProcessing = useUIStore((state) => state.isProcessing);
+  const isExportReady = useUIStore((state) => state.isExportReady);
+  const isExporting = useUIStore((state) => state.isExporting);
   const hasAcceptedOnboarding = useAppStore(
     (state) => state.hasAcceptedOnboarding,
   );
@@ -26,8 +29,16 @@ export const AISetupModal: React.FC = () => {
     }
   }, [isAiSetupOpen, hasAcceptedOnboarding, discoverProviders]);
 
-  // До завершения онбординга настройкой занимается OnboardingModal
-  if (!hasAcceptedOnboarding || !isAiSetupOpen) {
+  // До завершения онбординга настройкой занимается OnboardingModal.
+  // Смена провайдеров доступна только на шагах Upload/Context —
+  // с начала обработки и до конца экспорта модалка скрыта.
+  if (
+    !hasAcceptedOnboarding ||
+    !isAiSetupOpen ||
+    isProcessing ||
+    isExportReady ||
+    isExporting
+  ) {
     return null;
   }
 
