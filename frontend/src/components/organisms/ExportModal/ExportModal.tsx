@@ -6,6 +6,7 @@ import { Button } from '../../atoms/Button/Button';
 import { useUIStore } from '../../../store/useUIStore';
 import { useAppStore } from '../../../store/useAppStore';
 import { jobsApi } from '../../../services/api/api';
+import { useToastStore } from '../../../store/useToastStore';
 import styles from './ExportModal.module.scss';
 
 export const ExportModal: React.FC = () => {
@@ -23,16 +24,19 @@ export const ExportModal: React.FC = () => {
   );
 
   const setExportArtifacts = useUIStore((state) => state.setExportArtifacts);
+  const setIsExporting = useUIStore((state) => state.setIsExporting);
+  const addToast = useToastStore((state) => state.addToast);
 
   const [progress, setProgress] = useState(0);
-  const [isCancelled, setIsCancelled] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !currentJobId) return;
 
     setProgress(0);
-    setIsCancelled(false);
 
+    // Локальный флаг вместо state: замыкание doExport живёт дольше рендера,
+    // и state-переменная в нём навсегда остаётся со старым значением
+    let cancelled = false;
 
     const doExport = async () => {
       try {
@@ -47,7 +51,7 @@ export const ExportModal: React.FC = () => {
         while (!exportCompleted) {
           const { data } = await jobsApi.getExportStatus(currentJobId);
 
-          if (isCancelled) return;
+          if (cancelled) return;
 
           setProgress(data.export_progress);
 
@@ -72,18 +76,22 @@ export const ExportModal: React.FC = () => {
           openSuccessModal();
         }, 500);
       } catch (error) {
+        if (cancelled) return;
+        setIsExporting(false);
         closeExportModal();
+        addToast("Export failed", "error");
       }
     };
 
     doExport();
 
     return () => {
+      cancelled = true;
     };
   }, [isOpen]);
 
   const handleCancel = () => {
-    setIsCancelled(true);
+    setIsExporting(false);
     closeExportModal();
   };
 
