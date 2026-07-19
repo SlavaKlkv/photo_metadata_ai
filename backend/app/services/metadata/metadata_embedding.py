@@ -1,4 +1,5 @@
 import re
+import struct
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -185,6 +186,7 @@ def _embed_iptc_metadata(
         )
 
         iptc_info.save(options={'overwrite': True})
+        _ensure_iptc_utf8_marker(file_path)
     except Exception as error:
         logger.exception(
             'iptc_embedding_failed',
@@ -197,10 +199,97 @@ def _embed_iptc_metadata(
         ) from error
 
 
+# IPTC dataset 1:90 (CodedCharacterSet) со значением ESC % G — признак UTF-8.
+# iptcinfo3 пишет текст в UTF-8, но сам маркер не записывает, из-за чего
+# читатели (macOS, Adobe, стоки) трактуют байты как Latin-1 и портят кириллицу.
+_IPTC_UTF8_MARKER = b'\x1c\x01\x5a\x00\x03\x1b\x25\x47'
+
+
+def _ensure_iptc_utf8_marker(file_path: Path) -> None:
+    data = bytearray(file_path.read_bytes())
+    pos = 2
+
+    while pos + 4 <= len(data) and data[pos] == 0xFF:
+        marker = data[pos + 1]
+        if marker == 0xDA:
+            return
+        segment_length = struct.unpack_from('>H', data, pos + 2)[0]
+
+        if marker == 0xED and data[pos + 4 : pos + 18] == b'Photoshop 3.0\x00':
+            resource_pos = pos + 18
+            segment_end = pos + 2 + segment_length
+
+            while resource_pos + 12 <= segment_end:
+                if data[resource_pos : resource_pos + 4] != b'8BIM':
+                    return
+                resource_id = struct.unpack_from('>H', data, resource_pos + 4)[
+                    0
+                ]
+                name_length = data[resource_pos + 6]
+                name_padded = ((1 + name_length) + 1) // 2 * 2
+                size_pos = resource_pos + 6 + name_padded
+                resource_size = struct.unpack_from('>I', data, size_pos)[0]
+                data_pos = size_pos + 4
+
+                if resource_id != 0x0404:
+                    resource_pos = (
+                        data_pos + resource_size + (resource_size % 2)
+                    )
+                    continue
+
+                iptc_block = data[data_pos : data_pos + resource_size]
+                if iptc_block.startswith(b'\x1c\x01'):
+                    return
+
+                new_size = resource_size + len(_IPTC_UTF8_MARKER)
+                struct.pack_into('>I', data, size_pos, new_size)
+                struct.pack_into(
+                    '>H',
+                    data,
+                    pos + 2,
+                    segment_length + len(_IPTC_UTF8_MARKER),
+                )
+                data[data_pos:data_pos] = _IPTC_UTF8_MARKER
+                file_path.write_bytes(bytes(data))
+                return
+
+            return
+
+        pos += 2 + segment_length
+
+
+def resolve_iptc_location(file: ProcessingJobFile) -> IPTCLocation:
+    """
+    Возвращает IPTC-локацию из структурированных полей файла.
+
+    Если структурированные компоненты отсутствуют (например, локация была
+    отредактирована вручную одной строкой), выполняется fallback на разбор
+    строки ``location_metadata``.
+    """
+    structured = IPTCLocation(
+        sublocation=file.location_sublocation,
+        city=file.location_city,
+        province_state=file.location_province_state,
+        country_name=file.location_country,
+    )
+
+    if any(
+        (
+            structured.sublocation,
+            structured.city,
+            structured.province_state,
+            structured.country_name,
+        )
+    ):
+        return structured
+
+    return normalize_iptc_location(file.location_metadata)
+
+
 def _build_default_iptc_payload(
     file: ProcessingJobFile,
 ) -> IPTCEmbeddingPayload:
-    location = normalize_iptc_location(file.location_metadata)
+    location = resolve_iptc_location(file)
 
     return IPTCEmbeddingPayload(
         object_name=file.title or '',
