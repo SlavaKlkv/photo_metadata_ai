@@ -18,7 +18,27 @@ beforeEach(() => {
     hasAcceptedOnboarding: false,
     discoverProviders: jest.fn(),
   });
-  useUIStore.setState({ isAiSetupOpen: false });
+  useUIStore.setState({
+    isAiSetupOpen: false,
+    isProcessing: false,
+    isExportReady: false,
+    isExporting: false,
+  });
+});
+
+test.each([
+  ['processing', { isProcessing: true }],
+  ['review', { isExportReady: true }],
+  ['export', { isExporting: true }],
+])('is hidden on %s step', (_step, state) => {
+  useAppStore.setState({
+    hasAcceptedOnboarding: true,
+    discoverProviders: jest.fn().mockResolvedValue(undefined),
+  });
+  useUIStore.setState({ isAiSetupOpen: true, ...state });
+
+  render(<AISetupModal />);
+  expect(screen.queryByText('AI Setup')).not.toBeInTheDocument();
 });
 
 test('is hidden before onboarding or while closed', () => {

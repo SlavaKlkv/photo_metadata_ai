@@ -30,6 +30,10 @@ function App() {
     (state) => state.hasAcceptedOnboarding,
   );
   const openAiSetup = useUIStore((state) => state.openAiSetup);
+  const isProcessing = useUIStore((state) => state.isProcessing);
+  const isExporting = useUIStore((state) => state.isExporting);
+  // AI Setup доступен только на шагах Upload/Context — до старта обработки
+  const isAiSetupAvailable = !isProcessing && !isExportReady && !isExporting;
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -65,6 +69,7 @@ function App() {
                 size="md"
                 icon={<Icon name="ai-setup-icon" />}
                 onClick={openAiSetup}
+                disabled={!isAiSetupAvailable}
                 className={styles.aiSetupButton}
               >
                 AI Setup
