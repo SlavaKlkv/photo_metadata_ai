@@ -17,6 +17,10 @@ SPEC_DIR = Path(SPECPATH).resolve()
 BACKEND_DIR = SPEC_DIR.parent
 PROJECT_ROOT = BACKEND_DIR.parent
 FRONTEND_BUILD = PROJECT_ROOT / 'frontend' / 'build'
+BACKEND_DATA = BACKEND_DIR / 'app' / 'data'
+
+if not BACKEND_DATA.is_dir():
+    raise SystemExit(f'backend data dir not found: {BACKEND_DATA}')
 
 if not FRONTEND_BUILD.is_dir():
     raise SystemExit(
@@ -46,7 +50,11 @@ a = Analysis(
     [str(BACKEND_DIR / 'app' / 'desktop_main.py')],
     pathex=[str(BACKEND_DIR)],
     binaries=[],
-    datas=[(str(FRONTEND_BUILD), 'frontend_build')],
+    datas=[
+        (str(FRONTEND_BUILD), 'frontend_build'),
+        # Пути в коде считаются от app/, поэтому данные кладём в app/data
+        (str(BACKEND_DATA), 'app/data'),
+    ],
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
