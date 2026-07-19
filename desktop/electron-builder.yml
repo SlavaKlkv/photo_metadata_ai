@@ -31,21 +31,25 @@ mac:
   # update flow ручной (скачать новый .dmg и заменить приложение).
   identity: null
 
-# Фон со стрелкой «приложение -> Applications» генерируется скриптом
-# scripts/generate-dmg-background.py; позиции иконок согласованы
-# с картинкой.
+# Кастомный фон намеренно не задан: при любом фоне Finder рисует
+# подписи файлов чёрными независимо от темы. Без фона окно нативное
+# (фон и подписи следуют теме), а стрелка «приложение -> Applications»
+# и строка-подсказка добавляются отдельными файлами с кастомными
+# иконками (build/dmg-arrow.icns, dmg-hint*.icns из
+# scripts/generate-dmg-icons.py) через scripts/dmgbuild-wrapper.sh —
+# позиции ниже согласованы с ним.
 dmg:
-  background: build/dmg-background.tiff
   window:
-    width: 540
-    height: 340
-  iconSize: 100
+    width: 600
+    height: 400
+  iconSize: 128
+  iconTextSize: 16
   contents:
-    - x: 140
-      y: 170
+    - x: 160
+      y: 150
       type: file
-    - x: 400
-      y: 170
+    - x: 440
+      y: 150
       type: link
       path: /Applications
 

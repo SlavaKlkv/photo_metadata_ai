@@ -59,6 +59,24 @@ cp dist/photo-metadata-backend "$DESKTOP_DIR/resources/backend/"
 echo "==> [3/3] electron-builder --mac"
 cd "$DESKTOP_DIR"
 npm ci
+
+# Обёртка dmgbuild убирает дефолтный фон DMG (любой кастомный фон
+# делает подписи Finder чёрными независимо от темы), добавляет
+# файлы-иконки стрелки и подсказки (build/dmg-*.icns) и отодвигает
+# служебные файлы тома от иконок. Настоящий dmgbuild лежит в кэше
+# electron-builder после первой сборки; без него обёртка не
+# подключается — DMG соберётся с дефолтным фоном и без стрелки.
+REAL_DMGBUILD="$(find "$HOME/Library/Caches/electron-builder" \
+  -type f -name dmgbuild -path '*dmgbuild-bundle*' 2>/dev/null | head -1)"
+if [[ -n "$REAL_DMGBUILD" ]]; then
+  export REAL_DMGBUILD
+  export CUSTOM_DMGBUILD_PATH="$DESKTOP_DIR/scripts/dmgbuild-wrapper.sh"
+else
+  echo "ВНИМАНИЕ: dmgbuild не найден в кэше electron-builder;" >&2
+  echo "DMG соберётся с дефолтным фоном и без стрелки. Повторите" >&2
+  echo "сборку после первой успешной — кэш появится." >&2
+fi
+
 npx electron-builder --mac "$@"
 
 echo "==> Готово: артефакты в $DESKTOP_DIR/out/"
