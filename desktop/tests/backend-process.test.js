@@ -56,19 +56,46 @@ test('uses built development binary when available', () => {
   );
 });
 
-test('uses packaged backend from resources', () => {
+// Бинарники backend лежат раздельно по архитектурам: склейка lipo в
+// universal2 отдавала Intel-срезу arm64-библиотеки, и backend падал при
+// старте на Intel. Регрессия видна только по выбранному пути.
+function withPackagedArch(arch, action) {
   app.isPackaged = true;
   const previousResourcesPath = process.resourcesPath;
+  const previousArch = Object.getOwnPropertyDescriptor(process, 'arch');
   process.resourcesPath = '/Applications/Test.app/Contents/Resources';
+  Object.defineProperty(process, 'arch', { value: arch, configurable: true });
 
   try {
-    spawnBackend();
+    action();
   } finally {
     process.resourcesPath = previousResourcesPath;
+    Object.defineProperty(process, 'arch', previousArch);
   }
+}
+
+function spawnPackagedWithArch(arch) {
+  withPackagedArch(arch, spawnBackend);
+}
+
+test('uses arm64 packaged backend on Apple Silicon', () => {
+  spawnPackagedWithArch('arm64');
 
   expect(childProcess.spawn).toHaveBeenCalledWith(
-    '/Applications/Test.app/Contents/Resources/backend/photo-metadata-backend',
+    '/Applications/Test.app/Contents/Resources/backend/arm64/photo-metadata-backend',
+    [],
+    expect.objectContaining({
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: expect.objectContaining({ DESKTOP_APP_VERSION: '1.0.0' }),
+    })
+  );
+});
+
+test('uses x86_64 packaged backend on Intel', () => {
+  spawnPackagedWithArch('x64');
+
+  expect(childProcess.spawn).toHaveBeenCalledWith(
+    '/Applications/Test.app/Contents/Resources/backend/x86_64/photo-metadata-backend',
     [],
     expect.objectContaining({
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -86,15 +113,52 @@ test('passes app version reported by Electron, not a hardcoded one', () => {
   expect(options.env.DESKTOP_APP_VERSION).toBe('2.3.4');
 });
 
-test('kills orphaned backend and ignores pkill no-match error', () => {
-  killOrphanedBackends();
-  expect(childProcess.execFileSync).toHaveBeenCalledWith('/usr/bin/pkill', [
-    '-x',
-    'photo-metadata-backend',
-  ]);
+// Матч по полному пути, а не по имени процесса: `pkill -x
+// photo-metadata-backend` убивал и дымовой тест сборки, и бинарники
+// других сборок — имя у всех одинаковое.
+test('kills orphaned arm64 backend by its exact command line', () => {
+  withPackagedArch('arm64', killOrphanedBackends);
 
+  expect(childProcess.execFileSync).toHaveBeenCalledWith('/usr/bin/pkill', [
+    '-f',
+    '-x',
+    '/Applications/Test.app/Contents/Resources/backend/arm64/photo-metadata-backend',
+  ]);
+});
+
+test('kills orphaned x86_64 backend by its exact command line', () => {
+  withPackagedArch('x64', killOrphanedBackends);
+
+  expect(childProcess.execFileSync).toHaveBeenCalledWith('/usr/bin/pkill', [
+    '-f',
+    '-x',
+    '/Applications/Test.app/Contents/Resources/backend/x86_64/photo-metadata-backend',
+  ]);
+});
+
+test('kills orphaned development binary by its path', () => {
+  fs.existsSync.mockReturnValue(true);
+
+  killOrphanedBackends();
+
+  expect(childProcess.execFileSync).toHaveBeenCalledWith('/usr/bin/pkill', [
+    '-f',
+    '-x',
+    expect.stringMatching(/backend\/dist\/photo-metadata-backend$/),
+  ]);
+});
+
+test('skips pkill when backend runs from sources', () => {
+  killOrphanedBackends();
+
+  expect(childProcess.execFileSync).not.toHaveBeenCalled();
+});
+
+test('ignores pkill no-match error', () => {
+  fs.existsSync.mockReturnValue(true);
   childProcess.execFileSync.mockImplementationOnce(() => {
     throw new Error('no process');
   });
+
   expect(() => killOrphanedBackends()).not.toThrow();
 });
