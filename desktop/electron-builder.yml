@@ -8,8 +8,11 @@ files:
   - src/**/*
   - package.json
 
-# Universal2-бинарник backend (arm64+x86_64, склеен lipo)
-# подкладывается скриптом scripts/build-mac.sh
+# Бинарники backend (resources/backend/arm64/ и resources/backend/x86_64/)
+# подкладываются скриптом scripts/build-mac.sh. Раздельно, а не склеенные
+# lipo в universal2: spec собирает onefile с overlay'ем в конце файла,
+# который lipo сохраняет лишь для одного среза. Нужный выбирается в
+# рантайме — desktop/src/backend-process.js по process.arch.
 extraResources:
   - from: resources/backend/
     to: backend/
@@ -23,9 +26,11 @@ mac:
       arch: [universal]
   # electron-builder сам конвертирует исходный PNG 1024x1024 в ICNS.
   icon: build/icon.png
-  # Бинарник backend уже universal2 (склеен lipo в build-mac.sh),
-  # поэтому при merge x64/arm64-слайсов он одинаковый в обоих
-  x64ArchFiles: Contents/Resources/backend/photo-metadata-backend
+  # Бинарники backend одинаковы в x64- и arm64-ветках сборки (их кладёт
+  # build-mac.sh, а не electron). @electron/universal не берётся сам
+  # решать, что делать с идентичным Mach-O файлом, и требует явного
+  # правила — без него сборка падает на universal-merge.
+  x64ArchFiles: Contents/Resources/backend/*/photo-metadata-backend
   # Дистрибуция намеренно неподписанная: учётных данных Apple Developer
   # нет и не будет. Подпись/нотаризация/hardened runtime не настроены,
   # update flow ручной (скачать новый .dmg и заменить приложение).

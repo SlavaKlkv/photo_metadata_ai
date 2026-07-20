@@ -29,7 +29,12 @@ import urllib.request
 import uuid
 from pathlib import Path
 
-BASE_URL = 'http://127.0.0.1:8000'
+# Порт по умолчанию отличается от штатного 8000: тест поднимает свой
+# экземпляр backend и иначе конфликтовал бы с уже запущенным
+# приложением. Значение пробрасывается бинарнику через окружение.
+PORT_ENV_VAR = 'PHOTO_METADATA_BACKEND_PORT'
+PORT = int(os.environ.get(PORT_ENV_VAR, '8123'))
+BASE_URL = f'http://127.0.0.1:{PORT}'
 HEALTH_URL = f'{BASE_URL}/api/v1/desktop/health'
 HEALTH_TIMEOUT_SECONDS = 30
 PROCESS_TIMEOUT_SECONDS = 180
@@ -143,12 +148,13 @@ def main() -> int:
         log(f'ERROR: binary not found: {binary}')
         return 1
 
-    log(f'launching {binary}')
+    log(f'launching {binary} on port {PORT}')
     process = subprocess.Popen(
         [str(binary)],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
+        env={**os.environ, PORT_ENV_VAR: str(PORT)},
     )
     try:
         health = wait_for_health(process)
