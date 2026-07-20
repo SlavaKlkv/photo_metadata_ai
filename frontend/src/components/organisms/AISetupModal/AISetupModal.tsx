@@ -48,7 +48,7 @@ export const AISetupModal: React.FC = () => {
         <SectionHeader
           icon="ai-setup-icon"
           title="AI Setup"
-          subtitle="Manage your AI providers. Add or update API keys anytime."
+          subtitle="Manage your AI providers. Add or update API keys."
         />
 
         <AIProviderSetup />

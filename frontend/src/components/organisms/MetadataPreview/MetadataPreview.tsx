@@ -537,7 +537,7 @@ export const MetadataPreview: React.FC = () => {
       <SectionHeader
         icon="info-icon"
         title="Metadata Preview"
-        subtitle="Upload photos and set context to see AI-generated metadata."
+        subtitle="Review and edit AI-generated metadata before export."
       />
 
       {/* Навигация */}
