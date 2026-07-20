@@ -287,3 +287,100 @@ test('dismisses the current version and persists the choice', () => {
   expect(localStorage.getItem('update_dismissed_version')).toBe('1.1.0');
   expect(useAppStore.getState().isUpdateBannerVisible).toBe(false);
 });
+
+describe('cancelBatchProcessing', () => {
+  test('restores photos to the just-added state and keeps the context', () => {
+    useAppStore.setState({
+      jobs: [
+        {
+          ...makeJob('a', 'done'),
+          title: 'Generated title',
+          description: 'Generated description',
+          keywords: ['one', 'two'],
+          effective_ai_provider: 'gemini',
+          effective_ai_model: 'gemini-pro',
+          field_sources: { title: 'generated' },
+          preview: { errors: [] } as never,
+          metadata: {
+            title: 'Generated title',
+            description: 'Generated description',
+            keywords: ['one', 'two'],
+          },
+        },
+        { ...makeJob('b', 'processing'), error: 'boom' },
+      ],
+      draftBatchSettings: {
+        shootingContext: 'Sunset shoot in Lisbon',
+        stockPlatform: 'shutterstock',
+        exportFormats: { csv: true, iptc: true },
+      },
+      lockedBatchSettings: {
+        shootingContext: 'Sunset shoot in Lisbon',
+        stockPlatform: 'shutterstock',
+        exportFormats: { csv: true, iptc: true },
+      },
+      isProcessing: true,
+    });
+
+    useAppStore.getState().cancelBatchProcessing();
+
+    const state = useAppStore.getState();
+
+    // Список фото сохранён целиком, но без результатов прогона.
+    expect(state.jobs).toEqual([
+      { id: 'a', filename: 'a.jpg', originalFilename: 'a.jpg', status: 'queued' },
+      { id: 'b', filename: 'b.jpg', originalFilename: 'b.jpg', status: 'queued' },
+    ]);
+
+    // Введённый контекст и настройки не тронуты.
+    expect(state.draftBatchSettings.shootingContext).toBe(
+      'Sunset shoot in Lisbon',
+    );
+    expect(state.draftBatchSettings.exportFormats).toEqual({
+      csv: true,
+      iptc: true,
+    });
+  });
+
+  test('unlocks settings so they become editable again', () => {
+    useAppStore.setState({
+      lockedBatchSettings: {
+        shootingContext: 'locked context',
+        stockPlatform: 'getty_images',
+        exportFormats: { csv: true, iptc: false },
+      },
+      isProcessing: true,
+      regeneratingFileId: 'a',
+    });
+
+    useAppStore.getState().cancelBatchProcessing();
+
+    expect(useAppStore.getState()).toMatchObject({
+      lockedBatchSettings: null,
+      isProcessing: false,
+      regeneratingFileId: null,
+    });
+  });
+
+  test('allows a second run with a changed context', () => {
+    useAppStore.setState({
+      jobs: [makeJob('a', 'done')],
+      draftBatchSettings: {
+        shootingContext: 'first context',
+        stockPlatform: 'getty_images',
+        exportFormats: { csv: true, iptc: false },
+      },
+    });
+
+    useAppStore.getState().cancelBatchProcessing();
+    useAppStore
+      .getState()
+      .updateDraftBatchSetting('shootingContext', 'second context');
+    useAppStore.getState().lockBatchSettings();
+
+    expect(useAppStore.getState().lockedBatchSettings?.shootingContext).toBe(
+      'second context',
+    );
+    expect(useAppStore.getState().jobs[0].status).toBe('queued');
+  });
+});

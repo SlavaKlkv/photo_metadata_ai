@@ -76,6 +76,7 @@ export const SuccessModal: React.FC = () => {
       isOpen={isOpen}
       onClose={closeSuccessModal}
       closeOnBackdrop={false}
+      closeOnEscape
       size="lg"
     >
       <div className={styles.content}>

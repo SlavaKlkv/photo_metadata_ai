@@ -168,11 +168,82 @@ async def test_cancel_job_processing_marks_unfinished_files_cancelled():
 
 
 @pytest.mark.asyncio
+async def test_cancel_and_reset_job_leaves_no_partial_results():
+    """
+    Отменённая задача возвращается в состояние «до старта»: файлы снова
+    queued, а метаданные успевших обработаться файлов стёрты.
+    """
+    job = _job(FileStatus.PROCESSING)
+    job.status = JobStatus.PROCESSING
+    job.effective_ai_provider = AIProvider.MOCK
+    job.effective_ai_model = 'mock-model'
+    job.files.append(
+        ProcessingJobFile(
+            filename='done.jpg',
+            original_filename='done.jpg',
+            status=FileStatus.COMPLETED,
+            title='Generated title',
+            description='Generated description',
+            keywords=['one', 'two'],
+            effective_ai_provider=AIProvider.MOCK,
+            effective_ai_model='mock-model',
+            error_message='some error',
+            field_sources={'title': MetadataFieldSource.GENERATED},
+        )
+    )
+    await storage.create_job(job)
+
+    await processing.cancel_and_reset_job(job.job_id)
+
+    reset_job = await storage.get_job(job.job_id)
+    assert reset_job is not None
+    assert reset_job.status == JobStatus.QUEUED
+    assert reset_job.effective_ai_provider is None
+    assert reset_job.effective_ai_model is None
+    assert len(reset_job.files) == 2
+
+    for file in reset_job.files:
+        assert file.status == FileStatus.QUEUED
+        assert file.title is None
+        assert file.description is None
+        assert file.keywords == []
+        assert file.error_message is None
+        assert file.effective_ai_provider is None
+        assert file.effective_ai_model is None
+        assert file.field_sources == {}
+
+    # Сам список файлов не меняется — фото остаются добавленными.
+    assert [file.filename for file in reset_job.files] == [
+        'photo.jpg',
+        'done.jpg',
+    ]
+
+
+@pytest.mark.asyncio
+async def test_cancel_and_reset_job_preserves_file_identity():
+    """
+    Сброс сохраняет file_id, иначе фронтенд потеряет привязку превью к фото.
+    """
+    job = _job(FileStatus.PROCESSING)
+    job.status = JobStatus.PROCESSING
+    original_file_id = job.files[0].file_id
+    await storage.create_job(job)
+
+    await processing.cancel_and_reset_job(job.job_id)
+
+    reset_job = await storage.get_job(job.job_id)
+    assert reset_job is not None
+    assert reset_job.files[0].file_id == original_file_id
+    assert reset_job.files[0].original_filename == 'photo.jpg'
+
+
+@pytest.mark.asyncio
 async def test_processing_helpers_handle_missing_jobs():
     missing_job_id = uuid4()
 
     await processing.process_job(missing_job_id)
     await processing.retry_failed_files(missing_job_id)
     await processing.cancel_job_processing(missing_job_id)
+    await processing.cancel_and_reset_job(missing_job_id)
 
     assert await processing._is_job_cancelled(missing_job_id) is True

@@ -33,6 +33,7 @@ export interface UIState {
   closeAiSetup: () => void;
   toggleFileList: () => void;
   setIsProcessing: (isProcessing: boolean) => void;
+  resetProcessingState: () => void;
   openProgressModal: () => void;
   closeProgressModal: () => void;
   setIsUploaded: (val: boolean) => void;
@@ -79,6 +80,18 @@ export const useUIStore = create<UIState>()(
         set((state) => ({ isFileListOpen: !state.isFileListOpen })),
       setIsProcessing: (isProcessing) =>
         set({ isProcessing }),
+      // Снимает все флаги прогона после отмены.
+      // currentJobId сохраняем: backend вернул ту же задачу в queued,
+      // повторный запуск идёт по тому же id.
+      resetProcessingState: () =>
+        set({
+          isProcessing: false,
+          isPollingActive: false,
+          isProgressModalOpen: false,
+          isExportReady: false,
+          currentProcessingProvider: null,
+          currentProcessingModel: null,
+        }),
       openProgressModal: () =>
         set({ isProgressModalOpen: true }),
       closeProgressModal: () =>
