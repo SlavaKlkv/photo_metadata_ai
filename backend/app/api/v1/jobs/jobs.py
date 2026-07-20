@@ -65,7 +65,7 @@ from app.services.metadata.stock_validation import (
 )
 from app.services.processing.processing import (
     apply_generated_metadata_to_file,
-    cancel_job_processing,
+    cancel_and_reset_job,
     process_job,
     regenerate_metadata_for_file,
     retry_failed_files,
@@ -289,7 +289,10 @@ async def start_job_processing(
 @router.post('/{job_id}/cancel', response_model=ProcessingJob)
 async def cancel_job(job_id: UUID):
     """
-    Останавливает дальнейшую обработку задачи.
+    Останавливает обработку и возвращает задачу в состояние «до старта».
+
+    Задача снова оказывается в статусе queued без частичных результатов,
+    поэтому её можно запустить повторно по тому же job_id.
     """
     job = await storage.get_job(job_id)
 
@@ -299,8 +302,7 @@ async def cancel_job(job_id: UUID):
             detail='Job not found',
         )
 
-    await cancel_job_processing(job.job_id)
-    job_task_manager.cancel(job.job_id)
+    await cancel_and_reset_job(job.job_id)
 
     cancelled_job = await storage.get_job(job.job_id)
 

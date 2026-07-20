@@ -23,6 +23,7 @@ from app.services.image_preprocessing import resize_image_for_ai
 from app.services.metadata.metadata_embedding import get_upload_file_path
 from app.services.metadata.stock_autofix import apply_stock_metadata_autofixes
 from app.services.processing.constants import MAX_CONCURRENT_AI_REQUESTS
+from app.services.task_manager import job_task_manager
 from app.storage.jobs import storage
 
 ai_requests_semaphore = asyncio.Semaphore(MAX_CONCURRENT_AI_REQUESTS)
@@ -311,6 +312,19 @@ async def cancel_job_processing(job_id: UUID) -> None:
     await _mark_job_as_cancelled(job.job_id)
 
 
+async def cancel_and_reset_job(job_id: UUID) -> None:
+    """
+    Отменяет обработку и возвращает задачу в состояние «до старта».
+
+    Порядок важен: сначала пометка cancelled — по ней фоновый пайплайн сам
+    выходит из цикла; затем ожидание фактической остановки задачи; и только
+    после этого сброс, который иначе мог бы быть затёрт живым обработчиком.
+    """
+    await cancel_job_processing(job_id)
+    await job_task_manager.cancel_and_wait(job_id)
+    await _reset_job_to_queued(job_id)
+
+
 async def _process_file(
     file: ProcessingJobFile,
     selected_provider: AIProvider,
@@ -565,5 +579,37 @@ async def _mark_job_as_cancelled(job_id: UUID) -> None:
     logger.info(
         'job_marked_as_cancelled',
         job_id=str(job.job_id),
+    )
+    await storage.update_job(job)
+
+
+async def _reset_job_to_queued(job_id: UUID) -> None:
+    """
+    Возвращает задачу в состояние «до старта обработки».
+
+    Файлы пересобираются заново от идентифицирующих полей, поэтому частичные
+    результаты отменённого прогона не остаются ни в одном metadata-поле.
+    """
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        return
+
+    job.status = JobStatus.QUEUED
+    job.effective_ai_provider = None
+    job.effective_ai_model = None
+    job.files = [
+        ProcessingJobFile(
+            file_id=file.file_id,
+            filename=file.filename,
+            original_filename=file.original_filename,
+        )
+        for file in job.files
+    ]
+
+    logger.info(
+        'job_reset_to_queued',
+        job_id=str(job.job_id),
+        files_count=len(job.files),
     )
     await storage.update_job(job)

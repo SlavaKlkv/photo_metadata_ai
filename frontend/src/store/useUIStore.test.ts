@@ -76,3 +76,30 @@ test('updates processing, selection and export state', () => {
     currentProcessingModel: null,
   });
 });
+
+test('resets every processing flag but keeps the current job id', () => {
+  useUIStore.setState({
+    isProcessing: true,
+    isPollingActive: true,
+    isProgressModalOpen: true,
+    isExportReady: true,
+    currentProcessingProvider: 'gemini',
+    currentProcessingModel: 'gemini-pro',
+    currentJobId: 'job-1',
+    isUploaded: true,
+  });
+
+  useUIStore.getState().resetProcessingState();
+
+  expect(useUIStore.getState()).toMatchObject({
+    isProcessing: false,
+    isPollingActive: false,
+    isProgressModalOpen: false,
+    isExportReady: false,
+    currentProcessingProvider: null,
+    currentProcessingModel: null,
+    // Повторный запуск идёт по тому же job_id, а фото остаются загруженными.
+    currentJobId: 'job-1',
+    isUploaded: true,
+  });
+});

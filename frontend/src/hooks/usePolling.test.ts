@@ -130,3 +130,64 @@ test('stops polling and closes progress after request failure', async () => {
   });
   unmount();
 });
+
+test('restores the pre-generation state when the job comes back cancelled', async () => {
+  useAppStore.getState().addJobs([
+    {
+      id: 'file-1',
+      filename: 'photo.jpg',
+      originalFilename: 'photo.jpg',
+      status: 'done',
+      title: 'Generated title',
+    },
+  ]);
+  useAppStore.setState({
+    draftBatchSettings: {
+      shootingContext: 'Sunset shoot in Lisbon',
+      stockPlatform: 'getty_images',
+      exportFormats: { csv: true, iptc: false },
+    },
+    lockedBatchSettings: {
+      shootingContext: 'Sunset shoot in Lisbon',
+      stockPlatform: 'getty_images',
+      exportFormats: { csv: true, iptc: false },
+    },
+  });
+  useUIStore.setState({
+    isPollingActive: true,
+    isProcessing: true,
+    isProgressModalOpen: true,
+    currentProcessingProvider: 'gemini',
+  });
+  mockedJobsApi.getStatus.mockResolvedValue({
+    data: { status: 'cancelled', files: [] },
+  } as never);
+
+  renderHook(() => usePolling('job-1'));
+
+  await waitFor(() => {
+    expect(useUIStore.getState().isProcessing).toBe(false);
+  });
+
+  const appState = useAppStore.getState();
+  // Фото вернулись в состояние «только добавлены», контекст сохранён.
+  expect(appState.jobs).toEqual([
+    {
+      id: 'file-1',
+      filename: 'photo.jpg',
+      originalFilename: 'photo.jpg',
+      status: 'queued',
+    },
+  ]);
+  expect(appState.lockedBatchSettings).toBeNull();
+  expect(appState.draftBatchSettings.shootingContext).toBe(
+    'Sunset shoot in Lisbon',
+  );
+  expect(useUIStore.getState()).toMatchObject({
+    isPollingActive: false,
+    isProgressModalOpen: false,
+    isExportReady: false,
+  });
+  // Результаты отменённого прогона не подтягиваются.
+  expect(mockedJobsApi.getResultsByStock).not.toHaveBeenCalled();
+});

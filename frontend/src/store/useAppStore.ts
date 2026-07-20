@@ -108,6 +108,7 @@ export interface AppState {
   lockBatchSettings: () => void;
   unlockBatchSettings: () => void;
   resetBatchState: () => void;
+  cancelBatchProcessing: () => void;
 
   setIsProcessing: (isProcessing: boolean) => void;
   inc: () => void;
@@ -395,6 +396,22 @@ export const useAppStore = create<AppState>()(
         previews: {},
         regeneratingFileId: null,
       });
+    },
+
+    // Отмена возвращает batch в состояние «до старта»: фото и введённый
+    // контекст остаются, но частичные результаты прогона стираются.
+    cancelBatchProcessing: () => {
+      set((state) => ({
+        lockedBatchSettings: null,
+        isProcessing: false,
+        regeneratingFileId: null,
+        jobs: state.jobs.map((job) => ({
+          id: job.id,
+          filename: job.filename,
+          originalFilename: job.originalFilename,
+          status: "queued" as const,
+        })),
+      }));
     },
 
     setIsProcessing: (isProcessing: boolean) => {

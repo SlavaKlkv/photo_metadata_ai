@@ -77,6 +77,38 @@ class AsyncJobTaskManager:
         )
         return True
 
+    async def cancel_and_wait(self, job_id: UUID) -> bool:
+        """
+        Отменяет running task для job_id и дожидается её фактической остановки.
+
+        Нужен там, где после отмены сразу меняется состояние задачи: иначе
+        ещё живой обработчик успеет дописать результат поверх нового состояния.
+        """
+        task = self._tasks.get(job_id)
+        if task is None or task.done():
+            logger.info(
+                'background_task_cancel_skipped',
+                task_manager=self._name,
+                job_id=str(job_id),
+                reason='task_not_running',
+            )
+            return False
+
+        task.cancel()
+        logger.info(
+            'background_task_cancel_requested',
+            task_manager=self._name,
+            job_id=str(job_id),
+        )
+
+        await asyncio.gather(task, return_exceptions=True)
+        logger.info(
+            'background_task_cancel_completed',
+            task_manager=self._name,
+            job_id=str(job_id),
+        )
+        return True
+
     def is_running(self, job_id: UUID) -> bool:
         """
         Проверяет, есть ли активная task для job_id.

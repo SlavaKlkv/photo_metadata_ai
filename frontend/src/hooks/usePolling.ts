@@ -20,6 +20,13 @@ export const usePolling = (jobId: string | null) => {
     (state) => state.setCurrentProcessingProvider,
   );
 
+  const cancelBatchProcessing = useAppStore(
+    (state) => state.cancelBatchProcessing,
+  );
+  const resetProcessingState = useUIStore(
+    (state) => state.resetProcessingState,
+  );
+
   const updateJobPreview = useAppStore((state) => state.updateJobPreview);
   const setStockOptions = useAppStore((state) => state.setStockOptions);
   const draftBatchSettings = useAppStore((state) => state.draftBatchSettings);
@@ -67,14 +74,20 @@ export const usePolling = (jobId: string | null) => {
 
         if (isDone) {
           stopPolling();
+
+          // Отмена могла прийти и помимо кнопки Cancel — приводим UI
+          // к тому же состоянию «до старта».
+          if (statusData.status === "cancelled") {
+            cancelBatchProcessing();
+            resetProcessingState();
+            return;
+          }
+
           setIsPollingActive(false);
           setIsProcessing(false);
           setCurrentProcessingProvider(null);
 
-          if (
-            statusData.status === "error" ||
-            statusData.status === "cancelled"
-          ) {
+          if (statusData.status === "error") {
             closeProgressModal();
             return;
           }
@@ -153,6 +166,8 @@ export const usePolling = (jobId: string | null) => {
     setIsPollingActive,
     setIsProcessing,
     setCurrentProcessingProvider,
+    cancelBatchProcessing,
+    resetProcessingState,
   ]);
 };
 

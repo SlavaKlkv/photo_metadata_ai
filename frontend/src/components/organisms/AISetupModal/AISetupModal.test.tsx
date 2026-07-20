@@ -70,3 +70,17 @@ test('refreshes providers on open and closes from Done', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Done' }));
   expect(useUIStore.getState().isAiSetupOpen).toBe(false);
 });
+
+test('closes on Escape', async () => {
+  useAppStore.setState({
+    hasAcceptedOnboarding: true,
+    discoverProviders: jest.fn().mockResolvedValue(undefined),
+  });
+  useUIStore.setState({ isAiSetupOpen: true });
+
+  render(<AISetupModal />);
+
+  fireEvent.keyDown(document, { key: 'Escape' });
+
+  expect(useUIStore.getState().isAiSetupOpen).toBe(false);
+});

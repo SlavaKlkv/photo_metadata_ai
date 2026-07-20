@@ -43,7 +43,7 @@ export const AISetupModal: React.FC = () => {
   }
 
   return (
-    <Modal isOpen={true} onClose={closeAiSetup}>
+    <Modal isOpen={true} onClose={closeAiSetup} closeOnEscape>
       <div className={styles.container}>
         <SectionHeader
           icon="ai-setup-icon"
