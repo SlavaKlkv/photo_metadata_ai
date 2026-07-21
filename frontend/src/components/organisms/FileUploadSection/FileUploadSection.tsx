@@ -9,6 +9,7 @@ import { InfoCard } from "../../molecules/InfoCard/InfoCard";
 import { Panel } from "../../atoms/Panel/Panel";
 import styles from "./FileUploadSection.module.scss";
 import { SectionHeader } from "../../molecules/SectionHeader/SectionHeader";
+import { createThumbnails } from "../../../utils/imagePreview";
 
 const ALLOWED_FORMATS = ["image/jpeg"];
 const ALLOWED_EXTENSIONS = [".jpg", ".jpeg"];
@@ -133,6 +134,20 @@ export const FileUploadSection: React.FC = () => {
         previewMap[f.file_id] = URL.createObjectURL(uniqueFiles[index]);
       });
       addPreviews(previewMap);
+
+      // Ссылка на оригинал заставляет браузер декодировать полноразмерное
+      // фото на каждый показ строки — подменяем её миниатюрой. Не ждём:
+      // к моменту показа таблицы результатов миниатюры уже готовы.
+      void createThumbnails(
+        uploadedFiles.map((f, index) => ({
+          id: f.file_id,
+          file: uniqueFiles[index],
+        })),
+        (fileId, thumbnail) => {
+          addPreviews({ [fileId]: thumbnail });
+          URL.revokeObjectURL(previewMap[fileId]);
+        },
+      );
 
       const fileIds = uploadedFiles.map((f) => f.file_id);
       const jobs = createJobs(uniqueFiles, fileIds);
