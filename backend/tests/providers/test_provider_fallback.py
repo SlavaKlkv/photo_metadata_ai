@@ -1,10 +1,12 @@
+import asyncio
 from pathlib import Path
 
+import httpx
 import pytest
 
 from app.core.enums import AIProvider
 from app.core.exceptions import AIProviderConfigurationError
-from app.services.ai import ai_fallback
+from app.services.ai import ai_fallback, provider_cooldown, provider_throttle
 from app.services.ai.ai_fallback import (
     build_provider_fallback_chain,
     generate_metadata_with_fallback,
@@ -13,6 +15,11 @@ from app.services.ai.ai_fallback import (
 from app.services.ai.ai_provider import (
     AIMetadataResponse,
     BaseAIProvider,
+)
+from app.services.ai.constants import (
+    AI_FALLBACK_BUDGET_SECONDS,
+    AI_FALLBACK_MAX_CYCLES,
+    PROVIDER_COOLDOWN_MAX_SECONDS,
 )
 
 
@@ -28,6 +35,70 @@ class _SuccessfulProvider(BaseAIProvider):
             description='Fallback description',
             keywords=['fallback', 'metadata'],
         )
+
+
+class _RateLimitedProvider(BaseAIProvider):
+    def __init__(self, *args, retry_after: str | None = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._retry_after = retry_after
+
+    async def generate_metadata(self, *args, **kwargs):
+        raise _http_status_error(429, retry_after=self._retry_after)
+
+
+class _CancellingProvider(BaseAIProvider):
+    async def generate_metadata(self, *args, **kwargs):
+        raise asyncio.CancelledError
+
+
+class _FakeClock:
+    """Монотонные часы и sleep без реального ожидания."""
+
+    def __init__(self) -> None:
+        self.value = 0.0
+
+    def time(self) -> float:
+        return self.value
+
+    async def sleep(self, delay: float) -> None:
+        self.value += delay
+
+
+def _http_status_error(
+    status_code: int,
+    retry_after: str | None = None,
+) -> httpx.HTTPStatusError:
+    request = httpx.Request('POST', 'https://provider.test/v1/generate')
+    response = httpx.Response(
+        status_code,
+        headers={'Retry-After': retry_after} if retry_after else {},
+        request=request,
+    )
+    return httpx.HTTPStatusError(
+        'provider rate limited',
+        request=request,
+        response=response,
+    )
+
+
+@pytest.fixture(autouse=True)
+def reset_cooldowns():
+    provider_cooldown.reset_provider_cooldowns()
+    provider_throttle.reset_provider_throttle()
+    yield
+    provider_cooldown.reset_provider_cooldowns()
+    provider_throttle.reset_provider_throttle()
+
+
+@pytest.fixture
+def clock(monkeypatch) -> _FakeClock:
+    fake_clock = _FakeClock()
+    monkeypatch.setattr(ai_fallback, '_now', fake_clock.time)
+    monkeypatch.setattr(provider_cooldown, '_now', fake_clock.time)
+    monkeypatch.setattr(ai_fallback, '_sleep', fake_clock.sleep)
+    # Полный джиттер превращаем в детерминированный максимум.
+    monkeypatch.setattr(ai_fallback.random, 'uniform', lambda _low, high: high)
+    return fake_clock
 
 
 def _set_added_providers(monkeypatch, added: set[AIProvider]) -> None:
@@ -65,8 +136,8 @@ def test_provider_fallback_order_starts_from_selected_provider(monkeypatch):
         for attempt in build_provider_fallback_chain(AIProvider.OPENROUTER)
     ] == [
         AIProvider.OPENROUTER,
-        AIProvider.GEMINI,
         AIProvider.OLLAMA,
+        AIProvider.GEMINI,
     ]
 
 
@@ -259,3 +330,444 @@ def test_primary_provider_configuration_validation_does_not_try_fallback(
         )
 
     assert attempts == [AIProvider.OPENROUTER]
+
+
+def test_mock_provider_has_no_fallback(monkeypatch):
+    _set_added_providers(monkeypatch, {AIProvider.MOCK, AIProvider.GEMINI})
+
+    assert [
+        attempt.provider
+        for attempt in build_provider_fallback_chain(AIProvider.MOCK)
+    ] == [AIProvider.MOCK]
+
+
+@pytest.mark.asyncio
+async def test_success_on_second_cycle_after_full_ring_failure(
+    monkeypatch,
+    clock,
+):
+    """Временный сбой всего кольца переживается повторным кругом."""
+    _set_added_providers(
+        monkeypatch,
+        {AIProvider.OLLAMA, AIProvider.GEMINI, AIProvider.OPENROUTER},
+    )
+    attempts: list[AIProvider] = []
+
+    def provider_factory(provider: AIProvider, model: str | None):
+        attempts.append(provider)
+        if len(attempts) <= 3:
+            return _RuntimeFailingProvider(model=model)
+        return _SuccessfulProvider(model=model)
+
+    result = await generate_metadata_with_fallback(
+        selected_provider=AIProvider.OLLAMA,
+        image_path=Path('image.jpg'),
+        provider_factory=provider_factory,
+    )
+
+    assert result.provider == AIProvider.OLLAMA
+    assert attempts == [
+        AIProvider.OLLAMA,
+        AIProvider.GEMINI,
+        AIProvider.OPENROUTER,
+        AIProvider.OLLAMA,
+    ]
+    # Между кругами был backoff.
+    assert clock.value > 0.0
+
+
+@pytest.mark.asyncio
+async def test_permanent_failure_stops_at_cycle_limit(monkeypatch, clock):
+    _set_added_providers(
+        monkeypatch,
+        {AIProvider.OLLAMA, AIProvider.GEMINI, AIProvider.OPENROUTER},
+    )
+    attempts: list[AIProvider] = []
+
+    def provider_factory(provider: AIProvider, model: str | None):
+        attempts.append(provider)
+        return _RuntimeFailingProvider(model=model)
+
+    with pytest.raises(RuntimeError):
+        await generate_metadata_with_fallback(
+            selected_provider=AIProvider.OLLAMA,
+            image_path=Path('image.jpg'),
+            provider_factory=provider_factory,
+        )
+
+    assert len(attempts) == AI_FALLBACK_MAX_CYCLES * 3
+
+
+@pytest.mark.asyncio
+async def test_config_error_excludes_provider_from_next_cycles(
+    monkeypatch,
+    clock,
+):
+    """Провайдер без ключа выбывает из кольца до конца обработки файла."""
+    _set_added_providers(
+        monkeypatch,
+        {AIProvider.OLLAMA, AIProvider.GEMINI, AIProvider.OPENROUTER},
+    )
+    attempts: list[AIProvider] = []
+
+    def provider_factory(provider: AIProvider, model: str | None):
+        attempts.append(provider)
+        if provider == AIProvider.GEMINI:
+            raise AIProviderConfigurationError(
+                reason_code='gemini_api_key_missing',
+                message='GEMINI_API_KEY is not configured',
+            )
+        if len(attempts) < 4:
+            return _RuntimeFailingProvider(model=model)
+        return _SuccessfulProvider(model=model)
+
+    result = await generate_metadata_with_fallback(
+        selected_provider=AIProvider.OLLAMA,
+        image_path=Path('image.jpg'),
+        provider_factory=provider_factory,
+    )
+
+    assert result.provider == AIProvider.OLLAMA
+    # На втором круге Gemini уже не вызывается.
+    assert attempts == [
+        AIProvider.OLLAMA,
+        AIProvider.GEMINI,
+        AIProvider.OPENROUTER,
+        AIProvider.OLLAMA,
+    ]
+
+
+@pytest.mark.asyncio
+async def test_rate_limited_provider_is_skipped_for_next_file(
+    monkeypatch,
+    clock,
+):
+    """429 ставит провайдера на общую паузу: следующий файл его пропускает."""
+    _set_added_providers(
+        monkeypatch,
+        {AIProvider.OLLAMA, AIProvider.GEMINI, AIProvider.OPENROUTER},
+    )
+    attempts: list[AIProvider] = []
+
+    def provider_factory(provider: AIProvider, model: str | None):
+        attempts.append(provider)
+        if provider == AIProvider.GEMINI:
+            return _RateLimitedProvider(model=model)
+        return _SuccessfulProvider(model=model)
+
+    first = await generate_metadata_with_fallback(
+        selected_provider=AIProvider.GEMINI,
+        image_path=Path('first.jpg'),
+        provider_factory=provider_factory,
+    )
+    assert first.provider == AIProvider.OPENROUTER
+    assert attempts == [AIProvider.GEMINI, AIProvider.OPENROUTER]
+
+    attempts.clear()
+
+    second = await generate_metadata_with_fallback(
+        selected_provider=AIProvider.GEMINI,
+        image_path=Path('second.jpg'),
+        provider_factory=provider_factory,
+    )
+
+    assert second.provider == AIProvider.OPENROUTER
+    assert attempts == [AIProvider.OPENROUTER]
+
+
+@pytest.mark.asyncio
+async def test_retry_after_header_is_respected_and_capped(
+    monkeypatch,
+    clock,
+):
+    _set_added_providers(
+        monkeypatch,
+        {AIProvider.OLLAMA, AIProvider.GEMINI, AIProvider.OPENROUTER},
+    )
+
+    def provider_factory(provider: AIProvider, model: str | None):
+        if provider == AIProvider.GEMINI:
+            return _RateLimitedProvider(model=model, retry_after='45')
+        return _SuccessfulProvider(model=model)
+
+    await generate_metadata_with_fallback(
+        selected_provider=AIProvider.GEMINI,
+        image_path=Path('image.jpg'),
+        provider_factory=provider_factory,
+    )
+
+    assert provider_cooldown.get_cooldown_remaining(AIProvider.GEMINI) == 45.0
+
+    provider_cooldown.reset_provider_cooldowns()
+
+    def capped_factory(provider: AIProvider, model: str | None):
+        if provider == AIProvider.GEMINI:
+            return _RateLimitedProvider(model=model, retry_after='9999')
+        return _SuccessfulProvider(model=model)
+
+    await generate_metadata_with_fallback(
+        selected_provider=AIProvider.GEMINI,
+        image_path=Path('image.jpg'),
+        provider_factory=capped_factory,
+    )
+
+    assert (
+        provider_cooldown.get_cooldown_remaining(AIProvider.GEMINI)
+        == PROVIDER_COOLDOWN_MAX_SECONDS
+    )
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_shrinks_capacity_and_next_file_records_it(
+    monkeypatch,
+    clock,
+):
+    """429 сужает адаптивную ёмкость провайдера."""
+    _set_added_providers(
+        monkeypatch,
+        {AIProvider.OLLAMA, AIProvider.GEMINI, AIProvider.OPENROUTER},
+    )
+
+    def provider_factory(provider: AIProvider, model: str | None):
+        if provider == AIProvider.GEMINI:
+            return _RateLimitedProvider(model=model)
+        return _SuccessfulProvider(model=model)
+
+    assert provider_throttle.get_available_capacity(AIProvider.GEMINI) == 3
+
+    await generate_metadata_with_fallback(
+        selected_provider=AIProvider.GEMINI,
+        image_path=Path('image.jpg'),
+        provider_factory=provider_factory,
+    )
+
+    # 3.0 -> 1.5 -> floor 1 слот после одного 429.
+    assert provider_throttle.get_available_capacity(AIProvider.GEMINI) == 1
+
+
+@pytest.mark.asyncio
+async def test_throttle_skips_saturated_provider_for_alternative(
+    monkeypatch,
+    clock,
+):
+    """Слоты провайдера заняты, но он не под cooldown — берём альтернативу."""
+    _set_added_providers(
+        monkeypatch,
+        {AIProvider.OLLAMA, AIProvider.GEMINI, AIProvider.OPENROUTER},
+    )
+
+    # Сузим ёмкость GEMINI до 1 и займём единственный слот вручную —
+    # cooldown при этом не ставим.
+    provider_throttle.record_rate_limited(AIProvider.GEMINI)
+    provider_throttle.record_rate_limited(AIProvider.GEMINI)
+    assert provider_throttle.try_acquire(AIProvider.GEMINI) is True
+    assert provider_throttle.get_available_capacity(AIProvider.GEMINI) == 0
+
+    attempts: list[AIProvider] = []
+
+    def provider_factory(provider: AIProvider, model: str | None):
+        attempts.append(provider)
+        return _SuccessfulProvider(model=model)
+
+    result = await generate_metadata_with_fallback(
+        selected_provider=AIProvider.GEMINI,
+        image_path=Path('image.jpg'),
+        provider_factory=provider_factory,
+    )
+
+    # GEMINI пропущен по занятой ёмкости, попытка ушла на следующего в кольце.
+    assert result.provider == AIProvider.OPENROUTER
+    assert attempts == [AIProvider.OPENROUTER]
+
+
+@pytest.mark.asyncio
+async def test_single_saturated_provider_waits_for_free_slot(monkeypatch):
+    """Единственный провайдер с занятым слотом — файл ждёт освобождения."""
+    _set_added_providers(monkeypatch, {AIProvider.OLLAMA})
+
+    provider_throttle.record_rate_limited(AIProvider.OLLAMA)
+    provider_throttle.record_rate_limited(AIProvider.OLLAMA)
+    assert provider_throttle.try_acquire(AIProvider.OLLAMA) is True
+
+    def provider_factory(provider: AIProvider, model: str | None):
+        return _SuccessfulProvider(model=model)
+
+    task = asyncio.create_task(
+        generate_metadata_with_fallback(
+            selected_provider=AIProvider.OLLAMA,
+            image_path=Path('image.jpg'),
+            provider_factory=provider_factory,
+        )
+    )
+    await asyncio.sleep(0)
+    # Слот занят — файл ждёт, задача не завершена.
+    assert task.done() is False
+
+    await provider_throttle.release(AIProvider.OLLAMA)
+    result = await asyncio.wait_for(task, timeout=1.0)
+
+    assert result.provider == AIProvider.OLLAMA
+    # Слот, занятый на время попытки, освобождён.
+    assert provider_throttle.get_available_capacity(AIProvider.OLLAMA) == 1
+
+
+@pytest.mark.asyncio
+async def test_slot_released_after_cancellation(monkeypatch, clock):
+    """Отмена во время попытки освобождает занятый слот ёмкости."""
+    _set_added_providers(
+        monkeypatch,
+        {AIProvider.OLLAMA, AIProvider.GEMINI, AIProvider.OPENROUTER},
+    )
+
+    def provider_factory(provider: AIProvider, model: str | None):
+        return _CancellingProvider(model=model)
+
+    with pytest.raises(asyncio.CancelledError):
+        await generate_metadata_with_fallback(
+            selected_provider=AIProvider.OLLAMA,
+            image_path=Path('image.jpg'),
+            provider_factory=provider_factory,
+        )
+
+    assert provider_throttle.get_available_capacity(AIProvider.OLLAMA) == 3
+
+
+@pytest.mark.asyncio
+async def test_single_provider_waits_out_rate_limit_and_succeeds(
+    monkeypatch,
+    clock,
+):
+    """При единственном провайдере файл ждёт снятия лимита, а не падает."""
+    _set_added_providers(monkeypatch, {AIProvider.OLLAMA})
+    attempts: list[AIProvider] = []
+
+    def provider_factory(provider: AIProvider, model: str | None):
+        attempts.append(provider)
+        if len(attempts) == 1:
+            return _RateLimitedProvider(model=model, retry_after='20')
+        return _SuccessfulProvider(model=model)
+
+    result = await generate_metadata_with_fallback(
+        selected_provider=AIProvider.OLLAMA,
+        image_path=Path('image.jpg'),
+        provider_factory=provider_factory,
+    )
+
+    assert result.provider == AIProvider.OLLAMA
+    assert attempts == [AIProvider.OLLAMA, AIProvider.OLLAMA]
+    # Дождались снятия лимита, а не проскочили его.
+    assert clock.value >= 20.0
+
+
+@pytest.mark.asyncio
+async def test_budget_stops_retries_before_cycle_limit(monkeypatch, clock):
+    """Бюджет времени обрывает повторы, даже если круги не исчерпаны."""
+    _set_added_providers(monkeypatch, {AIProvider.OLLAMA})
+    attempts: list[AIProvider] = []
+
+    def provider_factory(provider: AIProvider, model: str | None):
+        attempts.append(provider)
+        return _RateLimitedProvider(
+            model=model,
+            retry_after=str(PROVIDER_COOLDOWN_MAX_SECONDS),
+        )
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await generate_metadata_with_fallback(
+            selected_provider=AIProvider.OLLAMA,
+            image_path=Path('image.jpg'),
+            provider_factory=provider_factory,
+        )
+
+    assert len(attempts) < AI_FALLBACK_MAX_CYCLES
+    assert clock.value <= AI_FALLBACK_BUDGET_SECONDS
+
+
+@pytest.mark.asyncio
+async def test_ring_emptied_by_config_errors_stops_retrying(
+    monkeypatch,
+    clock,
+):
+    _set_added_providers(
+        monkeypatch,
+        {AIProvider.OLLAMA, AIProvider.GEMINI, AIProvider.OPENROUTER},
+    )
+    attempts: list[AIProvider] = []
+
+    def provider_factory(provider: AIProvider, model: str | None):
+        attempts.append(provider)
+        # Первичный Ollama на первом круге падает временной ошибкой,
+        # на втором — уже ошибкой конфигурации и выбывает из кольца.
+        if provider == AIProvider.OLLAMA and len(attempts) == 1:
+            return _RuntimeFailingProvider(model=model)
+        raise AIProviderConfigurationError(
+            reason_code='provider_api_key_missing',
+            message='API key is not configured',
+        )
+
+    with pytest.raises(AIProviderConfigurationError):
+        await generate_metadata_with_fallback(
+            selected_provider=AIProvider.OLLAMA,
+            image_path=Path('image.jpg'),
+            provider_factory=provider_factory,
+        )
+
+    assert attempts == [
+        AIProvider.OLLAMA,
+        AIProvider.GEMINI,
+        AIProvider.OPENROUTER,
+        AIProvider.OLLAMA,
+    ]
+
+
+@pytest.mark.asyncio
+async def test_cancellation_during_attempt_aborts_fallback(
+    monkeypatch,
+    clock,
+):
+    _set_added_providers(
+        monkeypatch,
+        {AIProvider.OLLAMA, AIProvider.GEMINI, AIProvider.OPENROUTER},
+    )
+    attempts: list[AIProvider] = []
+
+    def provider_factory(provider: AIProvider, model: str | None):
+        attempts.append(provider)
+        return _CancellingProvider(model=model)
+
+    with pytest.raises(asyncio.CancelledError):
+        await generate_metadata_with_fallback(
+            selected_provider=AIProvider.OLLAMA,
+            image_path=Path('image.jpg'),
+            provider_factory=provider_factory,
+        )
+
+    assert attempts == [AIProvider.OLLAMA]
+
+
+@pytest.mark.asyncio
+async def test_cancellation_during_backoff_aborts_fallback(
+    monkeypatch,
+    clock,
+):
+    _set_added_providers(monkeypatch, {AIProvider.OLLAMA})
+    attempts: list[AIProvider] = []
+
+    async def cancelling_sleep(_delay: float) -> None:
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(ai_fallback, '_sleep', cancelling_sleep)
+
+    def provider_factory(provider: AIProvider, model: str | None):
+        attempts.append(provider)
+        return _RuntimeFailingProvider(model=model)
+
+    with pytest.raises(asyncio.CancelledError):
+        await generate_metadata_with_fallback(
+            selected_provider=AIProvider.OLLAMA,
+            image_path=Path('image.jpg'),
+            provider_factory=provider_factory,
+        )
+
+    # Отмена прервала ожидание перед вторым кругом.
+    assert attempts == [AIProvider.OLLAMA]
