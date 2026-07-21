@@ -1,5 +1,5 @@
 // frontend/src/components/organisms/ResultsTable/ResultsTable.tsx
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAppStore } from 'store/useAppStore';
 import { useUIStore } from 'store/useUIStore';
 import { jobsApi } from 'services/api/api';
@@ -8,6 +8,7 @@ import { Checkbox } from 'components/atoms/Checkbox/Checkbox';
 import { Panel } from 'components/atoms/Panel/Panel';
 import styles from './ResultsTable.module.scss';
 import { SectionHeader } from 'components/molecules/SectionHeader/SectionHeader';
+import { Pagination } from 'components/molecules/Pagination/Pagination';
 
 export const ResultsTable: React.FC = () => {
   const jobs = useAppStore((state) => state.jobs);
@@ -30,6 +31,10 @@ export const ResultsTable: React.FC = () => {
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE,
   );
+  // список задач мог сократиться (новый батч, отмена) — не оставляем пустую страницу
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(Math.max(1, totalPages));
+  }, [currentPage, totalPages]);
   const selectedJobId = useUIStore((state) => state.selectedJobId);
   const setSelectedJobId = useUIStore((state) => state.setSelectedJobId);
   const previews = useAppStore((state) => state.previews);
@@ -112,51 +117,12 @@ export const ResultsTable: React.FC = () => {
           )}
         </div>
 
-        {/* Pagination — показываем только если страниц больше одной */}
-        {totalPages > 1 && (
-          <div className={styles.pagination}>
-            <button
-              className={styles.pageBtn}
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-            >
-              ←
-            </button>
-
-            {/* Показываем: первые 3, ..., последнюю — как на макете */}
-            {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .filter((p) => p <= 3 || p === totalPages || p === currentPage)
-              .reduce<(number | "ellipsis")[]>((acc, p, idx, arr) => {
-                if (idx > 0 && p - (arr[idx - 1] as number) > 1)
-                  acc.push("ellipsis");
-                acc.push(p);
-                return acc;
-              }, [])
-              .map((item, idx) =>
-                item === "ellipsis" ? (
-                  <span key={`ellipsis-${idx}`} className={styles.ellipsis}>
-                    …
-                  </span>
-                ) : (
-                  <button
-                    key={item}
-                    className={`${styles.pageBtn} ${currentPage === item ? styles.pageBtnActive : ""}`}
-                    onClick={() => setCurrentPage(item as number)}
-                  >
-                    {item}
-                  </button>
-                ),
-              )}
-
-            <button
-              className={styles.pageBtn}
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-            >
-              →
-            </button>
-          </div>
-        )}
+        {/* Pagination — компонент сам скрывается, если страница одна */}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </Panel>
   );

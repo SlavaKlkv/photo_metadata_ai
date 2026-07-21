@@ -52,49 +52,6 @@
   gap: var(--spacing-md);
 }
 
-.pagination {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-xs);
-}
-
-.pageBtn {
-  background: none;
-  border: 1px solid transparent;
-  color: var(--text-secondary);
-  font-size: var(--font-size-sm);
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--transition-normal);
-
-  &:hover:not(:disabled) {
-    border-color: var(--border-hover);
-    color: var(--text-primary);
-  }
-
-  &:disabled {
-    opacity: 0.3;
-    cursor: default;
-  }
-}
-
-.pageBtnActive {
-  background: var(--accent-main);
-  color: var(--text-primary);
-  border-color: var(--accent-main);
-}
-
-.ellipsis {
-  color: var(--text-secondary);
-  font-size: var(--font-size-sm);
-  padding: 0 2px;
-}
-
 .selectAll {
   background: none;
   border: none;
