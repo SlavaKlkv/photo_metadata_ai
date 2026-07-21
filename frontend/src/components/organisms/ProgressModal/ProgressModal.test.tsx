@@ -56,6 +56,37 @@ beforeEach(() => {
   useToastStore.setState({ toasts: [] });
 });
 
+const makeJobs = (total: number, doneCount: number) =>
+  Array.from({ length: total }, (_, index) => ({
+    id: `file-${index + 1}`,
+    filename: `f-${index + 1}.jpg`,
+    originalFilename: `f-${index + 1}.jpg`,
+    status: index < doneCount ? ('done' as const) : ('processing' as const),
+  }));
+
+test('progress bar reflects the real processed/total ratio', () => {
+  useAppStore.setState({ jobs: makeJobs(104, 2) });
+  render(<ProgressModal />);
+
+  expect(screen.getByText('Processing: 2/104')).toBeInTheDocument();
+  // 2/104 ≈ 2%, а не искусственные 20%.
+  expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '2');
+});
+
+test('progress bar is empty when nothing is processed yet', () => {
+  useAppStore.setState({ jobs: makeJobs(104, 0) });
+  render(<ProgressModal />);
+
+  expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
+});
+
+test('progress bar is full when all files are processed', () => {
+  useAppStore.setState({ jobs: makeJobs(4, 4) });
+  render(<ProgressModal />);
+
+  expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '100');
+});
+
 test('cancels the job on the server and unblocks the UI', async () => {
   const user = userEvent.setup();
   render(<ProgressModal />);
