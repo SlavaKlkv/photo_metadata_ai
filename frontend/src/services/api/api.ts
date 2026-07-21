@@ -122,10 +122,22 @@ export const jobsApi = {
   updateDesktopSettings: (settings: { selected_provider: string }) =>
     apiClient.patch("/api/v1/desktop/settings", settings),
 
-  // результаты с маппингом под конкретный сток
-  getResultsByStock: (jobId: string, stockPlatform: StockPlatform) =>
+  // результаты с маппингом под конкретный сток.
+  // page/pageSize опциональны: без них backend отдаёт первую страницу
+  // (page_size=50), поэтому для пачек крупнее страницы вызывающий код
+  // обходит все страницы по pagination.has_next.
+  getResultsByStock: (
+    jobId: string,
+    stockPlatform: StockPlatform,
+    page?: number,
+    pageSize?: number,
+  ) =>
     apiClient.get(`/api/v1/jobs/${jobId}/results`, {
-      params: { stock_platform: stockPlatform },
+      params: {
+        stock_platform: stockPlatform,
+        ...(page !== undefined ? { page } : {}),
+        ...(pageSize !== undefined ? { page_size: pageSize } : {}),
+      },
     }),
 
   // правила и лимиты выбранного стока

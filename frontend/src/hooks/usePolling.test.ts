@@ -110,6 +110,65 @@ test('loads completed results and exposes export readiness', async () => {
   unmount();
 });
 
+test('loads metadata for files beyond the first results page', async () => {
+  useAppStore.getState().addJobs([
+    { id: 'file-1', filename: 'a.jpg', originalFilename: 'a.jpg', status: 'queued' },
+    { id: 'file-2', filename: 'b.jpg', originalFilename: 'b.jpg', status: 'queued' },
+  ]);
+  useUIStore.setState({
+    isPollingActive: true,
+    isProcessing: true,
+    isProgressModalOpen: true,
+  });
+  mockedJobsApi.getStatus.mockResolvedValue({
+    data: {
+      status: 'completed',
+      effective_ai_provider: 'gemini',
+      files: [
+        { file_id: 'file-1', status: 'completed' },
+        { file_id: 'file-2', status: 'completed' },
+      ],
+    },
+  } as never);
+  mockedJobsApi.getResultsByStock.mockImplementation(
+    (_jobId, _stock, page) =>
+      Promise.resolve({
+        data: {
+          results: [
+            {
+              file_id: page === 1 ? 'file-1' : 'file-2',
+              status: 'completed',
+              title: page === 1 ? 'First page title' : 'Second page title',
+              description: '',
+              keywords: [],
+            },
+          ],
+          pagination: { has_next: page === 1 },
+        },
+      }) as never,
+  );
+  mockedJobsApi.getStockOptions.mockResolvedValue({
+    data: { stock_platform: 'getty_images', categories: [], license_types: [] },
+  } as never);
+
+  const { unmount } = renderHook(() => usePolling('job-1'));
+
+  await waitFor(() => {
+    expect(useUIStore.getState().isExportReady).toBe(true);
+  });
+
+  // Файл со второй страницы обязан получить свой title, а не остаться пустым.
+  const jobs = useAppStore.getState().jobs;
+  expect(jobs.find((job) => job.id === 'file-1')?.metadata?.title).toBe(
+    'First page title',
+  );
+  expect(jobs.find((job) => job.id === 'file-2')?.metadata?.title).toBe(
+    'Second page title',
+  );
+  expect(mockedJobsApi.getResultsByStock).toHaveBeenCalledTimes(2);
+  unmount();
+});
+
 test('stops polling and closes progress after request failure', async () => {
   useUIStore.setState({
     isPollingActive: true,
