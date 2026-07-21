@@ -47,6 +47,7 @@ export const ResultRow: React.FC<ResultRowProps> = ({
             src={previewUrl}
             alt={job.originalFilename}
             className={styles.previewImg}
+            decoding="async"
           />
         ) : (
           <div className={styles.previewPlaceholder} />
