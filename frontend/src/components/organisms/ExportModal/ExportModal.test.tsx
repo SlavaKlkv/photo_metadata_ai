@@ -81,6 +81,47 @@ test('starts export, stores artifacts and opens success modal', async () => {
   });
 });
 
+test('progress bar matches the server export progress', async () => {
+  mockedJobsApi.startExport.mockResolvedValue({} as never);
+  mockedJobsApi.getExportStatus.mockResolvedValue({
+    data: {
+      export_status: 'processing',
+      export_progress: 40,
+      export_artifacts: [],
+    },
+  } as never);
+
+  useAppStore.setState({
+    jobs: [
+      {
+        id: 'file-1',
+        filename: 'a.jpg',
+        originalFilename: 'a.jpg',
+        status: 'done',
+        selected_for_export: true,
+      },
+      {
+        id: 'file-2',
+        filename: 'b.jpg',
+        originalFilename: 'b.jpg',
+        status: 'done',
+        selected_for_export: true,
+      },
+    ],
+  });
+
+  render(<ExportModal />);
+
+  await waitFor(() => {
+    expect(screen.getByRole('progressbar')).toHaveAttribute(
+      'aria-valuenow',
+      '40',
+    );
+  });
+  // Счётчик согласован с процентом: round(40% * 2) = 1 из 2.
+  expect(screen.getByText('Exporting: 1/2')).toBeInTheDocument();
+});
+
 test('completes export after a previous cancel (no stale cancelled flag)', async () => {
   mockedJobsApi.startExport.mockResolvedValue({} as never);
   mockedJobsApi.getExportStatus.mockResolvedValue({

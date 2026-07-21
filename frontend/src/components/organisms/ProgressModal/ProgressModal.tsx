@@ -22,8 +22,6 @@ export const ProgressModal: React.FC = () => {
     (j) => j.status === "done" || j.status === "error",
   ).length;
   const percent = total > 0 ? Math.round((current / total) * 100) : 0;
-  const displayPercent =
-  percent === 100 ? 100 : Math.max(percent, 20); // don't show less than 20% to avoid confusion
 
   const currentJobId = useUIStore((state) => state.currentJobId);
   const resetProcessingState = useUIStore(
@@ -86,7 +84,7 @@ export const ProgressModal: React.FC = () => {
               currentProcessingProvider}
           </p>
         )}
-        <ProgressBar value={displayPercent} animated={displayPercent < 100} />
+        <ProgressBar value={percent} animated={percent < 100} />
       </div>
     </Modal>
   );
