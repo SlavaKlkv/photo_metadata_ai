@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -7,6 +8,7 @@ from fastapi.testclient import TestClient
 from app.core.config import settings
 from app.core.runtime import reset_runtime_directories_cache
 from app.main import app
+from app.services.ai import provider_availability
 from app.services.desktop.desktop_startup import desktop_startup_orchestrator
 
 
@@ -434,4 +436,91 @@ def _provider_by_name(payload: dict, provider_name: str) -> dict:
         provider
         for provider in payload['providers']
         if provider['provider'] == provider_name
+    )
+
+
+class _AvailabilityProbe:
+    def __init__(self, results):
+        self.results = list(results)
+        self.calls = 0
+
+    async def __call__(self):
+        self.calls += 1
+        return SimpleNamespace(ready=self.results.pop(0))
+
+
+@pytest.fixture(autouse=True)
+def _reset_local_provider_availability():
+    provider_availability.reset_local_provider_availability()
+    yield
+    provider_availability.reset_local_provider_availability()
+
+
+def _patch_probe(monkeypatch, probe):
+    monkeypatch.setattr(
+        'app.services.provider_discovery.provider_discovery'
+        '._discover_ollama_provider',
+        probe,
+    )
+
+
+def test_empty_availability_cache_defaults_to_true():
+    assert provider_availability.is_local_provider_available() is True
+
+
+@pytest.mark.asyncio
+async def test_availability_cache_reuses_snapshot_within_ttl(monkeypatch):
+    probe = _AvailabilityProbe([False, True])
+    _patch_probe(monkeypatch, probe)
+
+    assert (
+        await provider_availability.refresh_local_provider_availability()
+        is False
+    )
+    assert (
+        await provider_availability.refresh_local_provider_availability()
+        is False
+    )
+    assert probe.calls == 1
+    assert provider_availability.is_local_provider_available() is False
+
+
+@pytest.mark.asyncio
+async def test_availability_cache_pings_again_after_ttl(monkeypatch):
+    probe = _AvailabilityProbe([False, True])
+    _patch_probe(monkeypatch, probe)
+
+    current = [1000.0]
+    monkeypatch.setattr(provider_availability, '_now', lambda: current[0])
+
+    assert (
+        await provider_availability.refresh_local_provider_availability()
+        is False
+    )
+
+    current[0] += (
+        provider_availability.LOCAL_PROVIDER_AVAILABILITY_TTL_SECONDS + 1.0
+    )
+    # Протухший снимок не блокирует провайдера до нового пинга.
+    assert provider_availability.is_local_provider_available() is True
+
+    assert (
+        await provider_availability.refresh_local_provider_availability()
+        is True
+    )
+    assert probe.calls == 2
+
+
+@pytest.mark.asyncio
+async def test_availability_refresh_treats_probe_failure_as_unavailable(
+    monkeypatch,
+):
+    async def failing_probe():
+        raise RuntimeError('boom')
+
+    _patch_probe(monkeypatch, failing_probe)
+
+    assert (
+        await provider_availability.refresh_local_provider_availability()
+        is False
     )

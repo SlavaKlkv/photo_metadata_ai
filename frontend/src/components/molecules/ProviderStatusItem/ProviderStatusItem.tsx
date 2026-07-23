@@ -18,6 +18,11 @@ export interface ProviderStatusItemProps {
   apiKey?: string | null;
   setupLink?: { label: string; url: string };
   suppressErrorIcon?: boolean;
+  // Включён ли провайдер пользователем. Тумблер показывается только когда
+  // передан обработчик — в онбординге его нет.
+  enabled?: boolean;
+  onToggleEnabled?: (enabled: boolean) => void;
+  isTogglePending?: boolean;
 }
 
 const providerIconMap: Record<string, string> = {
@@ -36,6 +41,9 @@ export const ProviderStatusItem: React.FC<ProviderStatusItemProps> = ({
   apiKey,
   setupLink,
   suppressErrorIcon = false,
+  enabled = true,
+  onToggleEnabled,
+  isTogglePending = false,
 }) => {
   const [inputValue, setInputValue] = useState(apiKey || "");
   const [hasTouchedInput, setHasTouchedInput] = useState(false);
@@ -44,6 +52,22 @@ export const ProviderStatusItem: React.FC<ProviderStatusItemProps> = ({
   const isOllama = provider === "ollama";
   const isCloudProvider = ["gemini", "openrouter"].includes(provider);
   const providerIcon = providerIconMap[provider] ?? "settings-icon";
+  const enabledToggle = onToggleEnabled ? (
+    <label
+      className={`${styles.enabledToggle} ${
+        isTogglePending ? styles.enabledTogglePending : ""
+      }`}
+    >
+      <input
+        type="checkbox"
+        className={styles.enabledToggleInput}
+        checked={enabled}
+        onChange={(e) => onToggleEnabled(e.target.checked)}
+        aria-label={`${enabled ? "Disable" : "Enable"} ${displayName}`}
+      />
+      <span className={styles.enabledToggleTrack} />
+    </label>
+  ) : null;
 
   // После успешного сохранения нового ключа сворачиваем режим замены,
   // дав пользователю увидеть подтверждение
@@ -192,10 +216,12 @@ export const ProviderStatusItem: React.FC<ProviderStatusItemProps> = ({
           </span>
           <div className={styles.rowText}>
             <p className={styles.rowTitle}>{displayName}</p>
-            <p className={styles.rowSubtitle}>{foundSubtitle}</p>
+            <p className={styles.rowSubtitle}>
+              {enabled ? foundSubtitle : "Disabled — excluded from fallback"}
+            </p>
           </div>
           <div className={styles.rowRight}>
-            {isCloudProvider && (
+            {isCloudProvider && enabled && (
               <button
                 type="button"
                 className={styles.replaceKeyBtn}
@@ -208,11 +234,11 @@ export const ProviderStatusItem: React.FC<ProviderStatusItemProps> = ({
                 {isReplacingKey ? "Cancel" : "Replace key"}
               </button>
             )}
-            <Icon name="checkmark-icon" className={styles.checkIcon} />
+            {enabledToggle}
           </div>
         </div>
 
-        {isReplacingKey && apiKeyEditor}
+        {isReplacingKey && enabled && apiKeyEditor}
       </div>
     );
   }
@@ -228,21 +254,24 @@ export const ProviderStatusItem: React.FC<ProviderStatusItemProps> = ({
         <div className={styles.rowText}>
           <p className={styles.rowTitle}>{displayName}</p>
           <p className={styles.rowSubtitle}>
-            {isOllama
-              ? "Install a recommended model for local processing"
-              : cloudSubtitle}
+            {!enabled
+              ? "Disabled — excluded from fallback"
+              : isOllama
+                ? "Install a recommended model for local processing"
+                : cloudSubtitle}
           </p>
         </div>
 
         <div className={styles.rowRight}>
-          {!suppressErrorIcon && (
+          {enabled && !suppressErrorIcon && (
             <Icon name="error-icon" className={styles.errorIcon} />
           )}
+          {enabledToggle}
         </div>
       </div>
 
       {/* Install guide для QWEN */}
-      {isOllama && setupLink && (
+      {isOllama && enabled && setupLink && (
         <div className={styles.installLink}>
           <a
             href={setupLink.url}
@@ -257,7 +286,7 @@ export const ProviderStatusItem: React.FC<ProviderStatusItemProps> = ({
       )}
 
       {/* Input + ссылка для cloud провайдеров */}
-      {isCloudProvider && apiKeyEditor}
+      {isCloudProvider && enabled && apiKeyEditor}
     </div>
   );
 };

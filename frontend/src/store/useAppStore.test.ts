@@ -384,3 +384,174 @@ describe('cancelBatchProcessing', () => {
     expect(useAppStore.getState().jobs[0].status).toBe('queued');
   });
 });
+
+test('disabling a provider persists it and drops it from available list', async () => {
+  useAppStore.setState({
+    providerDiscoveryItems: [
+      {
+        provider: 'gemini',
+        displayName: 'Gemini',
+        ready: true,
+        status: 'ready',
+        hints: [],
+        configured: true,
+        local: false,
+        enabled: true,
+      },
+      {
+        provider: 'openrouter',
+        displayName: 'OpenRouter',
+        ready: true,
+        status: 'ready',
+        hints: [],
+        configured: true,
+        local: false,
+        enabled: false,
+      },
+    ],
+    availableProviders: ['gemini'],
+  });
+  mockedJobsApi.updateDesktopSettings.mockResolvedValue({
+    data: { disabled_providers: ['gemini', 'openrouter'] },
+  } as never);
+
+  await useAppStore.getState().setProviderEnabled('gemini', false);
+
+  expect(mockedJobsApi.updateDesktopSettings).toHaveBeenCalledWith({
+    disabled_providers: ['gemini', 'openrouter'],
+  });
+  expect(useAppStore.getState().availableProviders).toEqual([]);
+  expect(useAppStore.getState().pendingProviderToggle).toBeNull();
+});
+
+test('toggle keeps its position until the backend confirms', async () => {
+  useAppStore.setState({
+    providerDiscoveryItems: [
+      {
+        provider: 'gemini',
+        displayName: 'Gemini',
+        ready: true,
+        status: 'ready',
+        hints: [],
+        configured: true,
+        local: false,
+        enabled: true,
+      },
+    ],
+    availableProviders: ['gemini'],
+  });
+  let resolveRequest: (value: unknown) => void = () => undefined;
+  mockedJobsApi.updateDesktopSettings.mockReturnValue(
+    new Promise((resolve) => {
+      resolveRequest = resolve;
+    }) as never,
+  );
+
+  const pending = useAppStore.getState().setProviderEnabled('gemini', false);
+
+  // Пока запрос в пути — положение тумблера не меняется.
+  expect(useAppStore.getState().providerDiscoveryItems[0].enabled).toBe(true);
+  expect(useAppStore.getState().pendingProviderToggle).toBe('gemini');
+
+  resolveRequest({ data: { disabled_providers: ['gemini'] } });
+  await pending;
+
+  expect(useAppStore.getState().providerDiscoveryItems[0].enabled).toBe(false);
+});
+
+test('a second toggle is ignored while the first one is saving', async () => {
+  useAppStore.setState({
+    providerDiscoveryItems: [
+      {
+        provider: 'gemini',
+        displayName: 'Gemini',
+        ready: true,
+        status: 'ready',
+        hints: [],
+        configured: true,
+        local: false,
+        enabled: true,
+      },
+    ],
+    pendingProviderToggle: 'gemini',
+  });
+
+  await useAppStore.getState().setProviderEnabled('gemini', false);
+
+  expect(mockedJobsApi.updateDesktopSettings).not.toHaveBeenCalled();
+});
+
+test('disabling the selected provider moves selection down the chain', async () => {
+  useAppStore.setState({
+    providerDiscoveryItems: [
+      {
+        provider: 'ollama',
+        displayName: 'QWEN',
+        ready: true,
+        status: 'ready',
+        hints: [],
+        configured: true,
+        local: true,
+        enabled: true,
+      },
+      {
+        provider: 'gemini',
+        displayName: 'Gemini',
+        ready: true,
+        status: 'ready',
+        hints: [],
+        configured: true,
+        local: false,
+        enabled: true,
+      },
+    ],
+    sessionSettings: { selectedProvider: 'ollama' },
+  });
+  mockedJobsApi.updateDesktopSettings.mockResolvedValue({
+    data: { disabled_providers: ['ollama'], selected_provider: 'gemini' },
+  } as never);
+
+  await useAppStore.getState().setProviderEnabled('ollama', false);
+
+  expect(useAppStore.getState().sessionSettings.selectedProvider).toBe(
+    'gemini',
+  );
+  expect(useAppStore.getState().draftBatchSettings.aiProvider).toBe('gemini');
+});
+
+test('clears selection immediately when the fallback provider is unavailable', async () => {
+  useAppStore.setState({
+    providerDiscoveryItems: [
+      {
+        provider: 'ollama',
+        displayName: 'QWEN',
+        ready: true,
+        status: 'ready',
+        hints: [],
+        configured: true,
+        local: true,
+        enabled: true,
+      },
+      {
+        provider: 'gemini',
+        displayName: 'Gemini',
+        ready: false,
+        status: 'not_ready',
+        hints: [],
+        configured: false,
+        local: false,
+        enabled: true,
+      },
+    ],
+    sessionSettings: { selectedProvider: 'ollama' },
+  });
+  // Бэкенд перевёл выбор на gemini, но у gemini нет ключа (ready: false).
+  mockedJobsApi.updateDesktopSettings.mockResolvedValue({
+    data: { disabled_providers: ['ollama'], selected_provider: 'gemini' },
+  } as never);
+
+  await useAppStore.getState().setProviderEnabled('ollama', false);
+
+  expect(useAppStore.getState().sessionSettings.selectedProvider).toBeNull();
+  expect(useAppStore.getState().availableProviders).toEqual([]);
+});

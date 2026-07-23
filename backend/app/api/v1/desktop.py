@@ -82,7 +82,10 @@ async def update_settings(payload: UpdateDesktopSettingsRequest):
     """
     Обновляет настройки десктопного окружения.
     """
-    return update_desktop_settings(payload.selected_provider)
+    return update_desktop_settings(
+        payload.selected_provider,
+        payload.disabled_providers,
+    )
 
 
 @router.get('/updates', response_model=DesktopUpdateCheckResponse)

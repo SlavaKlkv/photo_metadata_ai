@@ -51,7 +51,7 @@ export const AISetupModal: React.FC = () => {
           subtitle="Manage your AI providers. Add or update API keys."
         />
 
-        <AIProviderSetup />
+        <AIProviderSetup allowToggleProviders />
 
         <div className={styles.actions}>
           <Button

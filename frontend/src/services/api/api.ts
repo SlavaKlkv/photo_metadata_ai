@@ -119,8 +119,10 @@ export const jobsApi = {
     apiClient.get<DesktopStartupStatusResponse>(
       "/api/v1/desktop/startup/status",
     ),
-  updateDesktopSettings: (settings: { selected_provider: string }) =>
-    apiClient.patch("/api/v1/desktop/settings", settings),
+  updateDesktopSettings: (settings: {
+    selected_provider?: string;
+    disabled_providers?: string[];
+  }) => apiClient.patch("/api/v1/desktop/settings", settings),
 
   // результаты с маппингом под конкретный сток.
   // page/pageSize опциональны: без них backend отдаёт первую страницу

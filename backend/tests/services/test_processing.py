@@ -247,3 +247,50 @@ async def test_processing_helpers_handle_missing_jobs():
     await processing.cancel_and_reset_job(missing_job_id)
 
     assert await processing._is_job_cancelled(missing_job_id) is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ('status', 'entry_point'),
+    [
+        (FileStatus.QUEUED, 'process_job'),
+        (FileStatus.FAILED, 'retry_failed_files'),
+    ],
+)
+async def test_local_provider_availability_refreshed_once_per_job(
+    monkeypatch,
+    status,
+    entry_point,
+):
+    job = _job(status)
+    await storage.create_job(job)
+    monkeypatch.setattr(
+        processing,
+        'resolve_effective_ai_settings',
+        lambda _provider: EffectiveAISettings(AIProvider.MOCK, None),
+    )
+    monkeypatch.setattr(
+        processing,
+        'validate_primary_provider_configuration',
+        lambda _provider: None,
+    )
+    refresh_calls = []
+
+    async def refresh():
+        refresh_calls.append(True)
+        return True
+
+    monkeypatch.setattr(
+        processing,
+        'refresh_local_provider_availability',
+        refresh,
+    )
+
+    async def complete(file, *_args, **_kwargs):
+        file.status = FileStatus.COMPLETED
+
+    monkeypatch.setattr(processing, '_process_file', complete)
+
+    await getattr(processing, entry_point)(job.job_id)
+
+    assert len(refresh_calls) == 1

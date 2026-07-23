@@ -771,3 +771,118 @@ async def test_cancellation_during_backoff_aborts_fallback(
 
     # Отмена прервала ожидание перед вторым кругом.
     assert attempts == [AIProvider.OLLAMA]
+
+
+def test_fallback_chain_excludes_unavailable_local_provider(monkeypatch):
+    """Регрессия: выключенная Ollama не должна попадать в fallback-кольцо."""
+    monkeypatch.setattr(
+        ai_fallback,
+        'get_ai_provider_api_key',
+        lambda provider: 'stored-api-key',
+    )
+    monkeypatch.setattr(
+        ai_fallback,
+        'is_local_provider_available',
+        lambda: False,
+    )
+
+    assert [
+        attempt.provider
+        for attempt in build_provider_fallback_chain(AIProvider.GEMINI)
+    ] == [
+        AIProvider.GEMINI,
+        AIProvider.OPENROUTER,
+    ]
+
+
+def test_selected_local_provider_stays_in_chain_when_unavailable(monkeypatch):
+    monkeypatch.setattr(
+        ai_fallback,
+        'get_ai_provider_api_key',
+        lambda provider: None,
+    )
+    monkeypatch.setattr(
+        ai_fallback,
+        'is_local_provider_available',
+        lambda: False,
+    )
+
+    assert [
+        attempt.provider
+        for attempt in build_provider_fallback_chain(AIProvider.OLLAMA)
+    ] == [AIProvider.OLLAMA]
+
+
+def test_available_local_provider_keeps_previous_behaviour(monkeypatch):
+    monkeypatch.setattr(
+        ai_fallback,
+        'get_ai_provider_api_key',
+        lambda provider: 'stored-api-key',
+    )
+    monkeypatch.setattr(
+        ai_fallback,
+        'is_local_provider_available',
+        lambda: True,
+    )
+
+    assert [
+        attempt.provider
+        for attempt in build_provider_fallback_chain(AIProvider.GEMINI)
+    ] == [
+        AIProvider.GEMINI,
+        AIProvider.OPENROUTER,
+        AIProvider.OLLAMA,
+    ]
+
+
+def test_fallback_chain_excludes_providers_disabled_in_ai_setup(monkeypatch):
+    monkeypatch.setattr(
+        ai_fallback,
+        'get_ai_provider_api_key',
+        lambda provider: 'stored-api-key',
+    )
+    monkeypatch.setattr(
+        ai_fallback,
+        'is_local_provider_available',
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        ai_fallback,
+        'get_disabled_providers',
+        lambda: {AIProvider.OLLAMA},
+    )
+
+    assert ai_fallback.is_provider_added(AIProvider.OLLAMA) is False
+    assert [
+        attempt.provider
+        for attempt in build_provider_fallback_chain(AIProvider.GEMINI)
+    ] == [
+        AIProvider.GEMINI,
+        AIProvider.OPENROUTER,
+    ]
+
+
+def test_disabled_selected_provider_leaves_chain(monkeypatch):
+    monkeypatch.setattr(
+        ai_fallback,
+        'get_ai_provider_api_key',
+        lambda provider: 'stored-api-key',
+    )
+    monkeypatch.setattr(
+        ai_fallback,
+        'is_local_provider_available',
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        ai_fallback,
+        'get_disabled_providers',
+        lambda: {AIProvider.OLLAMA},
+    )
+
+    assert [
+        attempt.provider
+        for attempt in build_provider_fallback_chain(AIProvider.OLLAMA)
+    ] == [
+        AIProvider.GEMINI,
+        AIProvider.OPENROUTER,
+    ]

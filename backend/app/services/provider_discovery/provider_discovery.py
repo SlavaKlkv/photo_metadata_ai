@@ -19,6 +19,7 @@ from app.services.desktop.ai_provider_api_keys import (
     save_ai_provider_api_key,
     validate_ai_provider_api_key,
 )
+from app.services.desktop.app_settings import get_disabled_providers
 from app.services.provider_discovery.constants import (
     DISCOVERY_TIMEOUT_SECONDS,
     GEMINI_API_KEY_LINK,
@@ -31,13 +32,25 @@ logger = structlog.get_logger(__name__)
 
 
 async def discover_ai_providers() -> ProvidersDiscoveryResponse:
+    disabled_providers = {
+        provider.value for provider in get_disabled_providers()
+    }
     providers = [
-        await _discover_ollama_provider(),
-        await _discover_gemini_provider(),
-        await _discover_openrouter_provider(),
+        provider.model_copy(
+            update={'enabled': provider.provider not in disabled_providers},
+        )
+        for provider in (
+            await _discover_ollama_provider(),
+            await _discover_gemini_provider(),
+            await _discover_openrouter_provider(),
+        )
     ]
+    # Выключенный провайдер не предлагается ни для выбора, ни как
+    # рекомендация, но остаётся в списке — чтобы его можно было включить.
     ready_providers = [
-        provider.provider for provider in providers if provider.ready
+        provider.provider
+        for provider in providers
+        if provider.ready and provider.enabled
     ]
     recommended_provider = _select_recommended_provider(providers)
     detected_cloud_api_key_providers = [
@@ -346,7 +359,11 @@ def _select_recommended_provider(
 ) -> str | None:
     for provider_name in ('ollama', 'gemini', 'openrouter'):
         for provider in providers:
-            if provider.provider == provider_name and provider.ready:
+            if (
+                provider.provider == provider_name
+                and provider.ready
+                and provider.enabled
+            ):
                 return provider.provider
 
     return None

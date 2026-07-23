@@ -54,6 +54,9 @@ export interface ProviderDiscoveryItem {
   hints: string[];
   configured: boolean;
   local: boolean;
+  // Провайдер включён пользователем в AI Setup. Выключенный не участвует
+  // ни в выборе, ни в fallback-кольце.
+  enabled: boolean;
   model?: string | null;
   setup_links?: Array<{ label: string; url: string }>;
   api_key_links?: Array<{ label: string; url: string }>;

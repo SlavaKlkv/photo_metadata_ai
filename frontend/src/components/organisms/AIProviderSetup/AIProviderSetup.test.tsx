@@ -17,6 +17,8 @@ jest.mock(
       progress?: number;
       onApiKeyChange: (key: string) => void;
       apiKeySaveStatus: string;
+      enabled?: boolean;
+      onToggleEnabled?: (enabled: boolean) => void;
     }) => (
       <div
         data-testid={`provider-${props.provider}`}
@@ -29,6 +31,12 @@ jest.mock(
           aria-label={`${props.provider}-key`}
           onChange={(event) => props.onApiKeyChange(event.target.value)}
         />
+        {props.onToggleEnabled && (
+          <button
+            aria-label={`${props.provider}-toggle`}
+            onClick={() => props.onToggleEnabled?.(!props.enabled)}
+          />
+        )}
       </div>
     ),
   }),
@@ -46,6 +54,7 @@ beforeEach(() => {
         hints: [],
         configured: true,
         local: true,
+        enabled: true,
       },
       {
         provider: 'gemini',
@@ -55,6 +64,7 @@ beforeEach(() => {
         hints: [],
         configured: true,
         local: false,
+        enabled: true,
       },
     ],
     updateProviderApiKey: jest.fn(),
@@ -113,4 +123,27 @@ test('debounces API key validation and saves the normalized key', async () => {
     'data-save-status',
     'valid',
   );
+});
+
+
+test('provider toggles are hidden until AI Setup allows them', () => {
+  render(<AIProviderSetup />);
+
+  expect(screen.queryByLabelText('gemini-toggle')).not.toBeInTheDocument();
+});
+
+test('toggling a provider off persists it as disabled', () => {
+  const setProviderEnabled = jest.fn().mockResolvedValue(undefined);
+  useAppStore.setState({ setProviderEnabled });
+
+  render(<AIProviderSetup allowToggleProviders />);
+  fireEvent.click(screen.getByLabelText('gemini-toggle'));
+
+  expect(setProviderEnabled).toHaveBeenCalledWith('gemini', false);
+});
+
+test('provider toggles stay hidden while scanning', () => {
+  render(<AIProviderSetup allowToggleProviders isScanning />);
+
+  expect(screen.queryByLabelText('gemini-toggle')).not.toBeInTheDocument();
 });

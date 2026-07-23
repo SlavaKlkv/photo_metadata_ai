@@ -50,6 +50,7 @@ class ProviderDiscoveryItem(BaseModel):
     reason: str | None = None
     configured: bool
     local: bool
+    enabled: bool = True
     model: str | None = None
     setup_links: list[ProviderLink] = Field(default_factory=list)
     api_key_links: list[ProviderLink] = Field(default_factory=list)
