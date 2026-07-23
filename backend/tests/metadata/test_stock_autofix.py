@@ -96,6 +96,48 @@ def test_stock_autofix_keeps_edited_keywords_short():
     assert file.keywords == ['pastel']
 
 
+def test_stock_autofix_extends_title_short_after_shutterstock_mapping():
+    # Сырой title формально набирает 5 слов, но после обрезки мэппинга по
+    # символам (150 для Shutterstock) отображаемый заголовок теряет слова и
+    # опускается ниже title_min_words. Раньше автофикс смотрел на сырой title
+    # и не применял правку — заголовок «залипал» коротким.
+    long_word = 'a' * 30
+    raw_title = ' '.join(long_word for _ in range(5))
+
+    assert len(raw_title.split()) >= 5
+
+    file = ProcessingJobFile(
+        filename='image.jpg',
+        original_filename='image.jpg',
+        title=raw_title,
+        keywords=['sunset', 'ocean', 'travel', 'nature', 'scenic'],
+        categories=['Nature'],
+        has_people=False,
+        field_sources={'title': MetadataFieldSource.GENERATED},
+    )
+
+    # Предусловие бага: до автофикса mapped-заголовок короче минимума.
+    before = validate_file_metadata_for_stock(file, StockPlatform.SHUTTERSTOCK)
+    assert ('title', 'min_words_not_met') in {
+        (error.field, error.code) for error in before.errors
+    }
+
+    apply_stock_metadata_autofixes(file, StockPlatform.SHUTTERSTOCK)
+
+    validation = validate_file_metadata_for_stock(
+        file,
+        StockPlatform.SHUTTERSTOCK,
+    )
+    assert ('title', 'min_words_not_met') not in {
+        (error.field, error.code) for error in validation.errors
+    }
+
+    # Идемпотентность: повторный прогон ничего не меняет.
+    fixed_title = file.title
+    apply_stock_metadata_autofixes(file, StockPlatform.SHUTTERSTOCK)
+    assert file.title == fixed_title
+
+
 def test_stock_autofix_does_not_change_generated_editorial_metadata():
     file = ProcessingJobFile(
         filename='image.jpg',
