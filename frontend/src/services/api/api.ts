@@ -56,9 +56,11 @@ export const jobsApi = {
       iptc?: boolean;
       stock_platform?: StockPlatform;
     },
+    signal?: AbortSignal,
   ) =>
     apiClient.post(`/api/v1/jobs/${jobId}/export`, null, {
       params: formats,
+      signal,
     }),
 
   downloadExport: (jobId: string, exportFormat: string) =>
@@ -70,11 +72,16 @@ export const jobsApi = {
     }),
 
   // статус экспорта
-  getExportStatus: (jobId: string) =>
-    apiClient.get(`/api/v1/jobs/${jobId}/export/status`),
+  getExportStatus: (jobId: string, signal?: AbortSignal) =>
+    apiClient.get(`/api/v1/jobs/${jobId}/export/status`, { signal }),
 
-  // отмена
+  // отмена обработки: возвращает задачу в состояние «до старта»
   cancel: (jobId: string) => apiClient.post(`/api/v1/jobs/${jobId}/cancel`),
+
+  // отмена экспорта: останавливает запись файлов, результаты обработки
+  // остаются на месте, поэтому экспорт можно запустить повторно
+  cancelExport: (jobId: string) =>
+    apiClient.post(`/api/v1/jobs/${jobId}/export/cancel`),
 
   // обновление метаданных файла
   updateMetadata: (jobId: string, fileId: string, metadata: object) =>

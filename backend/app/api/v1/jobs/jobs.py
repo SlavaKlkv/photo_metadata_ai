@@ -50,7 +50,10 @@ from app.services.desktop.app_settings import (
     update_desktop_settings,
 )
 from app.services.export.export import (
+    clear_export_cancellation,
     ensure_job_exports,
+    request_export_cancellation,
+    rollback_export,
     run_job_export,
 )
 from app.services.metadata.stock_autofix import apply_stock_metadata_autofixes
@@ -914,6 +917,59 @@ async def get_job_export_status(job_id: UUID):
         export_format=job.export_format,
         export_error_message=job.export_error_message,
         export_artifacts=job.export_artifacts,
+    )
+
+
+@router.post(
+    '/{job_id}/export/cancel',
+    response_model=ProcessingJobExportStatus,
+)
+async def cancel_job_export(job_id: UUID):
+    """
+    Останавливает подготовку экспорта, не трогая результаты обработки.
+
+    Отдельный от /cancel эндпоинт: тот возвращает задачу в состояние
+    «до старта» и сбрасывает файлы в queued, из-за чего повторный экспорт
+    оказывался невозможен.
+    """
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail='Job not found',
+        )
+
+    # Только флаг, без task.cancel(): задача должна выйти сама и успеть
+    # откатить записанное. cancel() оборвал бы её на первом await,
+    # оставив частичные файлы на диске
+    request_export_cancellation(job.job_id)
+    await export_task_manager.wait(job.job_id)
+
+    cancelled_job = await storage.get_job(job.job_id)
+
+    if cancelled_job is None:
+        raise HTTPException(
+            status_code=404,
+            detail='Job not found',
+        )
+
+    # Откат по снимку — независимо от того, прервалась задача на середине или
+    # успела завершиться раньше отмены (прогресс фиктивный, гонка реальна).
+    # Идемпотентно: если задача уже откатилась сама, тут удалять нечего
+    cancelled_job = await rollback_export(cancelled_job)
+
+    # Флаг снимаем сразу: задача уже остановлена, а следующий экспорт
+    # того же джоба должен стартовать с чистого листа
+    clear_export_cancellation(job.job_id)
+
+    return ProcessingJobExportStatus(
+        job_id=cancelled_job.job_id,
+        export_status=cancelled_job.export_status,
+        export_progress=cancelled_job.export_progress,
+        export_format=cancelled_job.export_format,
+        export_error_message=cancelled_job.export_error_message,
+        export_artifacts=cancelled_job.export_artifacts,
     )
 
 

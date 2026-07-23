@@ -55,8 +55,11 @@ export const BottomActionBar: React.FC = () => {
       (job.preview?.errors ?? []).length > 0,
   );
 
+  // Считаем только то, что бэкенд реально экспортирует (COMPLETED + выбран):
+  // упавшие файлы иначе завышают счётчик и разблокируют кнопку там,
+  // где сервер ответит 400
   const selectedExportCount = jobs.filter(
-    (job) => job.selected_for_export !== false,
+    (job) => job.status === "done" && job.selected_for_export !== false,
   ).length;
 
   const currentStep = !isUploaded

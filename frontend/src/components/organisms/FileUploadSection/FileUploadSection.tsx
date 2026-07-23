@@ -62,7 +62,7 @@ export const FileUploadSection: React.FC = () => {
         status: validation.valid ? ("queued" as const) : ("error" as const),
         error: validation.error,
         metadata: undefined,
-        selected_for_export: true,
+        selected_for_export: validation.valid,
       };
     });
   };
