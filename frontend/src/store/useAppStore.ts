@@ -594,11 +594,14 @@ export const useAppStore = create<AppState>()(
     },
 
     setProviderEnabled: async (provider, enabled) => {
-      const { providerDiscoveryItems, pendingProviderToggle } = get();
+      const { providerDiscoveryItems, pendingProviderToggle, sessionSettings } =
+        get();
 
       if (pendingProviderToggle !== null) {
         return;
       }
+
+      const currentSelectedProvider = sessionSettings.selectedProvider;
 
       const disabledProviders = providerDiscoveryItems
         .filter((item) =>
@@ -622,16 +625,31 @@ export const useAppStore = create<AppState>()(
         const availableProviders = nextItems
           .filter((item) => item.ready && item.enabled)
           .map((item) => item.provider);
-        // Бэкенд передаёт выбор дальше по кольцу fallback, если выключили
-        // текущего провайдера. Но если и этот провайдер недоступен (нет ключа
-        // или рантайма) — сбрасываем выбор сразу, не дожидаясь следующего
-        // опроса discovery, иначе в дропдауне зависает несуществующий выбор.
         const savedProvider: AIProvider | undefined =
           response.data?.selected_provider;
-        const nextSelectedProvider =
-          savedProvider && availableProviders.includes(savedProvider)
-            ? savedProvider
-            : null;
+
+        // Выбор в дропдауне зависит от направления переключения.
+        // ДОБАВЛЕНИЕ: остался ровно один доступный — он падает в дропдаун;
+        // доступных несколько — «Select provider» (null), даже если что-то
+        // было выбрано авто-выбором.
+        // УБИРАНИЕ: текущий выбор ещё доступен — не трогаем; убрали именно
+        // выбранного — переезд по цепочке fallback (savedProvider); иначе
+        // остался один доступный — он; иначе null. Из нейтрального положения
+        // (выбора не было) цепочка не запускается — остаёмся в null.
+        const nextSelectedProvider: AIProvider | null = enabled
+          ? availableProviders.length === 1
+            ? availableProviders[0]
+            : null
+          : currentSelectedProvider &&
+              availableProviders.includes(currentSelectedProvider)
+            ? currentSelectedProvider
+            : currentSelectedProvider &&
+                savedProvider &&
+                availableProviders.includes(savedProvider)
+              ? savedProvider
+              : availableProviders.length === 1
+                ? availableProviders[0]
+                : null;
 
         set((state) => ({
           providerDiscoveryItems: nextItems,

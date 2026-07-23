@@ -556,6 +556,261 @@ test('clears selection immediately when the fallback provider is unavailable', a
   expect(useAppStore.getState().availableProviders).toEqual([]);
 });
 
+test('auto-selects when adding makes exactly one provider available', async () => {
+  useAppStore.setState({
+    providerDiscoveryItems: [
+      {
+        provider: 'ollama',
+        displayName: 'QWEN',
+        ready: true,
+        status: 'ready',
+        hints: [],
+        configured: true,
+        local: true,
+        enabled: false,
+      },
+      {
+        provider: 'gemini',
+        displayName: 'Gemini',
+        ready: true,
+        status: 'ready',
+        hints: [],
+        configured: true,
+        local: false,
+        enabled: false,
+      },
+    ] as never,
+    sessionSettings: { selectedProvider: null } as never,
+  });
+  // Бэкенд подтверждает включение gemini, но своего selected_provider не шлёт.
+  mockedJobsApi.updateDesktopSettings.mockResolvedValue({
+    data: { disabled_providers: ['ollama'] },
+  } as never);
+
+  await useAppStore.getState().setProviderEnabled('gemini', true);
+
+  expect(useAppStore.getState().availableProviders).toEqual(['gemini']);
+  // Единственный доступный — выбираем сразу, даже при добавлении.
+  expect(useAppStore.getState().sessionSettings.selectedProvider).toBe(
+    'gemini',
+  );
+});
+
+test('leaves “Select provider” when adding a second available provider', async () => {
+  useAppStore.setState({
+    providerDiscoveryItems: [
+      {
+        provider: 'ollama',
+        displayName: 'QWEN',
+        ready: true,
+        status: 'ready',
+        hints: [],
+        configured: true,
+        local: true,
+        enabled: true,
+      },
+      {
+        provider: 'gemini',
+        displayName: 'Gemini',
+        ready: true,
+        status: 'ready',
+        hints: [],
+        configured: true,
+        local: false,
+        enabled: false,
+      },
+    ] as never,
+    sessionSettings: { selectedProvider: null } as never,
+  });
+  // ollama уже доступна; включаем gemini — доступных становится двое.
+  mockedJobsApi.updateDesktopSettings.mockResolvedValue({
+    data: { disabled_providers: [] },
+  } as never);
+
+  await useAppStore.getState().setProviderEnabled('gemini', true);
+
+  expect(useAppStore.getState().availableProviders).toEqual([
+    'ollama',
+    'gemini',
+  ]);
+  // Несколько доступных без выбора — пользователь выбирает сам.
+  expect(useAppStore.getState().sessionSettings.selectedProvider).toBeNull();
+});
+
+test('auto-selects the last available provider when removing the others', async () => {
+  useAppStore.setState({
+    providerDiscoveryItems: [
+      {
+        provider: 'ollama',
+        displayName: 'QWEN',
+        ready: true,
+        status: 'ready',
+        hints: [],
+        configured: true,
+        local: true,
+        enabled: true,
+      },
+      {
+        provider: 'gemini',
+        displayName: 'Gemini',
+        ready: true,
+        status: 'ready',
+        hints: [],
+        configured: true,
+        local: false,
+        enabled: true,
+      },
+    ] as never,
+    sessionSettings: { selectedProvider: null } as never,
+  });
+  // Убираем ollama; выбранного не было, бэкенд свой selected_provider не шлёт.
+  mockedJobsApi.updateDesktopSettings.mockResolvedValue({
+    data: { disabled_providers: ['ollama'] },
+  } as never);
+
+  await useAppStore.getState().setProviderEnabled('ollama', false);
+
+  expect(useAppStore.getState().availableProviders).toEqual(['gemini']);
+  expect(useAppStore.getState().sessionSettings.selectedProvider).toBe(
+    'gemini',
+  );
+});
+
+test('resets to “Select provider” when adding a provider next to the selected one', async () => {
+  useAppStore.setState({
+    providerDiscoveryItems: [
+      {
+        provider: 'gemini',
+        displayName: 'Gemini',
+        ready: true,
+        status: 'ready',
+        hints: [],
+        configured: true,
+        local: false,
+        enabled: true,
+      },
+      {
+        provider: 'openrouter',
+        displayName: 'OpenRouter',
+        ready: true,
+        status: 'ready',
+        hints: [],
+        configured: true,
+        local: false,
+        enabled: false,
+      },
+    ] as never,
+    sessionSettings: { selectedProvider: 'gemini' } as never,
+  });
+  mockedJobsApi.updateDesktopSettings.mockResolvedValue({
+    data: { disabled_providers: [] },
+  } as never);
+
+  await useAppStore.getState().setProviderEnabled('openrouter', true);
+
+  // Доступных стало двое — выбор сбрасывается, пользователь выбирает сам.
+  expect(useAppStore.getState().sessionSettings.selectedProvider).toBeNull();
+});
+
+test('stays neutral when removing one provider while two remain and nothing is selected', async () => {
+  useAppStore.setState({
+    providerDiscoveryItems: [
+      {
+        provider: 'ollama',
+        displayName: 'QWEN',
+        ready: true,
+        status: 'ready',
+        hints: [],
+        configured: true,
+        local: true,
+        enabled: true,
+      },
+      {
+        provider: 'gemini',
+        displayName: 'Gemini',
+        ready: true,
+        status: 'ready',
+        hints: [],
+        configured: true,
+        local: false,
+        enabled: true,
+      },
+      {
+        provider: 'openrouter',
+        displayName: 'OpenRouter',
+        ready: true,
+        status: 'ready',
+        hints: [],
+        configured: true,
+        local: false,
+        enabled: true,
+      },
+    ] as never,
+    sessionSettings: { selectedProvider: null } as never,
+  });
+  // Ничего не выбрано; бэкенд шлёт selected_provider — но цепочку из
+  // нейтрального положения запускать нельзя.
+  mockedJobsApi.updateDesktopSettings.mockResolvedValue({
+    data: { disabled_providers: ['ollama'], selected_provider: 'gemini' },
+  } as never);
+
+  await useAppStore.getState().setProviderEnabled('ollama', false);
+
+  expect(useAppStore.getState().availableProviders).toEqual([
+    'gemini',
+    'openrouter',
+  ]);
+  expect(useAppStore.getState().sessionSettings.selectedProvider).toBeNull();
+});
+
+test('keeps the current valid selection when disabling a different provider', async () => {
+  useAppStore.setState({
+    providerDiscoveryItems: [
+      {
+        provider: 'ollama',
+        displayName: 'QWEN',
+        ready: true,
+        status: 'ready',
+        hints: [],
+        configured: true,
+        local: true,
+        enabled: true,
+      },
+      {
+        provider: 'gemini',
+        displayName: 'Gemini',
+        ready: true,
+        status: 'ready',
+        hints: [],
+        configured: true,
+        local: false,
+        enabled: true,
+      },
+      {
+        provider: 'openrouter',
+        displayName: 'OpenRouter',
+        ready: true,
+        status: 'ready',
+        hints: [],
+        configured: true,
+        local: false,
+        enabled: true,
+      },
+    ] as never,
+    sessionSettings: { selectedProvider: 'gemini' } as never,
+  });
+  // Выключаем НЕ выбранного (ollama); бэкенд selected_provider не шлёт.
+  mockedJobsApi.updateDesktopSettings.mockResolvedValue({
+    data: { disabled_providers: ['ollama'] },
+  } as never);
+
+  await useAppStore.getState().setProviderEnabled('ollama', false);
+
+  expect(useAppStore.getState().sessionSettings.selectedProvider).toBe(
+    'gemini',
+  );
+});
+
 test('unselects a file from export when it fails', () => {
   useAppStore.setState({
     jobs: [{ ...makeJob('file-1'), selected_for_export: true }],

@@ -47,6 +47,22 @@ test('shows AI Setup guidance when no provider is available', () => {
   expect(screen.getByRole('checkbox', { name: 'IPTC' })).not.toBeChecked();
 });
 
+test('prompts to pick a provider when several are available but none chosen', () => {
+  useAppStore.setState({
+    sessionSettings: { selectedProvider: null } as never,
+    availableProviders: ['gemini', 'openrouter'],
+    providerDiscoveryStatus: 'ready',
+  });
+  render(<SettingsPanel />);
+
+  expect(
+    screen.getByText('Select an AI provider to start.'),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByText(/No AI providers were detected/),
+  ).not.toBeInTheDocument();
+});
+
 test('updates provider and stock settings from controls', () => {
   useAppStore.setState({
     availableProviders: ['gemini'],
