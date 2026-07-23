@@ -8,6 +8,39 @@
   width: 100%;
 }
 
+.stateBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  min-height: 96px;
+  text-align: center;
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  color: var(--text-secondary);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loadingText {
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.errorText {
+  color: var(--color-error, #ef4444);
+  margin: 0;
+}
+
 .actions {
   display: flex;
 }

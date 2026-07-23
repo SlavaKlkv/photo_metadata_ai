@@ -7,6 +7,7 @@ import { useAppStore } from 'store/useAppStore';
 import { useUIStore } from 'store/useUIStore';
 import { Modal } from '../../atoms/Modal/Modal';
 import { Button } from '../../atoms/Button/Button';
+import { Icon } from '../../atoms/Icon/Icon';
 import { AIProviderSetup } from '../AIProviderSetup/AIProviderSetup';
 import { SectionHeader } from '../../molecules/SectionHeader/SectionHeader';
 import styles from './AISetupModal.module.scss';
@@ -21,6 +22,12 @@ export const AISetupModal: React.FC = () => {
     (state) => state.hasAcceptedOnboarding,
   );
   const discoverProviders = useAppStore((state) => state.discoverProviders);
+  const providerDiscoveryItems = useAppStore(
+    (state) => state.providerDiscoveryItems,
+  );
+  const providerDiscoveryError = useAppStore(
+    (state) => state.providerDiscoveryError,
+  );
 
   // Молча обновляем статусы провайдеров при каждом открытии
   useEffect(() => {
@@ -42,6 +49,10 @@ export const AISetupModal: React.FC = () => {
     return null;
   }
 
+  // Первичная загрузка провайдеров: список ещё пуст и ошибки нет.
+  const isChecking =
+    providerDiscoveryItems.length === 0 && !providerDiscoveryError;
+
   return (
     <Modal isOpen={true} onClose={closeAiSetup} closeOnEscape>
       <div className={styles.container}>
@@ -51,18 +62,35 @@ export const AISetupModal: React.FC = () => {
           subtitle="Manage your AI providers. Add or update API keys."
         />
 
-        <AIProviderSetup allowToggleProviders />
+        {providerDiscoveryItems.length === 0 ? (
+          providerDiscoveryError ? (
+            <div className={styles.stateBox}>
+              <p className={styles.errorText}>
+                Couldn’t load AI providers. Reopen to try again.
+              </p>
+            </div>
+          ) : (
+            <div className={styles.stateBox}>
+              <Icon name="load-icon" className={styles.spinner} />
+              <p className={styles.loadingText}>Checking AI providers…</p>
+            </div>
+          )
+        ) : (
+          <AIProviderSetup allowToggleProviders />
+        )}
 
-        <div className={styles.actions}>
-          <Button
-            variant="primary"
-            size="md"
-            onClick={closeAiSetup}
-            className={styles.actionBtn}
-          >
-            Done
-          </Button>
-        </div>
+        {!isChecking && (
+          <div className={styles.actions}>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={closeAiSetup}
+              className={styles.actionBtn}
+            >
+              Done
+            </Button>
+          </div>
+        )}
       </div>
     </Modal>
   );
