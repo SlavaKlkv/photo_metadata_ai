@@ -109,6 +109,26 @@ class AsyncJobTaskManager:
         )
         return True
 
+    async def wait(self, job_id: UUID) -> bool:
+        """
+        Дожидается завершения running task, не отменяя её.
+
+        Нужен для кооперативной остановки: задача сама выходит по флагу и
+        успевает прибрать за собой, тогда как task.cancel() оборвал бы её
+        на первом же await, не дав откатиться.
+        """
+        task = self._tasks.get(job_id)
+        if task is None or task.done():
+            return False
+
+        await asyncio.gather(task, return_exceptions=True)
+        logger.info(
+            'background_task_wait_completed',
+            task_manager=self._name,
+            job_id=str(job_id),
+        )
+        return True
+
     def is_running(self, job_id: UUID) -> bool:
         """
         Проверяет, есть ли активная task для job_id.

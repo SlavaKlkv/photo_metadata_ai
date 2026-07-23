@@ -206,9 +206,21 @@ export const useAppStore = create<AppState>()(
       updates = {},
     ) => {
       set((state) => ({
-        jobs: state.jobs.map((job) =>
-          job.id === jobId ? { ...job, status, error, ...updates } : job,
-        ),
+        jobs: state.jobs.map((job) => {
+          if (job.id !== jobId) return job;
+
+          const next = { ...job, status, error, ...updates };
+
+          // Упавший файл экспортировать нечем — снимаем его с экспорта,
+          // чтобы он не блокировал кнопку и не искажал счётчик выбранных.
+          // Явный выбор пользователя тут не теряется: вернуть галочку
+          // всё равно нельзя, бэкенд экспортирует только COMPLETED
+          if (status === "error") {
+            next.selected_for_export = false;
+          }
+
+          return next;
+        }),
       }));
     },
 
