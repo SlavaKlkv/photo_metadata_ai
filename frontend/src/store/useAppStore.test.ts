@@ -810,3 +810,26 @@ test('keeps the current valid selection when disabling a different provider', as
     'gemini',
   );
 });
+
+test('unselects a file from export when it fails', () => {
+  useAppStore.setState({
+    jobs: [{ ...makeJob('file-1'), selected_for_export: true }],
+  });
+
+  useAppStore.getState().updateJobStatus('file-1', 'error', 'provider timeout');
+
+  expect(useAppStore.getState().jobs[0]).toMatchObject({
+    status: 'error',
+    selected_for_export: false,
+  });
+});
+
+test('keeps the export selection for files that succeed', () => {
+  useAppStore.setState({
+    jobs: [{ ...makeJob('file-1'), selected_for_export: true }],
+  });
+
+  useAppStore.getState().updateJobStatus('file-1', 'done');
+
+  expect(useAppStore.getState().jobs[0].selected_for_export).toBe(true);
+});
