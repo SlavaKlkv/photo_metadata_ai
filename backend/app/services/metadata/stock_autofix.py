@@ -1,5 +1,9 @@
 from app.core.enums import MetadataFieldSource, StockPlatform
 from app.schemas.job import MetadataValidationIssue, ProcessingJobFile
+from app.services.metadata.stock_mapping import (
+    _get_stock_title_characters_limit,
+    map_stock_title,
+)
 from app.services.metadata.stock_mapping_data import DEFAULT_STOCK_CATEGORIES
 from app.services.metadata.stock_rules import get_stock_rules
 from app.services.metadata.stock_rules_data import StockRules
@@ -73,32 +77,48 @@ def _ensure_generated_title_has_min_words(
     if _is_edited(file, 'title'):
         return False
 
-    title_words = _split_words(file.title)
+    # Слова считаем по mapped-заголовку — тому же, что видит валидатор
+    # (map_stock_title обрезает и по символам, и по числу слов). Иначе при
+    # пограничном заголовке автофикс «видит» достаточно слов в сыром title,
+    # хотя после обрезки их не хватает, и правка не применяется.
+    mapped_title = map_stock_title(file, rules) or ''
+    title_words = mapped_title.split()
 
     if len(title_words) >= rules.title_min_words:
         return False
 
-    for source_text in _title_word_sources(file):
-        for word in _split_words(source_text):
-            title_words.append(word)
+    # Добиваем слова, не выходя за символьный лимит мэппинга, чтобы
+    # добавленное не срезалось при отображении и заголовок реально прошёл
+    # валидацию.
+    characters_limit = _get_stock_title_characters_limit(rules)
+    candidate_words = [
+        word
+        for source_text in _title_word_sources(file)
+        for word in _split_words(source_text)
+    ]
+    candidate_words.extend(('stock', 'photo', 'image', 'background', 'scene'))
 
-            if len(title_words) >= rules.title_min_words:
-                break
-
+    for word in candidate_words:
         if len(title_words) >= rules.title_min_words:
             break
 
-    for fallback_word in ('stock', 'photo', 'image', 'background', 'scene'):
-        if len(title_words) >= rules.title_min_words:
-            break
+        candidate_title = ' '.join((*title_words, word))
 
-        title_words.append(fallback_word)
+        if len(candidate_title) > characters_limit:
+            continue
 
-    if title_words:
-        file.title = ' '.join(title_words)
-        return True
+        title_words.append(word)
 
-    return False
+    if len(title_words) < rules.title_min_words:
+        return False
+
+    new_title = ' '.join(title_words)
+
+    if file.title == new_title:
+        return False
+
+    file.title = new_title
+    return True
 
 
 def _ensure_generated_title_exists(file: ProcessingJobFile) -> bool:
