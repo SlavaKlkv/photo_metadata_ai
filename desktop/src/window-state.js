@@ -75,17 +75,26 @@ function resetWindowState(window) {
     window.unmaximize();
   }
   const workArea = screen.getPrimaryDisplay().workArea;
-  window.setBounds({
-    width: Math.min(
-      PREFERRED_WIDTH,
-      Math.round(workArea.width * WORK_AREA_FRACTION)
-    ),
-    height: Math.min(
-      PREFERRED_HEIGHT,
-      Math.round(workArea.height * WORK_AREA_FRACTION)
-    ),
-  });
-  window.center();
+  const width = Math.min(
+    PREFERRED_WIDTH,
+    Math.round(workArea.width * WORK_AREA_FRACTION)
+  );
+  const height = Math.min(
+    PREFERRED_HEIGHT,
+    Math.round(workArea.height * WORK_AREA_FRACTION)
+  );
+  // Сбрасываем только размер, сохраняя текущее положение окна;
+  // при этом не даём новому размеру увести окно за пределы рабочей области.
+  const bounds = window.getBounds();
+  const x = Math.max(
+    workArea.x,
+    Math.min(bounds.x, workArea.x + workArea.width - width)
+  );
+  const y = Math.max(
+    workArea.y,
+    Math.min(bounds.y, workArea.y + workArea.height - height)
+  );
+  window.setBounds({ x, y, width, height });
 }
 
 module.exports = { getWindowState, saveWindowState, resetWindowState };
