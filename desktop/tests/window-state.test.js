@@ -80,12 +80,13 @@ test('saves normal bounds and maximized state', () => {
   );
 });
 
-test('resets fullscreen and maximized window to default bounds', () => {
+test('resets fullscreen and maximized window to default size keeping position', () => {
   const window = {
     isFullScreen: jest.fn(() => true),
     setFullScreen: jest.fn(),
     isMaximized: jest.fn(() => true),
     unmaximize: jest.fn(),
+    getBounds: jest.fn(() => ({ x: 40, y: 30, width: 500, height: 400 })),
     setBounds: jest.fn(),
     center: jest.fn(),
   };
@@ -97,9 +98,33 @@ test('resets fullscreen and maximized window to default bounds', () => {
   );
   expect(window.setFullScreen).toHaveBeenCalledWith(false);
   expect(window.unmaximize).toHaveBeenCalled();
+  // Размер сброшен к дефолту, положение сохранено, окно не центрируется.
   expect(window.setBounds).toHaveBeenCalledWith({
+    x: 40,
+    y: 30,
     width: 1080,
     height: 720,
   });
-  expect(window.center).toHaveBeenCalled();
+  expect(window.center).not.toHaveBeenCalled();
+});
+
+test('clamps position so resized window stays within work area', () => {
+  const window = {
+    isFullScreen: jest.fn(() => false),
+    setFullScreen: jest.fn(),
+    isMaximized: jest.fn(() => false),
+    unmaximize: jest.fn(),
+    // Окно у правого/нижнего края: новый размер увёл бы его за workArea.
+    getBounds: jest.fn(() => ({ x: 1100, y: 700, width: 200, height: 150 })),
+    setBounds: jest.fn(),
+  };
+
+  resetWindowState(window);
+
+  expect(window.setBounds).toHaveBeenCalledWith({
+    x: 120, // 1200 - 1080
+    y: 80, // 800 - 720
+    width: 1080,
+    height: 720,
+  });
 });
