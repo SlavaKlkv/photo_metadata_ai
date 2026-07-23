@@ -28,6 +28,9 @@ from app.services.ai.constants import (
     PROVIDER_COOLDOWN_DEFAULT_SECONDS,
     RETRYABLE_HTTP_STATUSES,
 )
+from app.services.ai.provider_availability import (
+    is_local_provider_available,
+)
 from app.services.ai.provider_cooldown import (
     get_cooldown_remaining,
     mark_provider_cooldown,
@@ -41,6 +44,7 @@ from app.services.ai.provider_throttle import (
     try_acquire,
 )
 from app.services.desktop.ai_provider_api_keys import get_ai_provider_api_key
+from app.services.desktop.app_settings import get_disabled_providers
 from app.services.desktop.constants import SUPPORTED_AI_API_KEY_PROVIDERS
 
 logger = structlog.get_logger(__name__)
@@ -80,9 +84,17 @@ async def _sleep(delay: float) -> None:
 
 def is_provider_added(provider: AIProvider) -> bool:
     """
-    Провайдер считается добавленным, если для него не нужен API-ключ
-    или ключ сохранён в desktop-хранилище либо окружении.
+    Провайдер считается добавленным, если ключ сохранён в desktop-хранилище
+    либо окружении, а для локального провайдера — если его рантайм доступен
+    по последнему снимку discovery. Провайдер, выключенный пользователем в
+    AI Setup, добавленным не считается независимо от ключа и доступности.
     """
+    if provider in get_disabled_providers():
+        return False
+
+    if provider == AIProvider.OLLAMA:
+        return is_local_provider_available()
+
     if provider not in SUPPORTED_AI_API_KEY_PROVIDERS:
         return True
 
@@ -102,7 +114,11 @@ def build_provider_fallback_chain(
 
         # Выбранный провайдер остаётся в кольце даже без ключа, чтобы
         # пользователь получил понятную ошибку конфигурации; fallback
-        # выполняется только на добавленных провайдеров.
+        # выполняется только на добавленных провайдеров. Явно выключенный
+        # в AI Setup провайдер исключается всегда, включая выбранный.
+        if current in get_disabled_providers():
+            continue
+
         if current != selected_provider and not is_provider_added(current):
             continue
 

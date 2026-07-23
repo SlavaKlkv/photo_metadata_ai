@@ -16,12 +16,16 @@ export interface AIProviderSetupProps {
   // Симулированный прогресс поиска QWEN (только онбординг)
   scanProgress?: number;
   suppressErrorIcon?: boolean;
+  // Тумблеры включения провайдеров: нужны в AI Setup, но не в онбординге,
+  // где пользователь ещё ничего не настроил.
+  allowToggleProviders?: boolean;
 }
 
 export const AIProviderSetup: React.FC<AIProviderSetupProps> = ({
   isScanning = false,
   scanProgress,
   suppressErrorIcon = false,
+  allowToggleProviders = false,
 }) => {
   const providerDiscoveryItems = useAppStore(
     (state) => state.providerDiscoveryItems,
@@ -30,6 +34,10 @@ export const AIProviderSetup: React.FC<AIProviderSetupProps> = ({
     (state) => state.updateProviderApiKey,
   );
   const saveProviderApiKey = useAppStore((state) => state.saveProviderApiKey);
+  const setProviderEnabled = useAppStore((state) => state.setProviderEnabled);
+  const pendingProviderToggle = useAppStore(
+    (state) => state.pendingProviderToggle,
+  );
 
   const [apiKeyValidationStatuses, setApiKeyValidationStatuses] = useState<
     Partial<Record<AIProvider, ApiKeyValidationStatus>>
@@ -106,6 +114,13 @@ export const AIProviderSetup: React.FC<AIProviderSetupProps> = ({
     }, 700);
   };
 
+  const buildToggleHandler = (provider: AIProvider) =>
+    allowToggleProviders && !isScanning
+      ? (enabled: boolean) => {
+          void setProviderEnabled(provider, enabled);
+        }
+      : undefined;
+
   const getProviderStatus = (item: (typeof providerDiscoveryItems)[number]) => {
     if (isScanning) {
       return 'scanning';
@@ -142,6 +157,9 @@ export const AIProviderSetup: React.FC<AIProviderSetupProps> = ({
               apiKeyError={apiKeyValidationErrors[item.provider]}
               setupLink={item.setup_links?.[0]}
               suppressErrorIcon={suppressErrorIcon}
+              enabled={item.enabled}
+              onToggleEnabled={buildToggleHandler(item.provider)}
+              isTogglePending={pendingProviderToggle === item.provider}
             />
           </div>
         ))}
@@ -158,6 +176,9 @@ export const AIProviderSetup: React.FC<AIProviderSetupProps> = ({
             apiKeyError={apiKeyValidationErrors[item.provider]}
             setupLink={item.api_key_links?.[0]}
             suppressErrorIcon={suppressErrorIcon}
+            enabled={item.enabled}
+            onToggleEnabled={buildToggleHandler(item.provider)}
+            isTogglePending={pendingProviderToggle === item.provider}
           />
         ))}
       </div>

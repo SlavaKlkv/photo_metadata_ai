@@ -43,10 +43,12 @@ class DesktopSettingsResponse(BaseModel):
     selected_provider: AIProvider
     effective_provider: AIProvider
     effective_model: str | None = None
+    disabled_providers: list[str] = Field(default_factory=list)
 
 
 class UpdateDesktopSettingsRequest(BaseModel):
-    selected_provider: AIProvider
+    selected_provider: AIProvider | None = None
+    disabled_providers: list[AIProvider] | None = None
 
 
 class DesktopStartupStatusResponse(BaseModel):

@@ -131,6 +131,12 @@ export interface AppState {
     provider: AIProvider,
     key: string,
   ) => Promise<{ success: boolean; error?: string }>;
+  setProviderEnabled: (
+    provider: AIProvider,
+    enabled: boolean,
+  ) => Promise<void>;
+  // Провайдер, для которого сохранение переключателя ещё не завершилось.
+  pendingProviderToggle: AIProvider | null;
 
   // regenerate одного файла, используя lockedBatchSettings — не дёргает весь batch
   regeneratingFileId: string | null;
@@ -148,6 +154,7 @@ export const useAppStore = create<AppState>()(
     providerDiscoveryStatus: "idle",
     providerDiscoveryItems: [],
     providerDiscoveryError: null,
+    pendingProviderToggle: null,
     draftBatchSettings: defaultBatchSettings,
     lockedBatchSettings: null,
     isProcessing: false,
@@ -287,13 +294,14 @@ export const useAppStore = create<AppState>()(
           hints: item.hints ?? [],
           configured: item.configured ?? false,
           local: item.local ?? false,
+          enabled: item.enabled ?? true,
           model: item.model,
           setup_links: item.setup_links ?? [],
           api_key_links: item.api_key_links ?? [],
         }));
 
         const availableProviders = providerDiscoveryItems
-          .filter((item) => item.ready)
+          .filter((item) => item.ready && item.enabled)
           .map((item) => item.provider);
 
         console.log("[Provider Discovery] Found providers:", {
@@ -570,6 +578,66 @@ export const useAppStore = create<AppState>()(
           success: false,
           error: "Failed to validate API key",
         };
+      }
+    },
+
+    setProviderEnabled: async (provider, enabled) => {
+      const { providerDiscoveryItems, pendingProviderToggle } = get();
+
+      if (pendingProviderToggle !== null) {
+        return;
+      }
+
+      const disabledProviders = providerDiscoveryItems
+        .filter((item) =>
+          item.provider === provider ? !enabled : !item.enabled,
+        )
+        .map((item) => item.provider);
+
+      // Тумблер не переключаем оптимистично: положение меняется только по
+      // подтверждению бэкенда, иначе он дёргается, пока запрос в пути.
+      set({ pendingProviderToggle: provider });
+
+      try {
+        const response = await jobsApi.updateDesktopSettings({
+          disabled_providers: disabledProviders,
+        });
+        const savedDisabled: string[] = response.data?.disabled_providers ?? [];
+        const nextItems = providerDiscoveryItems.map((item) => ({
+          ...item,
+          enabled: !savedDisabled.includes(item.provider),
+        }));
+        const availableProviders = nextItems
+          .filter((item) => item.ready && item.enabled)
+          .map((item) => item.provider);
+        // Бэкенд передаёт выбор дальше по кольцу fallback, если выключили
+        // текущего провайдера. Но если и этот провайдер недоступен (нет ключа
+        // или рантайма) — сбрасываем выбор сразу, не дожидаясь следующего
+        // опроса discovery, иначе в дропдауне зависает несуществующий выбор.
+        const savedProvider: AIProvider | undefined =
+          response.data?.selected_provider;
+        const nextSelectedProvider =
+          savedProvider && availableProviders.includes(savedProvider)
+            ? savedProvider
+            : null;
+
+        set((state) => ({
+          providerDiscoveryItems: nextItems,
+          availableProviders,
+          sessionSettings: {
+            ...state.sessionSettings,
+            selectedProvider: nextSelectedProvider,
+          },
+          draftBatchSettings: nextSelectedProvider
+            ? { ...state.draftBatchSettings, aiProvider: nextSelectedProvider }
+            : state.draftBatchSettings,
+        }));
+
+        get().saveSessionSettings();
+      } catch (error) {
+        console.error("[setProviderEnabled] Failed to save:", error);
+      } finally {
+        set({ pendingProviderToggle: null });
       }
     },
 

@@ -18,6 +18,9 @@ from app.services.ai.ai_fallback import (
     validate_primary_provider_configuration,
 )
 from app.services.ai.ai_provider import AIMetadataResponse
+from app.services.ai.provider_availability import (
+    refresh_local_provider_availability,
+)
 from app.services.desktop.app_settings import resolve_effective_ai_settings
 from app.services.image_preprocessing import resize_image_for_ai
 from app.services.metadata.metadata_embedding import get_upload_file_path
@@ -129,6 +132,7 @@ async def process_job(job_id: UUID) -> None:
         job.effective_ai_provider = effective_ai_settings.provider
         job.effective_ai_model = effective_ai_settings.model
         await storage.update_job(job)
+        await refresh_local_provider_availability()
         validate_primary_provider_configuration(
             effective_ai_settings.provider,
         )
@@ -242,6 +246,7 @@ async def retry_failed_files(job_id: UUID) -> None:
         job.effective_ai_provider = effective_ai_settings.provider
         job.effective_ai_model = effective_ai_settings.model
         await storage.update_job(job)
+        await refresh_local_provider_availability()
         validate_primary_provider_configuration(
             effective_ai_settings.provider,
         )
