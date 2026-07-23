@@ -169,6 +169,14 @@ export const SettingsPanel: React.FC = () => {
               </small>
             )}
 
+          {providerDiscoveryStatus === "ready" &&
+            availableProviders.length > 0 &&
+            selectedProvider === null && (
+              <small className={styles.hintText}>
+                Select an AI provider to start.
+              </small>
+            )}
+
           {providerDiscoveryStatus === "error" && (
             <small className={styles.errorText}>
               {providerDiscoveryError ?? "Failed to detect AI providers."}
