@@ -11,6 +11,7 @@ import { Panel } from "../../atoms/Panel/Panel";
 import styles from "./MetadataPreview.module.scss";
 import { SectionHeader } from "../../molecules/SectionHeader/SectionHeader";
 import { Input } from "../../atoms/Input/Input";
+import { getResultsPageForIndex } from "constants/pagination";
 type ValidationMessage = {
   field: string;
   code: string;
@@ -410,6 +411,7 @@ export const MetadataPreview: React.FC = () => {
 
   const selectedJobId = useUIStore((state) => state.selectedJobId);
   const setSelectedJobId = useUIStore((state) => state.setSelectedJobId);
+  const setResultsPage = useUIStore((state) => state.setResultsPage);
   const currentJobId = useUIStore((state) => state.currentJobId);
   const addToast = useToastStore((state) => state.addToast);
   const previews = useAppStore((state) => state.previews);
@@ -434,12 +436,25 @@ export const MetadataPreview: React.FC = () => {
     return () => window.clearTimeout(timeoutId);
   }, [recentlyRegeneratedFileId]);
 
-  // выбираем первый completed job автоматически
+  // Выбор из превью двигает и таблицу: страница считается по позиции файла
+  // в общем списке jobs — там же, где его показывает ResultsTable.
+  const selectJob = (id: string) => {
+    setSelectedJobId(id);
+    setResultsPage(getResultsPageForIndex(jobs.findIndex((j) => j.id === id)));
+  };
+
+  // выбираем первый completed job автоматически;
+  // то же самое, если выбранный файл исчез из списка (новый батч, удаление)
   useEffect(() => {
-    if (!selectedJobId && doneJobs.length > 0) {
-      setSelectedJobId(doneJobs[0].id);
+    if (doneJobs.length === 0) return;
+
+    const hasSelectedJob =
+      !!selectedJobId && jobs.some((j) => j.id === selectedJobId);
+
+    if (!hasSelectedJob) {
+      selectJob(doneJobs[0].id);
     }
-  }, [doneJobs, selectedJobId]);
+  }, [jobs, doneJobs, selectedJobId]);
 
   const handleNavigate = (direction: "prev" | "next") => {
     if (doneJobs.length === 0) return;
@@ -447,14 +462,14 @@ export const MetadataPreview: React.FC = () => {
       direction === "prev"
         ? Math.max(0, currentIndex - 1)
         : Math.min(doneJobs.length - 1, currentIndex + 1);
-    setSelectedJobId(doneJobs[newIndex].id);
+    selectJob(doneJobs[newIndex].id);
   };
 
   const handleIndexSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && indexInput !== null) {
       const num = parseInt(indexInput, 10);
       if (!isNaN(num) && num >= 1 && num <= doneJobs.length) {
-        setSelectedJobId(doneJobs[num - 1].id);
+        selectJob(doneJobs[num - 1].id);
       }
       setIndexInput(null);
     }

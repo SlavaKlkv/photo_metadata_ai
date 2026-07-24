@@ -28,7 +28,11 @@ const makeJobs = (count: number): ProcessingJob[] =>
 
 const setJobs = (count: number) => {
   useAppStore.setState({ jobs: makeJobs(count), previews: {} });
-  useUIStore.setState({ currentJobId: 'job-1', selectedJobId: null });
+  useUIStore.setState({
+    currentJobId: 'job-1',
+    selectedJobId: null,
+    resultsPage: 1,
+  });
 };
 
 test('на первой странице показывает первые десять файлов', () => {
@@ -65,4 +69,36 @@ test('не оставляет пустую страницу, если списо
 
   expect(screen.getByText('photo-1.jpg')).toBeInTheDocument();
   expect(screen.getByText('photo-5.jpg')).toBeInTheDocument();
+});
+
+test('показывает страницу, выставленную в store', () => {
+  setJobs(25);
+  useUIStore.setState({ resultsPage: 2 });
+  render(<ResultsTable />);
+
+  expect(screen.getByText('photo-11.jpg')).toBeInTheDocument();
+  expect(screen.queryByText('photo-1.jpg')).not.toBeInTheDocument();
+});
+
+test('смена страницы пагинацией не меняет выбранное фото', async () => {
+  setJobs(25);
+  useUIStore.setState({ selectedJobId: 'file-3' });
+  render(<ResultsTable />);
+
+  await userEvent.click(screen.getByRole('button', { name: '2' }));
+
+  expect(useUIStore.getState().selectedJobId).toBe('file-3');
+  expect(screen.getByText('photo-11.jpg')).toBeInTheDocument();
+});
+
+test('клик по строке выбирает фото и не сбрасывает страницу', async () => {
+  setJobs(25);
+  render(<ResultsTable />);
+
+  await userEvent.click(screen.getByRole('button', { name: '3' }));
+  await userEvent.click(screen.getByText('photo-22.jpg'));
+
+  expect(useUIStore.getState().selectedJobId).toBe('file-22');
+  expect(useUIStore.getState().resultsPage).toBe(3);
+  expect(screen.getByText('photo-21.jpg')).toBeInTheDocument();
 });

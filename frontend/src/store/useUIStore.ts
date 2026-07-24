@@ -20,6 +20,8 @@ export interface UIState {
   isExportReady: boolean;
   currentJobId: string | null;
   selectedJobId: string | null;
+  // страница таблицы Results — общая для таблицы и навигации в превью
+  resultsPage: number;
   isPollingActive: boolean;
   isExporting: boolean;
   isExportModalOpen: boolean;
@@ -40,6 +42,7 @@ export interface UIState {
   setIsExportReady: (val: boolean) => void;
   setCurrentJobId: (id: string | null) => void;
   setSelectedJobId: (id: string | null) => void;
+  setResultsPage: (page: number) => void;
   setIsPollingActive: (val: boolean) => void;
   setIsExporting: (val: boolean) => void;
   openExportModal: () => void;
@@ -65,6 +68,7 @@ export const useUIStore = create<UIState>()(
       isExportReady: false,
       currentJobId: null, 
       selectedJobId: null,
+      resultsPage: 1,
       isPollingActive: false,
       isExporting: false,
       isExportModalOpen: false,
@@ -103,6 +107,8 @@ export const useUIStore = create<UIState>()(
       setCurrentJobId: (id) =>
         set({ currentJobId: id }),
       setSelectedJobId: (id) => set({ selectedJobId: id }),
+      // страница нумеруется с 1; ниже единицы не опускаемся
+      setResultsPage: (page) => set({ resultsPage: Math.max(1, page) }),
       setIsPollingActive: (val) => set({ isPollingActive: val }),
       setIsExporting: (val) => set({ isExporting: val }),
       openExportModal: () => set({ isExportModalOpen: true }),

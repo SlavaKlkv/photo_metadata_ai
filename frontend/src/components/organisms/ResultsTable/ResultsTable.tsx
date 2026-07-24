@@ -1,5 +1,5 @@
 // frontend/src/components/organisms/ResultsTable/ResultsTable.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useAppStore } from 'store/useAppStore';
 import { useUIStore } from 'store/useUIStore';
 import { jobsApi } from 'services/api/api';
@@ -9,6 +9,7 @@ import { Panel } from 'components/atoms/Panel/Panel';
 import styles from './ResultsTable.module.scss';
 import { SectionHeader } from 'components/molecules/SectionHeader/SectionHeader';
 import { Pagination } from 'components/molecules/Pagination/Pagination';
+import { RESULTS_PAGE_SIZE } from 'constants/pagination';
 
 export const ResultsTable: React.FC = () => {
   const jobs = useAppStore((state) => state.jobs);
@@ -23,13 +24,13 @@ export const ResultsTable: React.FC = () => {
   ).length;
   const allChecked =
     selectedCount === visibleJobs.length && visibleJobs.length > 0;
-  // локальный стейт пагинации — не в batch state, сбрасывается при смене данных
-  const PAGE_SIZE = 10;
-  const [currentPage, setCurrentPage] = useState(1);
-  const totalPages = Math.ceil(visibleJobs.length / PAGE_SIZE);
+  // страница живёт в UI-store: превью переключает её, уводя выбор за границу страницы
+  const currentPage = useUIStore((state) => state.resultsPage);
+  const setCurrentPage = useUIStore((state) => state.setResultsPage);
+  const totalPages = Math.ceil(visibleJobs.length / RESULTS_PAGE_SIZE);
   const paginatedJobs = visibleJobs.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
+    (currentPage - 1) * RESULTS_PAGE_SIZE,
+    currentPage * RESULTS_PAGE_SIZE,
   );
   // список задач мог сократиться (новый батч, отмена) — не оставляем пустую страницу
   useEffect(() => {
