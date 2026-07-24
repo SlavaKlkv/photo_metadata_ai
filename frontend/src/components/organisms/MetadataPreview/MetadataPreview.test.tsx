@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { ProcessingJob } from 'types';
 import { useAppStore } from 'store/useAppStore';
 import { useUIStore } from 'store/useUIStore';
+import { getResultsPageForIndex } from 'constants/pagination';
 import { MetadataPreview } from './MetadataPreview';
 
 beforeEach(() => {
@@ -168,20 +169,20 @@ test('счётчик остаётся сквозным по всем done-фай
   expect(screen.getByText('11 of 25')).toBeInTheDocument();
 });
 
-test('стрелки на границах списка не уводят выбор и страницу', async () => {
+test('стрелки на границах листают по кругу', async () => {
   setJobs(makeJobs(12), 'file-1');
   render(<MetadataPreview />);
 
   await clickNav('‹');
-  expect(useUIStore.getState().selectedJobId).toBe('file-1');
-  expect(useUIStore.getState().resultsPage).toBe(1);
+  expect(useUIStore.getState().selectedJobId).toBe('file-12');
+  expect(useUIStore.getState().resultsPage).toBe(getResultsPageForIndex(11));
 
   act(() => {
     useUIStore.setState({ selectedJobId: 'file-12', resultsPage: 2 });
   });
   await clickNav('›');
-  expect(useUIStore.getState().selectedJobId).toBe('file-12');
-  expect(useUIStore.getState().resultsPage).toBe(2);
+  expect(useUIStore.getState().selectedJobId).toBe('file-1');
+  expect(useUIStore.getState().resultsPage).toBe(1);
 });
 
 test('исчезновение выбранного файла возвращает выбор и страницу к первому', async () => {
