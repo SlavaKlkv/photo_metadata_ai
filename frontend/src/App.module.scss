@@ -99,11 +99,18 @@
 .reviewGrid {
   width: 100%;
   display: grid;
-  grid-template-columns: 330fr 566fr 448fr;
+  grid-template-columns:
+    minmax(0, 330fr)
+    minmax(0, 566fr)
+    minmax(0, 448fr);
   gap: var(--spacing-lg);
   min-height: 0;
   height: 100%;
   overflow: hidden;
+}
+
+.reviewGrid > * {
+  min-width: 0;
 }
 
 /* При 1180px уже переходим на flex, не grid с одной колонкой */
