@@ -458,10 +458,9 @@ export const MetadataPreview: React.FC = () => {
 
   const handleNavigate = (direction: "prev" | "next") => {
     if (doneJobs.length === 0) return;
-    const newIndex =
-      direction === "prev"
-        ? Math.max(0, currentIndex - 1)
-        : Math.min(doneJobs.length - 1, currentIndex + 1);
+    const total = doneJobs.length;
+    const step = direction === "prev" ? -1 : 1;
+    const newIndex = (currentIndex + step + total) % total;
     selectJob(doneJobs[newIndex].id);
   };
 
