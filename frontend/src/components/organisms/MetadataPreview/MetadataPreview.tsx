@@ -607,7 +607,9 @@ export const MetadataPreview: React.FC = () => {
         </div>
 
         {/* Filename */}
-        <div className={styles.filename}>{job.originalFilename}</div>
+        <div className={styles.filename} title={job.originalFilename}>
+          {job.originalFilename}
+        </div>
 
         {(photoErrors.length > 0 || photoWarnings.length > 0) && (
           <div className={styles.photoValidation}>

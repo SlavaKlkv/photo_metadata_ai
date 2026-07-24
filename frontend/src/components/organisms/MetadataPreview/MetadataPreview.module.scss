@@ -52,20 +52,23 @@
 }
 
 .imagePlaceholder {
+  position: relative;
   width: 100%;
-  //aspect-ratio: 16/9;
+  aspect-ratio: 16/9;
   background: var(--bg-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  overflow: hidden;
 }
 
-/* вложенный контейнер с скруглением */
+/* вложенный контейнер со скруглением.
+   Абсолютное позиционирование выводит картинку из потока, чтобы её
+   размеры не влияли на высоту контейнера — её держит только aspect-ratio. */
 .imageInner {
-  width: 100%;
-  height: 100%;
-  aspect-ratio: 16/9;
+  position: absolute;
+  inset: 0;
   border-radius: var(--radius-lg);
   overflow: hidden;
   display: flex;
@@ -79,7 +82,15 @@
 
 .previewImage {
   width: 100%;
+  height: 100%;
   object-fit: contain;
+}
+
+.filename {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .scrollableContent {

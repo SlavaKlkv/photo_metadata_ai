@@ -200,3 +200,42 @@ test('исчезновение выбранного файла возвраща�
   });
   expect(useUIStore.getState().resultsPage).toBe(1);
 });
+
+test('renders preview image inside the fixed placeholder container', async () => {
+  useAppStore.setState({
+    jobs: [
+      {
+        id: 'file-1',
+        filename: 'very-wide-photo-with-a-long-name.jpg',
+        originalFilename: 'very-wide-photo-with-a-long-name.jpg',
+        status: 'done',
+        preview: {
+          stock_platform: 'getty_images',
+          common_fields: [
+            { key: 'title', label: 'Title', value: 'Generated title' },
+          ],
+          stock_specific: { title: 'Getty Images', fields: [] },
+          errors: [],
+          warnings: [],
+        },
+      },
+    ],
+    previews: { 'file-1': 'blob:preview-url' },
+  });
+
+  render(<MetadataPreview />);
+
+  const img = await screen.findByAltText(
+    'very-wide-photo-with-a-long-name.jpg',
+  );
+  expect(img).toHaveAttribute('src', 'blob:preview-url');
+  // Контейнер-заглушка держит габариты — картинка вписана внутрь.
+  expect(img.className).toContain('previewImage');
+  expect(img.parentElement?.className).toContain('imageInner');
+  expect(img.parentElement?.parentElement?.className).toContain(
+    'imagePlaceholder',
+  );
+  expect(
+    screen.getByTitle('very-wide-photo-with-a-long-name.jpg'),
+  ).toHaveClass('filename');
+});
