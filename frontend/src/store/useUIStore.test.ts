@@ -103,3 +103,15 @@ test('resets every processing flag but keeps the current job id', () => {
     isUploaded: true,
   });
 });
+
+test('keeps the results page at one or above', () => {
+  const state = useUIStore.getState();
+
+  expect(state.resultsPage).toBe(1);
+
+  state.setResultsPage(3);
+  expect(useUIStore.getState().resultsPage).toBe(3);
+
+  state.setResultsPage(0);
+  expect(useUIStore.getState().resultsPage).toBe(1);
+});
