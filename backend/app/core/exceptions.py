@@ -29,3 +29,18 @@ class UploadValidationError(DomainError):
     """
     Загруженный файл не прошел доменную валидацию.
     """
+
+
+class UnsupportedImageFormatError(UploadValidationError):
+    """
+    Файл распознан Pillow, но его формат не поддерживается.
+
+    Несёт фактический формат, чтобы причину отказа можно было залогировать.
+    """
+
+    def __init__(self, image_format: str):
+        super().__init__(
+            f'Unsupported image format: {image_format}',
+            reason_code='unsupported_image_format',
+        )
+        self.image_format = image_format
