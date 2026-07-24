@@ -179,8 +179,22 @@ export const FileUploadSection: React.FC = () => {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.currentTarget.files || []);
+    const input = e.currentTarget;
+    const files = Array.from(input.files || []);
+    // Сбрасываем value: браузер не шлёт change, если выбран тот же набор
+    // файлов, что и в прошлый раз (например Cmd+A в той же папке) — без
+    // сброса повторный выбор молча ничего не загружает.
+    input.value = "";
     uploadFiles(files);
+  };
+
+  const handleBrowseClick = () => {
+    // Дублируем сброс перед открытием диалога — на случай, если предыдущая
+    // попытка не дошла до onChange (ранний выход, ошибка аплоада).
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    fileInputRef.current?.click();
   };
 
   const hasUploads = jobsCount > 0;
@@ -248,7 +262,7 @@ export const FileUploadSection: React.FC = () => {
           onDragLeave={handleDrag}
           onDragOver={handleDrag}
           onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
+          onClick={handleBrowseClick}
         >
           <Icon name={iconName} className={styles.uploadIcon} />
           <div className={styles.uploadText}>
