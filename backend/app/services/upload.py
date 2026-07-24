@@ -10,10 +10,14 @@ from starlette.concurrency import run_in_threadpool
 
 from app.core.config import settings
 from app.core.constants import (
+    ALLOWED_IMAGE_FORMATS,
     ALLOWED_IMAGE_SUFFIXES,
     ALLOWED_IMAGE_TYPES,
 )
-from app.core.exceptions import UploadValidationError
+from app.core.exceptions import (
+    UnsupportedImageFormatError,
+    UploadValidationError,
+)
 from app.core.runtime import ensure_runtime_directories, resolve_path_in_base
 from app.utils.sanitizers import sanitize_filename
 
@@ -22,14 +26,15 @@ logger = structlog.get_logger(__name__)
 
 def verify_image(content: bytes) -> None:
     """
-    Проверяет, что файл является валидным JPEG-изображением.
+    Проверяет, что файл является валидным изображением поддерживаемого
+    формата (JPEG или JPEG-совместимый MPO).
     """
     with Image.open(BytesIO(content)) as image:
         image_format = (image.format or '').upper()
         image.verify()
 
-    if image_format != 'JPEG':
-        raise UploadValidationError('File is not a valid JPEG image')
+    if image_format not in ALLOWED_IMAGE_FORMATS:
+        raise UnsupportedImageFormatError(image_format or 'unknown')
 
 
 async def validate_upload_file(file: UploadFile, content: bytes) -> None:
@@ -79,6 +84,14 @@ async def validate_upload_file(file: UploadFile, content: bytes) -> None:
 
     try:
         await run_in_threadpool(verify_image, content)
+    except UnsupportedImageFormatError as error:
+        logger.warning(
+            'upload_validation_failed',
+            filename=file.filename,
+            image_format=error.image_format,
+            reason='unsupported_image_format',
+        )
+        raise
     except UploadValidationError:
         raise
     except (UnidentifiedImageError, OSError, SyntaxError):
