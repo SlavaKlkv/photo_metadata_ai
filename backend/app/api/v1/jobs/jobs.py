@@ -580,6 +580,7 @@ async def get_job_results(
     preview_stock_platform = (
         stock_platform or job.stock_platform or StockPlatform.SHUTTERSTOCK
     )
+    await _apply_stock_autofixes_for_platform(job, preview_stock_platform)
     sorted_files = _sort_result_files(job.files)
     total_items = len(sorted_files)
     total_pages = _count_total_pages(total_items, page_size)
@@ -832,6 +833,7 @@ async def start_job_export(
     export_stock_platform = (
         stock_platform or job.stock_platform or StockPlatform.SHUTTERSTOCK
     )
+    await _apply_stock_autofixes_for_platform(job, export_stock_platform)
     validation_errors: list[dict[str, object]] = []
 
     for file in completed_files:
@@ -1183,6 +1185,34 @@ def _sort_result_files(
             str(file.file_id),
         ),
     )
+
+
+async def _apply_stock_autofixes_for_platform(
+    job: ProcessingJob,
+    stock_platform: StockPlatform,
+) -> None:
+    """
+    Догоняет автофиксы под выбранную платформу.
+
+    Метаданные генерируются под платформу, выбранную на момент обработки.
+    При переключении платформы правила меняются (например, Getty и
+    Shutterstock требуют минимум 5 слов в title), поэтому формальные ошибки
+    нужно чинить заново — иначе они висят до ручной правки любого поля.
+    """
+    changed = False
+
+    for file in job.files:
+        if file.status != FileStatus.COMPLETED:
+            continue
+
+        before = file.model_dump()
+        apply_stock_metadata_autofixes(file, stock_platform)
+
+        if file.model_dump() != before:
+            changed = True
+
+    if changed:
+        await storage.update_job(job)
 
 
 def _count_total_pages(total_items: int, page_size: int) -> int:

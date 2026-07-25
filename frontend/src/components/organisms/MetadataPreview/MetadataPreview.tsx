@@ -72,7 +72,14 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
   const baselineValueRef = useRef<PreviewFieldValue>(
     getMetadataSaveValue(fieldKey, stringValue, value),
   );
-  const hasChanged = editValue !== stringValue;
+  // Правка считается «настоящей» только если меняется сохраняемое значение:
+  // лишние пробелы не должны выглядеть как исправление метаданных.
+  const hasChanged = !isPreviewFieldValueEqual(
+    normalizePreviewFieldValue(getMetadataSaveValue(fieldKey, editValue, value)),
+    normalizePreviewFieldValue(
+      getMetadataSaveValue(fieldKey, stringValue, value),
+    ),
+  );
 
   const addToast = useToastStore((state) => state.addToast);
   const applyMetadataResult = useAppStore(
@@ -128,8 +135,10 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
   const isEdited =
     hasUserChanged &&
     !isPreviewFieldValueEqual(
-      getMetadataSaveValue(fieldKey, editValue, value),
-      baselineValueRef.current,
+      normalizePreviewFieldValue(
+        getMetadataSaveValue(fieldKey, editValue, value),
+      ),
+      normalizePreviewFieldValue(baselineValueRef.current),
     );
 
   useEffect(() => {
@@ -160,7 +169,12 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
         value,
       );
 
-      if (isPreviewFieldValueEqual(saveValue, currentSaveValue)) {
+      if (
+        isPreviewFieldValueEqual(
+          normalizePreviewFieldValue(saveValue),
+          normalizePreviewFieldValue(currentSaveValue),
+        )
+      ) {
         setHasUserChanged(
           !isPreviewFieldValueEqual(
             currentSaveValue,
@@ -273,9 +287,15 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
         )}
       </div>
 
-      {/* Валидация под полем */}
-      {!isRegenerating && !hasChanged && errors.length > 0 && (
-        <div className={styles.fieldValidation}>
+      {/* Валидация под полем. Пока правка не сохранена, сообщения остаются
+          видимыми, но помечаются как устаревшие — иначе любое изменение
+          выглядит как исправление проблемы. */}
+      {!isRegenerating && (errors.length > 0 || warnings.length > 0) && (
+        <div
+          className={`${styles.fieldValidation} ${
+            hasChanged ? styles.fieldValidationStale : ""
+          }`}
+        >
           {errors.map((err, index) => (
             <div
               key={`${fieldKey}-${err.code}-${index}`}
@@ -285,11 +305,6 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
               <span>{err.message}</span>
             </div>
           ))}
-        </div>
-      )}
-
-      {!isRegenerating && !hasChanged && warnings.length > 0 && (
-        <div className={styles.fieldValidation}>
           {warnings.map((warn, index) => (
             <div
               key={`${fieldKey}-${warn.code}-${index}`}
@@ -299,6 +314,11 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
               <span>{warn.message}</span>
             </div>
           ))}
+          {hasChanged && (
+            <div className={styles.validationStaleNote}>
+              Validation is outdated — save the field to refresh it.
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -321,6 +341,22 @@ const isPreviewFieldValueEqual = (
   }
 
   return firstValue === secondValue;
+};
+
+// Пробелы не меняют смысл значения (backend считает слова через split()),
+// поэтому для сравнения схлопываем их.
+const normalizePreviewFieldValue = (
+  value: PreviewFieldValue,
+): PreviewFieldValue => {
+  if (Array.isArray(value)) {
+    return value.map((item) => item.trim().replace(/\s+/g, " "));
+  }
+
+  if (typeof value === "string") {
+    return value.trim().replace(/\s+/g, " ");
+  }
+
+  return value;
 };
 
 const getPreviewFieldStringValue = (value: PreviewFieldValue) =>
