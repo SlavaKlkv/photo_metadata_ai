@@ -239,3 +239,52 @@ test('renders preview image inside the fixed placeholder container', async () =>
     screen.getByTitle('very-wide-photo-with-a-long-name.jpg'),
   ).toHaveClass('filename');
 });
+
+const WARNING_MESSAGE = 'Title is shorter than recommended (5+ words).';
+
+const makeJobWithTitleWarning = () =>
+  ({
+    id: 'file-1',
+    filename: 'photo.jpg',
+    originalFilename: 'photo.jpg',
+    status: 'done',
+    preview: {
+      stock_platform: 'adobe_stock',
+      common_fields: [
+        { key: 'title', label: 'Title', value: 'Sunset Over Mountain Range' },
+      ],
+      stock_specific: { title: 'Adobe Stock', fields: [] },
+      errors: [],
+      warnings: [
+        {
+          field: 'title',
+          code: 'recommended_words_not_met',
+          message: WARNING_MESSAGE,
+        },
+      ],
+    },
+  }) as unknown as ProcessingJob;
+
+test('лишний пробел в title не снимает предупреждение', async () => {
+  useAppStore.setState({ jobs: [makeJobWithTitleWarning()] });
+  render(<MetadataPreview />);
+
+  const input = await screen.findByDisplayValue('Sunset Over Mountain Range');
+  await userEvent.type(input, ' ');
+
+  expect(screen.getByText(WARNING_MESSAGE)).toBeInTheDocument();
+  expect(
+    screen.queryByText(/Validation is outdated/),
+  ).not.toBeInTheDocument();
+});
+
+test('несохранённая правка не скрывает предупреждение, а помечает его устаревшим', async () => {
+  useAppStore.setState({ jobs: [makeJobWithTitleWarning()] });
+  render(<MetadataPreview />);
+
+  const input = await screen.findByDisplayValue('Sunset Over Mountain Range');
+  await userEvent.type(input, ' Landscape');
+
+  expect(screen.getByText(WARNING_MESSAGE)).toBeInTheDocument();
+  expect(screen.getByText(/Validation is outdated/)).toBeInTheDocument();
+});
