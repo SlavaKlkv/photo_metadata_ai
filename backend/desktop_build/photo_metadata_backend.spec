@@ -45,6 +45,7 @@ hiddenimports = [
 hiddenimports += collect_submodules('openai')
 hiddenimports += collect_submodules('httpx')
 hiddenimports += collect_submodules('iptcinfo3')
+hiddenimports += collect_submodules('piexif')
 
 a = Analysis(
     [str(BACKEND_DIR / 'app' / 'desktop_main.py')],
