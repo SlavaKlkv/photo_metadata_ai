@@ -2,6 +2,11 @@
 import React from 'react';
 import { AI_PROVIDER_LABELS, ProcessingJob } from 'types';
 import { Checkbox } from '../../atoms/Checkbox/Checkbox';
+import {
+  getJobValidationGroup,
+  VALIDATION_GROUP_HINTS,
+  VALIDATION_GROUP_SHORT_LABELS,
+} from 'utils/validationGroups';
 import styles from './ResultRow.module.scss';
 
 interface ResultRowProps {
@@ -21,6 +26,9 @@ export const ResultRow: React.FC<ResultRowProps> = ({
   onCheck,
   previewUrl,
 }) => {
+  // маркер группы виден и без фильтра — иначе строки не читаются
+  const validationGroup = getJobValidationGroup(job);
+
   return (
     <div
       className={`${styles.row} ${isSelected ? styles.selected : ''}`}
@@ -55,6 +63,16 @@ export const ResultRow: React.FC<ResultRowProps> = ({
       </div>
 
       <span className={styles.filename}>{job.originalFilename}</span>
+      {/* Только цветная точка: подпись съедала место у заголовка.
+          Расшифровка остаётся в подсказке и для скринридеров. */}
+      <span
+        className={`${styles.validationBadge} ${styles[validationGroup]}`}
+        title={VALIDATION_GROUP_HINTS[validationGroup]}
+        aria-label={VALIDATION_GROUP_SHORT_LABELS[validationGroup]}
+        role="img"
+      >
+        <span className={styles.validationDot} />
+      </span>
       <div className={styles.titleCell}>
         <span className={styles.title}>
           {job.metadata?.title ?? '—'}

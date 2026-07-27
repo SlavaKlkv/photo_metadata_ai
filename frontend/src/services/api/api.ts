@@ -87,9 +87,16 @@ export const jobsApi = {
   updateMetadata: (jobId: string, fileId: string, metadata: object) =>
     apiClient.patch(`/api/v1/jobs/${jobId}/files/${fileId}/metadata`, metadata),
 
-  updateSelection: (jobId: string, selectedForExport: boolean) =>
+  // без fileIds выбор меняется у всех файлов задачи,
+  // с fileIds — только у перечисленных
+  updateSelection: (
+    jobId: string,
+    selectedForExport: boolean,
+    fileIds?: string[],
+  ) =>
     apiClient.patch(`/api/v1/jobs/${jobId}/files/selection`, {
       selected_for_export: selectedForExport,
+      ...(fileIds ? { file_ids: fileIds } : {}),
     }),
 
   // регенерация метаданных одного файла без перезапуска всего batch

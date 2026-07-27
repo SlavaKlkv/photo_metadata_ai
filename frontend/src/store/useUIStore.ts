@@ -2,6 +2,7 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import type { AIProvider } from 'types';
+import type { ValidationGroup } from 'utils/validationGroups';
 
 export interface ExportArtifact {
   export_format: "csv" | "iptc" | "json";
@@ -20,6 +21,8 @@ export interface UIState {
   isExportReady: boolean;
   currentJobId: string | null;
   selectedJobId: string | null;
+  // активная группа валидации в сводке; null — показываем все файлы
+  validationFilter: ValidationGroup | null;
   // страница таблицы Results — общая для таблицы и навигации в превью
   resultsPage: number;
   isPollingActive: boolean;
@@ -42,6 +45,7 @@ export interface UIState {
   setIsExportReady: (val: boolean) => void;
   setCurrentJobId: (id: string | null) => void;
   setSelectedJobId: (id: string | null) => void;
+  setValidationFilter: (group: ValidationGroup | null) => void;
   setResultsPage: (page: number) => void;
   setIsPollingActive: (val: boolean) => void;
   setIsExporting: (val: boolean) => void;
@@ -68,6 +72,7 @@ export const useUIStore = create<UIState>()(
       isExportReady: false,
       currentJobId: null, 
       selectedJobId: null,
+      validationFilter: null,
       resultsPage: 1,
       isPollingActive: false,
       isExporting: false,
@@ -93,6 +98,7 @@ export const useUIStore = create<UIState>()(
           isPollingActive: false,
           isProgressModalOpen: false,
           isExportReady: false,
+          validationFilter: null,
           currentProcessingProvider: null,
           currentProcessingModel: null,
         }),
@@ -107,6 +113,10 @@ export const useUIStore = create<UIState>()(
       setCurrentJobId: (id) =>
         set({ currentJobId: id }),
       setSelectedJobId: (id) => set({ selectedJobId: id }),
+      // смена фильтра всегда возвращает на первую страницу:
+      // прежний номер относился к другому набору файлов
+      setValidationFilter: (group) =>
+        set({ validationFilter: group, resultsPage: 1 }),
       // страница нумеруется с 1; ниже единицы не опускаемся
       setResultsPage: (page) => set({ resultsPage: Math.max(1, page) }),
       setIsPollingActive: (val) => set({ isPollingActive: val }),

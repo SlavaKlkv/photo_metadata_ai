@@ -746,7 +746,11 @@ async def update_job_files_selection(
     payload: UpdateJobFileSelectionRequest,
 ):
     """
-    Массово обновляет selected_for_export для всех файлов задачи.
+    Массово обновляет selected_for_export для файлов задачи.
+
+    Без file_ids затрагивает все файлы, с file_ids — только перечисленные:
+    это нужно фронтенду, чтобы одним запросом оставить в экспорте,
+    например, только файлы без ошибок валидации.
     """
     job = await storage.get_job(job_id)
 
@@ -756,15 +760,24 @@ async def update_job_files_selection(
             detail='Job not found',
         )
 
+    target_ids = (
+        set(payload.file_ids) if payload.file_ids is not None else None
+    )
+    updated_count = 0
+
     for file in job.files:
+        if target_ids is not None and file.file_id not in target_ids:
+            continue
+
         file.selected_for_export = payload.selected_for_export
+        updated_count += 1
 
     await storage.update_job(job)
 
     return UpdateJobFileSelectionResponse(
         job_id=job.job_id,
         selected_for_export=payload.selected_for_export,
-        updated_count=len(job.files),
+        updated_count=updated_count,
         total_items=len(job.files),
     )
 

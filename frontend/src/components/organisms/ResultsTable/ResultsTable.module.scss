@@ -13,7 +13,7 @@
 
 .tableHeader {
   display: grid;
-  grid-template-columns: 32px 56px 1fr 1fr;
+  grid-template-columns: 32px 56px 1fr 20px 1.4fr;
   gap: var(--spacing-md);
   padding: 0 var(--spacing-md);
   font-size: var(--font-size-sm);
@@ -50,6 +50,11 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
+}
+
+.footerHint {
+  color: var(--text-secondary);
+  opacity: 0.75;
 }
 
 .selectAll {

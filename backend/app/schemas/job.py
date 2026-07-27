@@ -223,10 +223,14 @@ class ProcessingJobMetadataResults(BaseModel):
 
 class UpdateJobFileSelectionRequest(BaseModel):
     """
-    Массовое изменение выбора файлов для export по всей задаче.
+    Массовое изменение выбора файлов для export.
+
+    Без file_ids изменение применяется ко всем файлам задачи,
+    с file_ids — только к перечисленным.
     """
 
     selected_for_export: bool
+    file_ids: list[UUID] | None = None
 
 
 class UpdateJobFileSelectionResponse(BaseModel):
