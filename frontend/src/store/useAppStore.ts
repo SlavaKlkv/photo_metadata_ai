@@ -13,6 +13,7 @@ import {
   DesktopUpdateCheckResponse,
 } from "../types";
 import { jobsApi } from "../services/api/api";
+import { fetchAllStockResults } from "../services/api/fetchAllStockResults";
 
 const defaultSessionSettings: SessionSettings = {
   selectedProvider: null,
@@ -727,14 +728,16 @@ export const useAppStore = create<AppState>()(
       updateDraftBatchSetting("stockPlatform", stockPlatform);
 
       try {
-        const [resultsResponse, optionsResponse] = await Promise.all([
-          jobsApi.getResultsByStock(jobId, stockPlatform),
+        // Результаты забираем со ВСЕХ страниц: бэкенд отдаёт максимум 100
+        // файлов за запрос, а перемапить нужно всю задачу целиком — иначе
+        // у файлов за первой страницей остаётся preview прошлой платформы
+        // и её поля недоступны в UI, хотя экспорт валидируется по новой.
+        const [results, optionsResponse] = await Promise.all([
+          fetchAllStockResults(jobId, stockPlatform),
           jobsApi.getStockOptions(stockPlatform),
         ]);
 
         // обновляем preview для каждого файла
-        const results = resultsResponse.data?.results ?? [];
-
         results.forEach((file: any) => {
           if (file.preview) {
             updateJobPreview(file.file_id, file.preview);

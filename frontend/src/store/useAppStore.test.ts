@@ -833,3 +833,105 @@ test('keeps the export selection for files that succeed', () => {
 
   expect(useAppStore.getState().jobs[0].selected_for_export).toBe(true);
 });
+
+// Регрессия: смена stock-платформы перемаппливала только первую страницу
+// результатов (page_size=50), из-за чего файлы с 51-го сохраняли preview
+// прошлой платформы и её поля были недоступны в UI.
+const makeStockResultsPage = (
+  fileIds: string[],
+  hasNext: boolean,
+) => ({
+  data: {
+    results: fileIds.map((id) => ({
+      file_id: id,
+      preview: {
+        stock_platform: 'getty_images',
+        common_fields: [],
+        stock_specific: { title: `Getty fields for ${id}`, fields: [] },
+        errors: [],
+        warnings: [],
+      },
+    })),
+    pagination: { has_next: hasNext },
+  },
+});
+
+test('switchStockPlatform remaps previews for every file, not just the first page', async () => {
+  const fileIds = Array.from({ length: 114 }, (_, index) => `file-${index + 1}`);
+
+  useAppStore.setState({
+    jobs: fileIds.map((id) => ({
+      ...makeJob(id, 'done'),
+      preview: { stock_platform: 'adobe_stock' },
+    })) as never,
+  });
+
+  mockedJobsApi.getResultsByStock.mockImplementation(
+    (async (_jobId: string, _platform: string, page?: number) => {
+      const pageIndex = (page ?? 1) - 1;
+      const slice = fileIds.slice(pageIndex * 100, pageIndex * 100 + 100);
+      return makeStockResultsPage(slice, (pageIndex + 1) * 100 < fileIds.length);
+    }) as never,
+  );
+  mockedJobsApi.getStockOptions.mockResolvedValue({
+    data: { categories: [] },
+  } as never);
+
+  await useAppStore.getState().switchStockPlatform('getty_images' as never, 'job-1');
+
+  // Обе страницы запрошены с максимальным page_size (бэкенд ограничен le=100).
+  expect(mockedJobsApi.getResultsByStock).toHaveBeenCalledTimes(2);
+  expect(mockedJobsApi.getResultsByStock).toHaveBeenNthCalledWith(
+    1,
+    'job-1',
+    'getty_images',
+    1,
+    100,
+  );
+  expect(mockedJobsApi.getResultsByStock).toHaveBeenNthCalledWith(
+    2,
+    'job-1',
+    'getty_images',
+    2,
+    100,
+  );
+
+  const jobs = useAppStore.getState().jobs;
+  expect(jobs).toHaveLength(114);
+  expect(
+    jobs.every((job) => job.preview?.stock_platform === 'getty_images'),
+  ).toBe(true);
+  expect(jobs[113].preview?.stock_specific.title).toBe(
+    'Getty fields for file-114',
+  );
+});
+
+test('switchStockPlatform keeps previews from pages fetched before a failure', async () => {
+  const fileIds = Array.from({ length: 114 }, (_, index) => `file-${index + 1}`);
+
+  useAppStore.setState({
+    jobs: fileIds.map((id) => ({
+      ...makeJob(id, 'done'),
+      preview: { stock_platform: 'adobe_stock' },
+    })) as never,
+  });
+
+  mockedJobsApi.getResultsByStock.mockImplementation(
+    (async (_jobId: string, _platform: string, page?: number) => {
+      if ((page ?? 1) > 1) {
+        throw new Error('network error');
+      }
+      return makeStockResultsPage(fileIds.slice(0, 100), true);
+    }) as never,
+  );
+  mockedJobsApi.getStockOptions.mockResolvedValue({
+    data: { categories: [] },
+  } as never);
+
+  await useAppStore.getState().switchStockPlatform('getty_images' as never, 'job-1');
+
+  const jobs = useAppStore.getState().jobs;
+  expect(jobs[99].preview?.stock_platform).toBe('getty_images');
+  expect(jobs[100].preview?.stock_platform).toBe('adobe_stock');
+  expect(useAppStore.getState().stockOptions).toEqual({ categories: [] });
+});
