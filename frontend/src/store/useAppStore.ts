@@ -90,6 +90,9 @@ export interface AppState {
   updateMetadata: (jobId: string, metadata: ProcessingJob["metadata"]) => void;
   updateJobSelection: (jobId: string, selectedForExport: boolean) => void;
   updateAllJobsSelection: (selectedForExport: boolean) => void;
+  // точечная простановка выбора: id -> selected_for_export.
+  // Нужна массовым операциям сводки и откату при ошибке запроса.
+  applyJobsSelectionMap: (selection: Record<string, boolean>) => void;
   removeJob: (jobId: string) => void;
 
   updateSessionSetting: (
@@ -249,6 +252,16 @@ export const useAppStore = create<AppState>()(
           ...job,
           selected_for_export: selectedForExport,
         })),
+      }));
+    },
+
+    applyJobsSelectionMap: (selection) => {
+      set((state) => ({
+        jobs: state.jobs.map((job) =>
+          job.id in selection
+            ? { ...job, selected_for_export: selection[job.id] }
+            : job,
+        ),
       }));
     },
 

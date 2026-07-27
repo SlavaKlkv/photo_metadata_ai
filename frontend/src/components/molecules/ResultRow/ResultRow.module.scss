@@ -3,7 +3,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: 32px 56px 1fr 1fr;
+  grid-template-columns: 32px 56px 1fr 20px 1.4fr;
   align-items: center;
   gap: var(--spacing-md);
   padding: 10px var(--spacing-md);
@@ -81,4 +81,35 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.validationBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+}
+
+.validationDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.ready .validationDot {
+  background: var(--success-color);
+}
+
+.warnings .validationDot {
+  background: var(--warning-color);
+}
+
+.errors .validationDot {
+  background: var(--error-color);
+}
+
+.failed .validationDot {
+  background: var(--text-secondary);
 }

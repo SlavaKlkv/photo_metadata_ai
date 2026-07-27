@@ -2,7 +2,9 @@ import re
 import struct
 from dataclasses import dataclass
 from pathlib import Path
+from xml.sax.saxutils import escape as xml_escape
 
+import piexif
 import structlog
 from fastapi import HTTPException
 from iptcinfo3 import IPTCInfo
@@ -56,6 +58,11 @@ def embed_metadata_into_jpg(
     try:
         effective_payload = payload or _build_default_iptc_payload(file)
         _embed_iptc_metadata(target_file_path, effective_payload)
+        # IPTC IIM читают Adobe и стоки, но не Finder, Просмотр и Фото:
+        # им нужен XMP, а части старых программ — EXIF. Пишем все три,
+        # иначе метаданные «не видно» в штатных просмотрщиках macOS.
+        _embed_exif_metadata(target_file_path, effective_payload)
+        _embed_xmp_metadata(target_file_path, effective_payload)
 
         logger.info(
             'metadata_embedding_completed',
@@ -256,6 +263,200 @@ def _ensure_iptc_utf8_marker(file_path: Path) -> None:
             return
 
         pos += 2 + segment_length
+
+
+_XMP_IDENTIFIER = b'http://ns.adobe.com/xap/1.0/\x00'
+
+
+def _embed_exif_metadata(
+    file_path: Path,
+    payload: IPTCEmbeddingPayload,
+) -> None:
+    """
+    Дублирует заголовок, описание и ключевые слова в EXIF.
+
+    ImageDescription читают почти все программы, XP*-поля — проводник
+    Windows. Остальной EXIF (съёмочные параметры, ориентация) сохраняется:
+    piexif заменяет только APP1 Exif, не трогая изображение.
+    """
+    try:
+        exif_dict = piexif.load(str(file_path))
+    except Exception:
+        logger.warning('exif_load_failed', file_path=str(file_path))
+        exif_dict = {'0th': {}, 'Exif': {}, '1st': {}, 'GPS': {}, 'ifd1': {}}
+
+    zeroth = exif_dict.setdefault('0th', {})
+    description = payload.caption_abstract.strip()
+    title = payload.object_name.strip()
+    keywords = '; '.join(_normalize_iptc_list(payload.keywords))
+
+    if description:
+        zeroth[piexif.ImageIFD.ImageDescription] = description.encode('utf-8')
+        zeroth[piexif.ImageIFD.XPComment] = _encode_xp_field(description)
+
+    if title:
+        zeroth[piexif.ImageIFD.XPTitle] = _encode_xp_field(title)
+
+    if keywords:
+        zeroth[piexif.ImageIFD.XPKeywords] = _encode_xp_field(keywords)
+
+    # Миниатюра из исходника нередко невалидна для повторного dump,
+    # а нужна она только просмотрщикам — без неё файл остаётся корректным
+    exif_dict.pop('thumbnail', None)
+    exif_dict.pop('1st', None)
+
+    try:
+        piexif.insert(piexif.dump(exif_dict), str(file_path))
+    except Exception:
+        logger.warning('exif_embedding_skipped', file_path=str(file_path))
+
+
+def _encode_xp_field(value: str) -> bytes:
+    """
+    XP*-поля EXIF хранятся как UTF-16LE с нулевым терминатором.
+    """
+    return value.encode('utf-16le') + b'\x00\x00'
+
+
+def _embed_xmp_metadata(
+    file_path: Path,
+    payload: IPTCEmbeddingPayload,
+) -> None:
+    """
+    Записывает XMP-пакет — именно его читают Finder, Просмотр и Фото.
+
+    Существующий XMP-сегмент заменяется целиком, прочие сегменты
+    (EXIF, ICC, IPTC) остаются на месте.
+    """
+    packet = _build_xmp_packet(payload)
+    segment = (
+        b'\xff\xe1'
+        + struct.pack('>H', len(_XMP_IDENTIFIER) + len(packet) + 2)
+        + _XMP_IDENTIFIER
+        + packet
+    )
+
+    data = bytearray(file_path.read_bytes())
+    insert_pos = 2
+    pos = 2
+
+    while pos + 4 <= len(data) and data[pos] == 0xFF:
+        marker = data[pos + 1]
+
+        if marker == 0xDA:
+            break
+
+        segment_length = struct.unpack_from('>H', data, pos + 2)[0]
+        segment_end = pos + 2 + segment_length
+        is_xmp = (
+            marker == 0xE1
+            and data[pos + 4 : pos + 4 + len(_XMP_IDENTIFIER)]
+            == _XMP_IDENTIFIER
+        )
+
+        if is_xmp:
+            del data[pos:segment_end]
+            continue
+
+        # XMP кладём после APP0/APP1, как это делают Adobe и ImageIO
+        if marker in (0xE0, 0xE1):
+            insert_pos = segment_end
+
+        pos = segment_end
+
+    data[insert_pos:insert_pos] = segment
+    file_path.write_bytes(bytes(data))
+
+
+def _build_xmp_packet(payload: IPTCEmbeddingPayload) -> bytes:
+    keywords = _normalize_iptc_list(payload.keywords)
+    categories = _normalize_iptc_list(payload.supplemental_category)
+    title = payload.object_name.strip()
+    description = payload.caption_abstract.strip()
+
+    properties: list[str] = []
+
+    if title:
+        properties.append(
+            '<dc:title><rdf:Alt><rdf:li xml:lang="x-default">'
+            f'{xml_escape(title)}</rdf:li></rdf:Alt></dc:title>'
+        )
+        properties.append(
+            f'<photoshop:Headline>{xml_escape(title)}</photoshop:Headline>'
+        )
+
+    if description:
+        properties.append(
+            '<dc:description><rdf:Alt><rdf:li xml:lang="x-default">'
+            f'{xml_escape(description)}</rdf:li></rdf:Alt></dc:description>'
+        )
+
+    if keywords:
+        items = ''.join(
+            f'<rdf:li>{xml_escape(keyword)}</rdf:li>' for keyword in keywords
+        )
+        properties.append(
+            f'<dc:subject><rdf:Bag>{items}</rdf:Bag></dc:subject>'
+        )
+
+    if categories:
+        items = ''.join(
+            f'<rdf:li>{xml_escape(category)}</rdf:li>'
+            for category in categories
+        )
+        properties.append(
+            '<photoshop:SupplementalCategories><rdf:Bag>'
+            f'{items}</rdf:Bag></photoshop:SupplementalCategories>'
+        )
+
+    for tag, value in (
+        ('photoshop:City', payload.city),
+        ('photoshop:State', payload.province_state),
+        ('photoshop:Country', payload.country_name),
+        ('Iptc4xmpCore:Location', payload.sublocation),
+        ('photoshop:Instructions', payload.special_instructions),
+    ):
+        normalized = (value or '').strip()
+        if normalized:
+            name = tag.split(':')[1]
+            properties.append(
+                f'<{tag}>{xml_escape(normalized)}</{tag.split(":")[0]}:{name}>'
+            )
+
+    date_created = _normalize_xmp_date(payload.date_created)
+    if date_created:
+        properties.append(
+            f'<photoshop:DateCreated>{date_created}</photoshop:DateCreated>'
+        )
+
+    body = ''.join(properties)
+    packet = (
+        '<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>'
+        '<x:xmpmeta xmlns:x="adobe:ns:meta/">'
+        '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">'
+        '<rdf:Description rdf:about=""'
+        ' xmlns:dc="http://purl.org/dc/elements/1.1/"'
+        ' xmlns:photoshop="http://ns.adobe.com/photoshop/1.0/"'
+        ' xmlns:Iptc4xmpCore='
+        '"http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/">'
+        f'{body}'
+        '</rdf:Description></rdf:RDF></x:xmpmeta>'
+        '<?xpacket end="w"?>'
+    )
+
+    return packet.encode('utf-8')
+
+
+def _normalize_xmp_date(value: str | None) -> str | None:
+    """
+    XMP хранит дату в ISO-8601, в отличие от IPTC-формата YYYYMMDD.
+    """
+    normalized = _normalize_iptc_date(value)
+
+    if normalized is None:
+        return None
+
+    return f'{normalized[:4]}-{normalized[4:6]}-{normalized[6:]}'
 
 
 def resolve_iptc_location(file: ProcessingJobFile) -> IPTCLocation:

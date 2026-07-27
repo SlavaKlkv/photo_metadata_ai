@@ -288,11 +288,22 @@ def get_job_iptc_export_path(
 ) -> Path:
     """
     Возвращает путь к JPG/IPTC artifact в директории результатов задачи.
+
+    Имя берётся из оригинального, а не из внутреннего (с UUID-префиксом):
+    в папке результатов пользователь должен узнавать свои фотографии.
+    Дубликаты имён внутри задачи запрещены на загрузке, поэтому
+    коллизий здесь не возникает.
     """
     results_dir = get_runtime_directories().results_dir
     job_result_dir = resolve_path_in_base(results_dir, str(job.job_id))
-    safe_filename = Path(file.filename).name
-    return resolve_path_in_base(job_result_dir, safe_filename)
+    safe_filename = Path(file.original_filename or file.filename).name
+
+    try:
+        return resolve_path_in_base(job_result_dir, safe_filename)
+    except ValueError:
+        # оригинальное имя оказалось небезопасным — падать из-за этого
+        # незачем, внутреннее имя всегда валидно
+        return resolve_path_in_base(job_result_dir, Path(file.filename).name)
 
 
 def store_job_export(

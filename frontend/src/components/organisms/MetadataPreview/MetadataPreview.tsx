@@ -12,6 +12,7 @@ import styles from "./MetadataPreview.module.scss";
 import { SectionHeader } from "../../molecules/SectionHeader/SectionHeader";
 import { Input } from "../../atoms/Input/Input";
 import { getResultsPageForIndex } from "constants/pagination";
+import { getJobValidationGroup } from "utils/validationGroups";
 type ValidationMessage = {
   field: string;
   code: string;
@@ -446,6 +447,7 @@ export const MetadataPreview: React.FC = () => {
   const stockOptions = useAppStore((state) => state.stockOptions);
 
   const selectedJobId = useUIStore((state) => state.selectedJobId);
+  const validationFilter = useUIStore((state) => state.validationFilter);
   const setSelectedJobId = useUIStore((state) => state.setSelectedJobId);
   const setResultsPage = useUIStore((state) => state.setResultsPage);
   const currentJobId = useUIStore((state) => state.currentJobId);
@@ -473,10 +475,18 @@ export const MetadataPreview: React.FC = () => {
   }, [recentlyRegeneratedFileId]);
 
   // Выбор из превью двигает и таблицу: страница считается по позиции файла
-  // в общем списке jobs — там же, где его показывает ResultsTable.
+  // в том же списке, который показывает ResultsTable, — с учётом фильтра
+  // сводки. Если файл в текущий фильтр не попадает, страницу не трогаем:
+  // прокручивать таблицу некуда.
   const selectJob = (id: string) => {
     setSelectedJobId(id);
-    setResultsPage(getResultsPageForIndex(jobs.findIndex((j) => j.id === id)));
+
+    const tableJobs = validationFilter
+      ? jobs.filter((j) => getJobValidationGroup(j) === validationFilter)
+      : jobs;
+    const tableIndex = tableJobs.findIndex((j) => j.id === id);
+
+    if (tableIndex >= 0) setResultsPage(getResultsPageForIndex(tableIndex));
   };
 
   // выбираем первый completed job автоматически;

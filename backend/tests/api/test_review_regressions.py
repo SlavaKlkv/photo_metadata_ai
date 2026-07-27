@@ -535,6 +535,62 @@ def test_bulk_selection_updates_all_pages_and_export_uses_full_selection():
     assert csv_content.count('.jpg') == 5
 
 
+def test_bulk_selection_with_file_ids_touches_only_listed_files():
+    job = _build_completed_job(
+        files=[
+            _build_completed_file(
+                filename=f'image-{index:03}.jpg',
+                original_filename=f'image-{index:03}.jpg',
+                title=f'Image {index:03} title',
+            )
+            for index in range(1, 4)
+        ]
+    )
+
+    for file in job.files:
+        file.selected_for_export = False
+
+    kept_file = job.files[1]
+
+    with TestClient(app) as client:
+        response = client.patch(
+            f'/api/v1/jobs/{job.job_id}/files/selection',
+            json={
+                'selected_for_export': True,
+                'file_ids': [str(kept_file.file_id)],
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()['updated_count'] == 1
+    assert response.json()['total_items'] == 3
+    assert [file.selected_for_export for file in job.files] == [
+        False,
+        True,
+        False,
+    ]
+
+
+def test_bulk_selection_ignores_unknown_file_ids():
+    job = _build_completed_job()
+
+    for file in job.files:
+        file.selected_for_export = True
+
+    with TestClient(app) as client:
+        response = client.patch(
+            f'/api/v1/jobs/{job.job_id}/files/selection',
+            json={
+                'selected_for_export': False,
+                'file_ids': [str(uuid4())],
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()['updated_count'] == 0
+    assert all(file.selected_for_export for file in job.files)
+
+
 def test_regenerate_returns_not_found_for_missing_job_or_file():
     job = _build_completed_job()
 

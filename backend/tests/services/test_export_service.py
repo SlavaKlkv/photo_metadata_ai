@@ -51,6 +51,43 @@ def test_export_filename_and_paths_are_stock_aware():
     )
 
 
+def test_iptc_export_path_uses_original_filename_without_uuid_prefix():
+    job = _completed_job()
+    file = job.files[0]
+    # так файл лежит в uploads: внутреннее имя с UUID-префиксом
+    file.filename = f'{file.file_id}_seaside-sunset.jpg'
+    file.original_filename = 'seaside-sunset.jpg'
+
+    iptc_path = export_service.get_job_iptc_export_path(job, file)
+
+    assert iptc_path.name == 'seaside-sunset.jpg'
+    assert str(file.file_id) not in iptc_path.name
+
+
+def test_iptc_export_path_strips_directories_from_original_filename():
+    job = _completed_job()
+    file = job.files[0]
+    file.filename = 'safe-internal-name.jpg'
+    file.original_filename = '../../escape.jpg'
+
+    iptc_path = export_service.get_job_iptc_export_path(job, file)
+
+    # путь не уходит выше каталога задачи, каким бы ни было имя из upload
+    assert iptc_path.name == 'escape.jpg'
+    assert iptc_path.parent.name == str(job.job_id)
+
+
+def test_iptc_export_path_falls_back_to_internal_name_when_original_empty():
+    job = _completed_job()
+    file = job.files[0]
+    file.filename = 'safe-internal-name.jpg'
+    file.original_filename = ''
+
+    iptc_path = export_service.get_job_iptc_export_path(job, file)
+
+    assert iptc_path.name == 'safe-internal-name.jpg'
+
+
 def test_load_stored_export_returns_none_then_csv(monkeypatch):
     job = _completed_job()
     monkeypatch.setattr(
