@@ -10,8 +10,25 @@
 .nav {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+/* Один навигатор — общий (слева) или групповой (справа) */
+.navGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+/* Подпись отличает общий навигатор от группового */
+.navLabel {
+  font-size: var(--font-size-xs);
+  color: var(--text-placeholder);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .navBtn {
@@ -37,6 +54,13 @@
   cursor: pointer;
 
   &:hover { color: var(--text-primary); }
+}
+
+.navCountDisabled {
+  color: var(--text-placeholder);
+  cursor: default;
+
+  &:hover { color: var(--text-placeholder); }
 }
 
 .indexInput {
