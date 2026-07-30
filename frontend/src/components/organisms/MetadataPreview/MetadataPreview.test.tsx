@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ProcessingJob } from 'types';
 import { useAppStore } from 'store/useAppStore';
@@ -19,6 +19,7 @@ beforeEach(() => {
     selectedJobId: null,
     currentJobId: null,
     resultsPage: 1,
+    validationFilter: null,
   });
 });
 
@@ -47,8 +48,14 @@ const setJobs = (jobs: ProcessingJob[], selectedJobId: string | null) => {
 const makeJobs = (count: number) =>
   Array.from({ length: count }, (_, i) => makeJob(i + 1));
 
+const allNav = () =>
+  within(screen.getByRole('group', { name: 'All photos navigation' }));
+
+const groupNav = (label: string) =>
+  within(screen.getByRole('group', { name: `${label} group navigation` }));
+
 const clickNav = (label: '‹' | '›') =>
-  userEvent.click(screen.getByRole('button', { name: label }));
+  userEvent.click(allNav().getByRole('button', { name: label }));
 
 test('shows empty state without a selected completed photo', () => {
   render(<MetadataPreview />);
@@ -287,4 +294,183 @@ test('несохранённая правка не скрывает предуп
 
   expect(screen.getByText(WARNING_MESSAGE)).toBeInTheDocument();
   expect(screen.getByText(/Validation is outdated/)).toBeInTheDocument();
+});
+
+// --- Групповой навигатор ---
+
+// warnings → группа Recommendations, остальные файлы остаются в Ready
+const withWarning = (job: ProcessingJob): ProcessingJob =>
+  ({
+    ...job,
+    preview: {
+      ...job.preview!,
+      warnings: [
+        { field: 'title', code: 'recommended_words_not_met', message: 'Short' },
+      ],
+    },
+  }) as ProcessingJob;
+
+// Из 10 файлов в Recommendations попадают file-2, file-5, file-9
+const makeMixedJobs = () =>
+  makeJobs(10).map((job) =>
+    ['file-2', 'file-5', 'file-9'].includes(job.id) ? withWarning(job) : job,
+  );
+
+test('без фильтра групповой навигатор не рендерится', () => {
+  setJobs(makeJobs(5), 'file-1');
+  render(<MetadataPreview />);
+
+  expect(screen.getAllByRole('group')).toHaveLength(1);
+  expect(allNav().getByText('1 of 5')).toBeInTheDocument();
+});
+
+test('с активным фильтром рядом с общим появляется групповой навигатор', () => {
+  setJobs(makeMixedJobs(), 'file-5');
+  useUIStore.setState({ validationFilter: 'warnings' });
+  render(<MetadataPreview />);
+
+  // Нумерация общего навигатора не зависит от фильтра
+  expect(allNav().getByText('5 of 10')).toBeInTheDocument();
+  expect(allNav().getByText('All')).toBeInTheDocument();
+  expect(groupNav('Recommendations').getByText('2 of 3')).toBeInTheDocument();
+  expect(
+    groupNav('Recommendations').getByText('Recommendations'),
+  ).toBeInTheDocument();
+});
+
+test('групповые стрелки листают только по фото группы', async () => {
+  setJobs(makeMixedJobs(), 'file-2');
+  useUIStore.setState({ validationFilter: 'warnings' });
+  render(<MetadataPreview />);
+
+  await userEvent.click(
+    groupNav('Recommendations').getByRole('button', { name: '›' }),
+  );
+  expect(useUIStore.getState().selectedJobId).toBe('file-5');
+
+  await userEvent.click(
+    groupNav('Recommendations').getByRole('button', { name: '‹' }),
+  );
+  expect(useUIStore.getState().selectedJobId).toBe('file-2');
+
+  // назад с первого — на последнее фото группы
+  await userEvent.click(
+    groupNav('Recommendations').getByRole('button', { name: '‹' }),
+  );
+  expect(useUIStore.getState().selectedJobId).toBe('file-9');
+});
+
+test('групповой переход обновляет счётчик общего навигатора', async () => {
+  setJobs(makeMixedJobs(), 'file-2');
+  useUIStore.setState({ validationFilter: 'warnings' });
+  render(<MetadataPreview />);
+
+  await userEvent.click(
+    groupNav('Recommendations').getByRole('button', { name: '›' }),
+  );
+
+  expect(allNav().getByText('5 of 10')).toBeInTheDocument();
+  expect(groupNav('Recommendations').getByText('2 of 3')).toBeInTheDocument();
+});
+
+test('общий переход к фото группы обновляет групповой счётчик', async () => {
+  setJobs(makeMixedJobs(), 'file-4');
+  useUIStore.setState({ validationFilter: 'warnings' });
+  render(<MetadataPreview />);
+
+  // file-4 вне группы — счётчик группы без номера
+  expect(groupNav('Recommendations').getByText('— of 3')).toBeInTheDocument();
+
+  await clickNav('›');
+
+  expect(useUIStore.getState().selectedJobId).toBe('file-5');
+  expect(groupNav('Recommendations').getByText('2 of 3')).toBeInTheDocument();
+});
+
+test('фото вне группы: вперёд ведёт к первому фото группы, назад — к последнему', async () => {
+  setJobs(makeMixedJobs(), 'file-4');
+  useUIStore.setState({ validationFilter: 'warnings' });
+  render(<MetadataPreview />);
+
+  await userEvent.click(
+    groupNav('Recommendations').getByRole('button', { name: '›' }),
+  );
+  expect(useUIStore.getState().selectedJobId).toBe('file-2');
+
+  act(() => {
+    useUIStore.setState({ selectedJobId: 'file-4' });
+  });
+  await userEvent.click(
+    groupNav('Recommendations').getByRole('button', { name: '‹' }),
+  );
+  expect(useUIStore.getState().selectedJobId).toBe('file-9');
+});
+
+test('группа из одного фото: стрелки оставляют выбор на нём', async () => {
+  const jobs = makeJobs(5).map((job) =>
+    job.id === 'file-3' ? withWarning(job) : job,
+  );
+  setJobs(jobs, 'file-3');
+  useUIStore.setState({ validationFilter: 'warnings' });
+  render(<MetadataPreview />);
+
+  expect(groupNav('Recommendations').getByText('1 of 1')).toBeInTheDocument();
+
+  await userEvent.click(
+    groupNav('Recommendations').getByRole('button', { name: '›' }),
+  );
+  expect(useUIStore.getState().selectedJobId).toBe('file-3');
+});
+
+test('пустая группа: групповые стрелки задизейблены, счётчик «— of 0»', () => {
+  setJobs(makeJobs(5), 'file-1');
+  useUIStore.setState({ validationFilter: 'errors' });
+  render(<MetadataPreview />);
+
+  const nav = groupNav('Required fields missing');
+  expect(nav.getByText('— of 0')).toBeInTheDocument();
+  expect(nav.getByRole('button', { name: '›' })).toBeDisabled();
+  expect(nav.getByRole('button', { name: '‹' })).toBeDisabled();
+});
+
+test('переход по номеру внутри группы выбирает фото этой группы', async () => {
+  setJobs(makeMixedJobs(), 'file-2');
+  useUIStore.setState({ validationFilter: 'warnings' });
+  render(<MetadataPreview />);
+
+  await userEvent.click(groupNav('Recommendations').getByText('1 of 3'));
+  const input = groupNav('Recommendations').getByDisplayValue('1');
+  await userEvent.clear(input);
+  await userEvent.type(input, '3{Enter}');
+
+  expect(useUIStore.getState().selectedJobId).toBe('file-9');
+  expect(useUIStore.getState().resultsPage).toBe(getResultsPageForIndex(2));
+});
+
+test('смена фильтра во время открытого превью пересчитывает групповой навигатор', async () => {
+  setJobs(makeMixedJobs(), 'file-2');
+  useUIStore.setState({ validationFilter: 'warnings' });
+  render(<MetadataPreview />);
+
+  expect(groupNav('Recommendations').getByText('1 of 3')).toBeInTheDocument();
+
+  act(() => {
+    useUIStore.setState({ validationFilter: 'ready' });
+  });
+
+  // file-2 в Ready не входит: номера нет, размер группы — 7
+  expect(groupNav('Ready').getByText('— of 7')).toBeInTheDocument();
+  expect(useUIStore.getState().selectedJobId).toBe('file-2');
+});
+
+test('во время regenerate обе группы стрелок задизейблены', () => {
+  setJobs(makeMixedJobs(), 'file-2');
+  useUIStore.setState({ validationFilter: 'warnings' });
+  useAppStore.setState({ regeneratingFileId: 'file-2' });
+  render(<MetadataPreview />);
+
+  expect(allNav().getByRole('button', { name: '›' })).toBeDisabled();
+  expect(
+    groupNav('Recommendations').getByRole('button', { name: '›' }),
+  ).toBeDisabled();
 });

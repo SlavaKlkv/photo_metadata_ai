@@ -12,7 +12,10 @@ import styles from "./MetadataPreview.module.scss";
 import { SectionHeader } from "../../molecules/SectionHeader/SectionHeader";
 import { Input } from "../../atoms/Input/Input";
 import { getResultsPageForIndex } from "constants/pagination";
-import { getJobValidationGroup } from "utils/validationGroups";
+import {
+  VALIDATION_GROUP_LABELS,
+  getJobValidationGroup,
+} from "utils/validationGroups";
 type ValidationMessage = {
   field: string;
   code: string;
@@ -458,8 +461,17 @@ export const MetadataPreview: React.FC = () => {
   const currentIndex = doneJobs.findIndex((j) => j.id === selectedJobId);
   const job = doneJobs.find((j) => j.id === selectedJobId);
 
+  // Групповая навигация листает только фото активного быстрого фильтра
+  // Results. Без фильтра (All) группа совпадает со всем набором — второй
+  // навигатор не нужен и не рендерится.
+  const groupJobs = validationFilter
+    ? doneJobs.filter((j) => getJobValidationGroup(j) === validationFilter)
+    : [];
+  const groupIndex = groupJobs.findIndex((j) => j.id === selectedJobId);
+
   // навигация — ввод номера вручную
   const [indexInput, setIndexInput] = useState<string | null>(null);
+  const [groupIndexInput, setGroupIndexInput] = useState<string | null>(null);
   const [recentlyRegeneratedFileId, setRecentlyRegeneratedFileId] = useState<
     string | null
   >(null);
@@ -519,6 +531,38 @@ export const MetadataPreview: React.FC = () => {
       setIndexInput(null);
     }
     if (e.key === "Escape") setIndexInput(null);
+  };
+
+  // Смена фильтра меняет содержимое группы, поэтому начатый ввод номера
+  // в группе теряет смысл.
+  useEffect(() => {
+    setGroupIndexInput(null);
+  }, [validationFilter]);
+
+  // Если текущее фото не входит в группу, счётчик показывает «— of N»,
+  // а стрелки ведут к первому/последнему фото группы.
+  const handleGroupNavigate = (direction: "prev" | "next") => {
+    const total = groupJobs.length;
+    if (total === 0) return;
+
+    if (groupIndex < 0) {
+      selectJob(groupJobs[direction === "prev" ? total - 1 : 0].id);
+      return;
+    }
+
+    const step = direction === "prev" ? -1 : 1;
+    selectJob(groupJobs[(groupIndex + step + total) % total].id);
+  };
+
+  const handleGroupIndexSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && groupIndexInput !== null) {
+      const num = parseInt(groupIndexInput, 10);
+      if (!isNaN(num) && num >= 1 && num <= groupJobs.length) {
+        selectJob(groupJobs[num - 1].id);
+      }
+      setGroupIndexInput(null);
+    }
+    if (e.key === "Escape") setGroupIndexInput(null);
   };
 
   // Regenerate использует lockedBatchSettings — оригинальные настройки batch,
@@ -600,40 +644,107 @@ export const MetadataPreview: React.FC = () => {
         subtitle="Review and edit AI-generated metadata before export."
       />
 
-      {/* Навигация */}
+      {/* Навигация: слева — по всем фото, справа — по фото активной группы */}
       <div className={styles.nav}>
-        <button
-          className={styles.navBtn}
-          onClick={() => handleNavigate("prev")}
-          disabled={isRegenerating}
+        <div
+          className={styles.navGroup}
+          role="group"
+          aria-label="All photos navigation"
         >
-          ‹
-        </button>
-        {indexInput !== null ? (
-          <input
-            autoFocus
-            className={styles.indexInput}
-            value={indexInput}
-            onChange={(e) => setIndexInput(e.target.value)}
-            onKeyDown={handleIndexSubmit}
-            onBlur={() => setIndexInput(null)}
-          />
-        ) : (
-          <span
-            className={styles.navCount}
-            onClick={() => setIndexInput(String(displayIndex))}
-            title="Click to jump to file"
+          <span className={styles.navLabel}>All</span>
+          <button
+            className={styles.navBtn}
+            onClick={() => handleNavigate("prev")}
+            disabled={isRegenerating}
+            title="Previous photo"
           >
-            {displayIndex} of {doneJobs.length}
-          </span>
+            ‹
+          </button>
+          {indexInput !== null ? (
+            <input
+              autoFocus
+              className={styles.indexInput}
+              value={indexInput}
+              onChange={(e) => setIndexInput(e.target.value)}
+              onKeyDown={handleIndexSubmit}
+              onBlur={() => setIndexInput(null)}
+            />
+          ) : (
+            <span
+              className={styles.navCount}
+              onClick={() => setIndexInput(String(displayIndex))}
+              title="Click to jump to file"
+            >
+              {displayIndex} of {doneJobs.length}
+            </span>
+          )}
+          <button
+            className={styles.navBtn}
+            onClick={() => handleNavigate("next")}
+            disabled={isRegenerating}
+            title="Next photo"
+          >
+            ›
+          </button>
+        </div>
+
+        {validationFilter && (
+          <div
+            className={styles.navGroup}
+            role="group"
+            aria-label={`${VALIDATION_GROUP_LABELS[validationFilter]} group navigation`}
+          >
+            <span
+              className={styles.navLabel}
+              title={`Group: ${VALIDATION_GROUP_LABELS[validationFilter]}`}
+            >
+              {VALIDATION_GROUP_LABELS[validationFilter]}
+            </span>
+            <button
+              className={styles.navBtn}
+              onClick={() => handleGroupNavigate("prev")}
+              disabled={isRegenerating || groupJobs.length === 0}
+              title="Previous photo in this group"
+            >
+              ‹
+            </button>
+            {groupIndexInput !== null ? (
+              <input
+                autoFocus
+                className={styles.indexInput}
+                value={groupIndexInput}
+                onChange={(e) => setGroupIndexInput(e.target.value)}
+                onKeyDown={handleGroupIndexSubmit}
+                onBlur={() => setGroupIndexInput(null)}
+              />
+            ) : (
+              <span
+                className={`${styles.navCount} ${
+                  groupJobs.length === 0 ? styles.navCountDisabled : ""
+                }`}
+                onClick={() => {
+                  if (groupJobs.length === 0) return;
+                  setGroupIndexInput(groupIndex >= 0 ? String(groupIndex + 1) : "");
+                }}
+                title={
+                  groupIndex >= 0
+                    ? "Click to jump to file in this group"
+                    : "Current photo is outside this group"
+                }
+              >
+                {groupIndex >= 0 ? groupIndex + 1 : "—"} of {groupJobs.length}
+              </span>
+            )}
+            <button
+              className={styles.navBtn}
+              onClick={() => handleGroupNavigate("next")}
+              disabled={isRegenerating || groupJobs.length === 0}
+              title="Next photo in this group"
+            >
+              ›
+            </button>
+          </div>
         )}
-        <button
-          className={styles.navBtn}
-          onClick={() => handleNavigate("next")}
-          disabled={isRegenerating}
-        >
-          ›
-        </button>
       </div>
 
       <div className={styles.scrollableContent}>
