@@ -102,3 +102,10 @@
     cursor: default;
   }
 }
+
+// Повтор упавших файлов — действие по группе ошибок, поэтому цвет ошибки,
+// а не акцентный: визуально связывает кнопку с чипом «Processing errors».
+.retryAction {
+  composes: exportAction;
+  color: var(--error-color);
+}

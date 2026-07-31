@@ -16,7 +16,9 @@ interface ValidationSummaryProps {
   // готовые + с рекомендациями: всё, что вообще можно экспортировать
   exportableCount: number;
   isApplyingSelection?: boolean;
+  isRetryingFailed?: boolean;
   onSelectGroup: (group: ValidationGroup | null) => void;
+  onRetryFailed: () => void;
   onExportReadyOnly: () => void;
   onExportWithoutErrors: () => void;
 }
@@ -28,7 +30,9 @@ export const ValidationSummary: React.FC<ValidationSummaryProps> = ({
   readyCount,
   exportableCount,
   isApplyingSelection = false,
+  isRetryingFailed = false,
   onSelectGroup,
+  onRetryFailed,
   onExportReadyOnly,
   onExportWithoutErrors,
 }) => {
@@ -76,6 +80,22 @@ export const ValidationSummary: React.FC<ValidationSummaryProps> = ({
       </div>
 
       <div className={styles.actions}>
+        {/* Повтор упавших файлов: перезапускает разом все failed файлы
+            задачи, а не выбранные, — поэтому счётчик в подписи. */}
+        {counts.failed > 0 && (
+          <button
+            type="button"
+            className={styles.retryAction}
+            disabled={isRetryingFailed}
+            title="Process every file that failed again, without re-running the whole batch"
+            onClick={onRetryFailed}
+          >
+            {isRetryingFailed
+              ? 'Retrying...'
+              : `Retry failed (${counts.failed})`}
+          </button>
+        )}
+
         {showExportWithoutErrors && (
           <button
             type="button"
