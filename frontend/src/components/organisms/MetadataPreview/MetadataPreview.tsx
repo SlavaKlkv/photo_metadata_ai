@@ -4,7 +4,12 @@ import { useAppStore } from "store/useAppStore";
 import { useUIStore } from "store/useUIStore";
 import { useToastStore } from "store/useToastStore";
 import { jobsApi } from "services/api/api";
-import { PreviewFieldValue, StockOptions, StockPlatform } from "types";
+import {
+  PreviewFieldValue,
+  ProcessingJob,
+  StockOptions,
+  StockPlatform,
+} from "types";
 import { Button } from "../../atoms/Button/Button";
 import { Icon } from "../../atoms/Icon/Icon";
 import { Panel } from "../../atoms/Panel/Panel";
@@ -34,6 +39,19 @@ const BOOLEAN_METADATA_FIELDS = new Set([
 
 const PHOTO_VALIDATION_FIELDS = new Set(["image", "photo", "file"]);
 
+// Источник поля — персистентный признак с бэкенда: пережившая ремоунт
+// подсветка ручной правки строится по нему, а не по локальному состоянию.
+const getFieldSource = (
+  job: ProcessingJob,
+  fieldKey: string,
+): "generated" | "edited" | undefined => {
+  const source = job.field_sources?.[fieldKey];
+
+  if (source) return source;
+
+  return job.edited_fields?.includes(fieldKey) ? "edited" : undefined;
+};
+
 const getValidationDisplayField = (field: string) => {
   if (field === "model_release_available") return "releases";
 
@@ -54,6 +72,7 @@ interface MetadataFieldProps {
   isRegenerating?: boolean;
   wasRegenerated?: boolean;
   fixedOptions?: string[];
+  fieldSource?: "generated" | "edited";
 }
 
 const MetadataField: React.FC<MetadataFieldProps> = ({
@@ -69,6 +88,7 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
   isRegenerating = false,
   wasRegenerated = false,
   fixedOptions = [],
+  fieldSource,
 }) => {
   const stringValue = getPreviewFieldStringValue(value);
   const [editValue, setEditValue] = useState(stringValue);
@@ -88,6 +108,10 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
   const addToast = useToastStore((state) => state.addToast);
   const applyMetadataResult = useAppStore(
     (state) => state.applyMetadataResult,
+  );
+  const markFieldEdited = useAppStore((state) => state.markFieldEdited);
+  const wasEditedLocally = useAppStore(
+    (state) => state.locallyEditedFields[jobId]?.includes(fieldKey) ?? false,
   );
   const isBoolean =
     typeof value === "boolean" || BOOLEAN_METADATA_FIELDS.has(fieldKey);
@@ -136,7 +160,12 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
 
   const counterExceeded =
     counterConfig !== null && counterConfig.count > counterConfig.limit;
-  const isEdited =
+  // Источник поля приходит с бэкенда и переживает любой ремоунт компонента
+  // (регенерация другого файла, смена страницы, переключение файлов).
+  // Локальная правка дублируется в стор — там она тоже переживает ремоунт,
+  // поэтому подсветка держится и до ответа сервера.
+  const isEditedBySource = fieldSource === "edited";
+  const isLocallyEdited =
     hasUserChanged &&
     !isPreviewFieldValueEqual(
       normalizePreviewFieldValue(
@@ -144,6 +173,18 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
       ),
       normalizePreviewFieldValue(baselineValueRef.current),
     );
+  const isEdited = isEditedBySource || isLocallyEdited || wasEditedLocally;
+
+  // Локальный признак живёт в сторе по паре файл+поле: локальный стейт
+  // компонента исчезает при ремоунте, стор — нет. Пишем обе стороны, чтобы
+  // возврат значения к исходному снимал подсветку, но только когда поле
+  // трогали: на ремоунте (переключение файла) писать нечего, иначе чужой
+  // ремоунт стёр бы уже отмеченную правку.
+  useEffect(() => {
+    if (!hasUserChanged && !isLocallyEdited) return;
+
+    markFieldEdited(jobId, fieldKey, isLocallyEdited);
+  }, [hasUserChanged, isLocallyEdited, jobId, fieldKey, markFieldEdited]);
 
   useEffect(() => {
     setEditValue(stringValue);
@@ -157,6 +198,28 @@ const MetadataField: React.FC<MetadataFieldProps> = ({
     );
     setHasUserChanged(false);
   }, [jobId, fieldKey]);
+
+  // Перегенерация возвращает источник в generated — снимаем и локальный
+  // признак, иначе подсветка висела бы поверх заново сгенерированного значения.
+  const previousStringValueRef = useRef(stringValue);
+
+  useEffect(() => {
+    const hasNewValue = previousStringValueRef.current !== stringValue;
+    previousStringValueRef.current = stringValue;
+
+    // Только пришедшее заново сгенерированное значение снимает признак
+    // правки. Первый рендер не считается: ремоунт поля (переключение файла,
+    // смена страницы) не должен стирать локальную правку.
+    if (!hasNewValue || fieldSource !== "generated") return;
+
+    baselineValueRef.current = getMetadataSaveValue(
+      fieldKey,
+      stringValue,
+      value,
+    );
+    setHasUserChanged(false);
+    markFieldEdited(jobId, fieldKey, false);
+  }, [fieldSource, stringValue]);
 
   const handleSave = async (nextEditValue = editValue) => {
     if (!currentJobId || isRegenerating) return;
@@ -806,6 +869,7 @@ export const MetadataPreview: React.FC = () => {
                 isRegenerating={isRegenerating}
                 wasRegenerated={wasRegenerated}
                 fixedOptions={getFixedFieldOptions(field.key, stockOptions)}
+                fieldSource={getFieldSource(job, field.key)}
               />
             );
           })}
@@ -837,6 +901,7 @@ export const MetadataPreview: React.FC = () => {
                 isRegenerating={isRegenerating}
                 wasRegenerated={wasRegenerated}
                 fixedOptions={getFixedFieldOptions(field.key, stockOptions)}
+                fieldSource={getFieldSource(job, field.key)}
               />
             );
           })}
