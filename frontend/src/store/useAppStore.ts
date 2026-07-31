@@ -48,6 +48,11 @@ export interface AppState {
   stockOptions: StockOptions | null;
   updateInfo: DesktopUpdateCheckResponse | null;
   isUpdateBannerVisible: boolean;
+  // локально отредактированные поля по файлам: fileId -> [fieldKey].
+  // Живёт в сторе, а не в MetadataField, чтобы подсветка переживала ремоунт
+  // поля (переключение файлов, смена страницы, регенерация другого файла)
+  // независимо от того, доехал ли уже признак edited с бэкенда.
+  locallyEditedFields: Record<string, string[]>;
 
   setStockOptions: (options: StockOptions) => void;
   checkForUpdates: () => Promise<void>;
@@ -55,6 +60,18 @@ export interface AppState {
 
   // обновить preview конкретного файла после смены стока
   updateJobPreview: (fileId: string, preview: FilePreview) => void;
+  // пометить/снять локальную правку поля
+  markFieldEdited: (
+    fileId: string,
+    fieldKey: string,
+    isEdited: boolean,
+  ) => void;
+  // источники полей (generated/edited) — персистентная основа подсветки правок
+  applyFieldSources: (
+    fileId: string,
+    fieldSources: ProcessingJob["field_sources"],
+    editedFields?: string[],
+  ) => void;
   applyMetadataResult: (
     fileId: string,
     result: {
@@ -84,7 +101,10 @@ export interface AppState {
     error?: string,
     updates?: Pick<
       ProcessingJob,
-      "effective_ai_provider" | "effective_ai_model"
+      | "effective_ai_provider"
+      | "effective_ai_model"
+      | "field_sources"
+      | "edited_fields"
     >,
   ) => void;
   updateMetadata: (jobId: string, metadata: ProcessingJob["metadata"]) => void;
@@ -153,6 +173,7 @@ export interface AppState {
 export const useAppStore = create<AppState>()(
   devtools((set, get) => ({
     jobs: [],
+    locallyEditedFields: {},
     sessionSettings: defaultSessionSettings,
     availableProviders: [],
     providerDiscoveryStatus: "idle",
@@ -426,6 +447,7 @@ export const useAppStore = create<AppState>()(
         draftBatchSettings: defaultBatchSettings,
         lockedBatchSettings: null,
         jobs: [],
+        locallyEditedFields: {},
         isProcessing: false,
         previews: {},
         regeneratingFileId: null,
@@ -489,6 +511,7 @@ export const useAppStore = create<AppState>()(
     clearAll: () => {
       set({
         jobs: [],
+        locallyEditedFields: {},
         isProcessing: false,
         previews: {},
       });
@@ -697,6 +720,40 @@ export const useAppStore = create<AppState>()(
       }));
     },
 
+    markFieldEdited: (fileId, fieldKey, isEdited) => {
+      set((state) => {
+        const current = state.locallyEditedFields[fileId] ?? [];
+        const alreadyMarked = current.includes(fieldKey);
+
+        if (isEdited === alreadyMarked) return state;
+
+        const next = isEdited
+          ? [...current, fieldKey]
+          : current.filter((key) => key !== fieldKey);
+
+        return {
+          locallyEditedFields: {
+            ...state.locallyEditedFields,
+            [fileId]: next,
+          },
+        };
+      });
+    },
+
+    applyFieldSources: (fileId, fieldSources, editedFields) => {
+      set((state) => ({
+        jobs: state.jobs.map((job) =>
+          job.id === fileId
+            ? {
+                ...job,
+                field_sources: fieldSources,
+                edited_fields: editedFields ?? job.edited_fields,
+              }
+            : job,
+        ),
+      }));
+    },
+
     applyMetadataResult: (fileId, result) => {
       set((state) => ({
         jobs: state.jobs.map((job) => {
@@ -734,8 +791,12 @@ export const useAppStore = create<AppState>()(
     // меняет stock preview без новой AI генерации —
     // GET results?stock_platform + GET stock-options
     switchStockPlatform: async (stockPlatform, jobId) => {
-      const { setStockOptions, updateJobPreview, updateDraftBatchSetting } =
-        get();
+      const {
+        setStockOptions,
+        updateJobPreview,
+        updateDraftBatchSetting,
+        applyFieldSources,
+      } = get();
 
       // обновляем draft чтобы UI отразил новый выбор
       updateDraftBatchSetting("stockPlatform", stockPlatform);
@@ -754,6 +815,16 @@ export const useAppStore = create<AppState>()(
         results.forEach((file: any) => {
           if (file.preview) {
             updateJobPreview(file.file_id, file.preview);
+          }
+
+          // источники полей нужны превью, чтобы подсветка ручных правок
+          // пережила смену стока
+          if (file.field_sources) {
+            applyFieldSources(
+              file.file_id,
+              file.field_sources,
+              file.edited_fields,
+            );
           }
         });
 

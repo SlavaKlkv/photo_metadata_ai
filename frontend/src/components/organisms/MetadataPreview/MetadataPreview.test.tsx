@@ -9,6 +9,7 @@ import { MetadataPreview } from './MetadataPreview';
 beforeEach(() => {
   useAppStore.setState({
     jobs: [],
+    locallyEditedFields: {},
     previews: {},
     stockOptions: null,
     lockedBatchSettings: null,
@@ -473,4 +474,168 @@ test('во время regenerate обе группы стрелок задизе
   expect(
     groupNav('Recommendations').getByRole('button', { name: '›' }),
   ).toBeDisabled();
+});
+
+const makeJobWithFieldSources = (
+  index: number,
+  fieldSources: ProcessingJob['field_sources'],
+) =>
+  ({
+    ...makeJob(index),
+    field_sources: fieldSources,
+  }) as ProcessingJob;
+
+test('подсветка отредактированного поля переживает регенерацию другого файла', async () => {
+  setJobs(
+    [
+      makeJobWithFieldSources(1, { title: 'edited' }),
+      makeJobWithFieldSources(2, { title: 'generated' }),
+    ],
+    'file-1',
+  );
+  render(<MetadataPreview />);
+
+  expect(screen.getByText('Title')).toHaveClass('fieldEdited');
+
+  // регенерация другого файла перерисовывает список и ремоунтит поля
+  act(() => {
+    useAppStore.setState({
+      jobs: [
+        makeJobWithFieldSources(1, { title: 'edited' }),
+        makeJobWithFieldSources(2, { title: 'generated' }),
+      ],
+    });
+  });
+
+  expect(screen.getByText('Title')).toHaveClass('fieldEdited');
+});
+
+test('поле без ручной правки не подсвечивается', () => {
+  setJobs([makeJobWithFieldSources(1, { title: 'generated' })], 'file-1');
+  render(<MetadataPreview />);
+
+  expect(screen.getByText('Title')).not.toHaveClass('fieldEdited');
+});
+
+test('перегенерированное поле теряет подсветку правки', () => {
+  setJobs([makeJobWithFieldSources(1, { title: 'edited' })], 'file-1');
+  const { rerender } = render(<MetadataPreview />);
+
+  expect(screen.getByText('Title')).toHaveClass('fieldEdited');
+
+  act(() => {
+    const regenerated = makeJobWithFieldSources(1, { title: 'generated' });
+    regenerated.preview!.common_fields[0].value = 'Regenerated title';
+    useAppStore.setState({ jobs: [regenerated] });
+  });
+  rerender(<MetadataPreview />);
+
+  expect(screen.getByText('Title')).not.toHaveClass('fieldEdited');
+});
+
+test('подсветка появляется сразу после ручной правки, до ответа сервера', async () => {
+  setJobs([makeJobWithFieldSources(1, { title: 'generated' })], 'file-1');
+  useUIStore.setState({ currentJobId: 'job-1' });
+  render(<MetadataPreview />);
+
+  await userEvent.type(screen.getByDisplayValue('Title 1'), '!');
+
+  expect(screen.getByText('Title')).toHaveClass('fieldEdited');
+});
+
+test('правка одними пробелами не подсвечивает поле', async () => {
+  setJobs([makeJobWithFieldSources(1, { title: 'generated' })], 'file-1');
+  useUIStore.setState({ currentJobId: 'job-1' });
+  render(<MetadataPreview />);
+
+  await userEvent.type(screen.getByDisplayValue('Title 1'), '   ');
+
+  expect(screen.getByText('Title')).not.toHaveClass('fieldEdited');
+});
+
+jest.mock('services/api/api', () => ({
+  jobsApi: {
+    updateMetadata: jest.fn(),
+  },
+}));
+
+const { jobsApi } = jest.requireMock('services/api/api');
+
+test('подсветка сохранённой правки переживает переключение файлов', async () => {
+  jobsApi.updateMetadata.mockResolvedValue({
+    data: {
+      file_id: 'file-1',
+      title: 'Title 1!',
+      field_sources: { title: 'edited' },
+      edited_fields: ['title'],
+      preview: {
+        stock_platform: 'getty_images',
+        common_fields: [
+          { key: 'title', label: 'Title', value: 'Title 1!' },
+        ],
+        stock_specific: { title: 'Getty Images', fields: [] },
+        errors: [],
+        warnings: [],
+      },
+    },
+  });
+
+  setJobs([makeJob(1), makeJob(2)], 'file-1');
+  useUIStore.setState({ currentJobId: 'job-1' });
+  render(<MetadataPreview />);
+
+  const input = screen.getByDisplayValue('Title 1');
+  await userEvent.type(input, '!');
+  await userEvent.tab();
+
+  await waitFor(() => {
+    expect(useAppStore.getState().jobs[0].field_sources).toEqual({
+      title: 'edited',
+    });
+  });
+  expect(screen.getByText('Title')).toHaveClass('fieldEdited');
+
+  await clickNav('›');
+  expect(screen.getByText('Title')).not.toHaveClass('fieldEdited');
+
+  await clickNav('‹');
+  expect(screen.getByText('Title')).toHaveClass('fieldEdited');
+});
+
+test('локальная правка держит подсветку при переключении файлов без ответа сервера', async () => {
+  // сервер признак edited не вернул — подсветка должна держаться на локальном
+  jobsApi.updateMetadata.mockResolvedValue({ data: {} });
+
+  setJobs([makeJob(1), makeJob(2)], 'file-1');
+  useUIStore.setState({ currentJobId: 'job-1' });
+  render(<MetadataPreview />);
+
+  await userEvent.type(screen.getByDisplayValue('Title 1'), '!');
+  expect(screen.getByText('Title')).toHaveClass('fieldEdited');
+
+  await clickNav('›');
+  expect(screen.getByText('Title')).not.toHaveClass('fieldEdited');
+
+  await clickNav('‹');
+  expect(screen.getByText('Title')).toHaveClass('fieldEdited');
+});
+
+test('возврат значения к исходному снимает подсветку и не возвращает её при переключении', async () => {
+  jobsApi.updateMetadata.mockResolvedValue({ data: {} });
+
+  setJobs([makeJob(1), makeJob(2)], 'file-1');
+  useUIStore.setState({ currentJobId: 'job-1' });
+  render(<MetadataPreview />);
+
+  const input = screen.getByDisplayValue('Title 1');
+  await userEvent.type(input, '!');
+  expect(screen.getByText('Title')).toHaveClass('fieldEdited');
+
+  // вернули как было — правки больше нет
+  await userEvent.type(input, '{backspace}');
+  expect(screen.getByText('Title')).not.toHaveClass('fieldEdited');
+
+  await clickNav('›');
+  await clickNav('‹');
+  expect(screen.getByText('Title')).not.toHaveClass('fieldEdited');
 });

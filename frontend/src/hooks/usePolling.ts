@@ -111,6 +111,9 @@ export const usePolling = (jobId: string | null) => {
               updateJobStatus(file.file_id, status, file.error_message, {
                 effective_ai_provider: file.effective_ai_provider,
                 effective_ai_model: file.effective_ai_model,
+                // источники полей нужны превью для подсветки ручных правок
+                field_sources: file.field_sources,
+                edited_fields: file.edited_fields,
               });
 
               if (status !== "done") {
