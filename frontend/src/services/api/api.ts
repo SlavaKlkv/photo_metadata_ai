@@ -114,6 +114,10 @@ export const jobsApi = {
       settings,
     ),
 
+  // повторная обработка только упавших файлов задачи
+  retryFailed: (jobId: string) =>
+    apiClient.post(`/api/v1/jobs/${jobId}/retry-failed`),
+
   providerDiscovery: () => apiClient.get("/api/v1/desktop/providers/discovery"),
   validateAndSaveProviderApiKey: (provider: AIProvider, apiKey: string) =>
     apiClient.post<AIProviderApiKeyValidationResponse>(

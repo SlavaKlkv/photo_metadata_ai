@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAppStore } from 'store/useAppStore';
 import { useUIStore } from 'store/useUIStore';
+import { useToastStore } from 'store/useToastStore';
 import { jobsApi } from 'services/api/api';
 import { ResultRow } from 'components/molecules/ResultRow/ResultRow';
 import { Checkbox } from 'components/atoms/Checkbox/Checkbox';
@@ -18,6 +19,19 @@ import {
   getJobValidationGroup,
 } from 'utils/validationGroups';
 
+// Коды ошибок ручки повтора: 404 — задача пропала, 409 — обработка уже идёт,
+// 400 — упавших файлов не осталось (список мог обновиться в другом окне).
+const resolveRetryFailedErrorMessage = (error: unknown): string => {
+  const status = (error as { response?: { status?: number } })?.response
+    ?.status;
+
+  if (status === 404) return 'Job not found — reload the results';
+  if (status === 409) return 'Processing is already running';
+  if (status === 400) return 'No failed files to retry';
+
+  return 'Failed to restart failed files';
+};
+
 export const ResultsTable: React.FC = () => {
   const jobs = useAppStore((state) => state.jobs);
   const updateJobSelection = useAppStore((state) => state.updateJobSelection);
@@ -30,7 +44,12 @@ export const ResultsTable: React.FC = () => {
   const currentJobId = useUIStore((state) => state.currentJobId);
   const validationFilter = useUIStore((state) => state.validationFilter);
   const setValidationFilter = useUIStore((state) => state.setValidationFilter);
+  const setIsProcessing = useUIStore((state) => state.setIsProcessing);
+  const setIsPollingActive = useUIStore((state) => state.setIsPollingActive);
+  const openProgressModal = useUIStore((state) => state.openProgressModal);
+  const addToast = useToastStore((state) => state.addToast);
   const [isApplyingSelection, setIsApplyingSelection] = useState(false);
+  const [isRetryingFailed, setIsRetryingFailed] = useState(false);
   const groupCounts = countValidationGroups(jobs);
   const readyJobs = getJobsInValidationGroup(jobs, 'ready');
   // экспортировать можно всё, где нет ошибок валидации:
@@ -130,6 +149,27 @@ export const ResultsTable: React.FC = () => {
   // Всё, что валидно для стока: рекомендации экспорту не мешают.
   const handleExportWithoutErrors = () => selectOnlyForExport(exportableJobs);
 
+  // Ручка перезапускает разом все упавшие файлы задачи, поэтому подтверждать
+  // выбор не нужно: пользователю показываем счётчик и переводим UI в
+  // обработку тем же путём, что и обычный старт батча.
+  const handleRetryFailed = async () => {
+    if (!currentJobId || isRetryingFailed) return;
+
+    setIsRetryingFailed(true);
+
+    try {
+      setIsProcessing(true);
+      await jobsApi.retryFailed(currentJobId);
+      setIsPollingActive(true);
+      openProgressModal();
+    } catch (error) {
+      setIsProcessing(false);
+      addToast(resolveRetryFailedErrorMessage(error), 'error');
+    } finally {
+      setIsRetryingFailed(false);
+    }
+  };
+
   const handleCheck = async (id: string, checked: boolean) => {
     if (!currentJobId) return;
 
@@ -166,7 +206,9 @@ export const ResultsTable: React.FC = () => {
         readyCount={readyJobs.length}
         exportableCount={exportableJobs.length}
         isApplyingSelection={isApplyingSelection}
+        isRetryingFailed={isRetryingFailed}
         onSelectGroup={setValidationFilter}
+        onRetryFailed={handleRetryFailed}
         onExportReadyOnly={handleExportReadyOnly}
         onExportWithoutErrors={handleExportWithoutErrors}
       />
