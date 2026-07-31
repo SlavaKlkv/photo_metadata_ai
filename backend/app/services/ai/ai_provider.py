@@ -11,7 +11,7 @@ from fastapi import HTTPException
 from app.core.config import settings
 from app.core.enums import AIProvider, StockPlatform
 from app.core.exceptions import AIProviderConfigurationError
-from app.services.ai.constants import AI_PROVIDER_TIMEOUT
+from app.services.ai.constants import get_provider_timeout
 from app.services.desktop.ai_provider_api_keys import get_ai_provider_api_key
 from app.services.prompt_templates.constants import (
     DEFAULT_PROMPT_LANGUAGE,
@@ -189,7 +189,9 @@ class OllamaImageMetadataProvider(BaseAIProvider):
             shooting_context=shooting_context,
         )
 
-        async with httpx.AsyncClient(timeout=AI_PROVIDER_TIMEOUT) as client:
+        async with httpx.AsyncClient(
+            timeout=get_provider_timeout(AIProvider.OLLAMA)
+        ) as client:
             logger.info(
                 'ollama_request_started',
                 file_number=file_number,
@@ -280,7 +282,9 @@ class GeminiImageMetadataProvider(BaseAIProvider):
             shooting_context=shooting_context,
         )
 
-        async with httpx.AsyncClient(timeout=AI_PROVIDER_TIMEOUT) as client:
+        async with httpx.AsyncClient(
+            timeout=get_provider_timeout(AIProvider.GEMINI)
+        ) as client:
             logger.info(
                 'gemini_request_started',
                 file_number=file_number,
@@ -383,7 +387,9 @@ class OpenRouterImageMetadataProvider(BaseAIProvider):
             shooting_context=shooting_context,
         )
 
-        async with httpx.AsyncClient(timeout=AI_PROVIDER_TIMEOUT) as client:
+        async with httpx.AsyncClient(
+            timeout=get_provider_timeout(AIProvider.OPENROUTER)
+        ) as client:
             logger.info(
                 'openrouter_request_started',
                 file_number=file_number,

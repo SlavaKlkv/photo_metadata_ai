@@ -20,6 +20,7 @@ from app.services.ai.constants import (
     AI_FALLBACK_BUDGET_SECONDS,
     AI_FALLBACK_MAX_CYCLES,
     PROVIDER_COOLDOWN_MAX_SECONDS,
+    get_provider_timeout,
 )
 
 
@@ -44,6 +45,19 @@ class _RateLimitedProvider(BaseAIProvider):
 
     async def generate_metadata(self, *args, **kwargs):
         raise _http_status_error(429, retry_after=self._retry_after)
+
+
+class _TimingOutProvider(BaseAIProvider):
+    """Проваливается по таймауту, потратив на это своё время по часам."""
+
+    def __init__(self, *args, clock: '_FakeClock', timeout: float, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._clock = clock
+        self._timeout = timeout
+
+    async def generate_metadata(self, *args, **kwargs):
+        self._clock.value += self._timeout
+        raise httpx.ReadTimeout('provider timed out')
 
 
 class _CancellingProvider(BaseAIProvider):
@@ -395,7 +409,10 @@ async def test_permanent_failure_stops_at_cycle_limit(monkeypatch, clock):
             provider_factory=provider_factory,
         )
 
-    assert len(attempts) == AI_FALLBACK_MAX_CYCLES * 3
+    # Круги отработали до лимита; часть поздних попыток отсекается бюджетом,
+    # когда таймаут провайдера уже не умещается в остаток.
+    assert len(attempts) <= AI_FALLBACK_MAX_CYCLES * 3
+    assert len(attempts) >= (AI_FALLBACK_MAX_CYCLES - 1) * 3
 
 
 @pytest.mark.asyncio
@@ -680,6 +697,92 @@ async def test_budget_stops_retries_before_cycle_limit(monkeypatch, clock):
         )
 
     assert len(attempts) < AI_FALLBACK_MAX_CYCLES
+    assert clock.value <= AI_FALLBACK_BUDGET_SECONDS
+
+
+def test_local_provider_timeout_is_longer_than_cloud():
+    """Локальной модели дано заметно больше времени, чем облачным."""
+    ollama_timeout = get_provider_timeout(AIProvider.OLLAMA)
+
+    assert ollama_timeout > get_provider_timeout(AIProvider.GEMINI)
+    assert ollama_timeout > get_provider_timeout(AIProvider.OPENROUTER)
+    # После полного таймаута локальной модели в бюджете обязан остаться
+    # запас хотя бы на один облачный заход.
+    assert (
+        ollama_timeout + get_provider_timeout(AIProvider.GEMINI)
+        < AI_FALLBACK_BUDGET_SECONDS
+    )
+
+
+@pytest.mark.asyncio
+async def test_timeout_penalizes_provider_and_waits_for_cloud(
+    monkeypatch,
+    clock,
+):
+    """
+    Регрессия: Ollama таймаутит, облачные под cooldown после 429 — файл
+    обязан дождаться облачного провайдера, а не заходить в локальную модель
+    второй раз и падать по исчерпанному бюджету.
+    """
+    _set_added_providers(
+        monkeypatch,
+        {AIProvider.OLLAMA, AIProvider.GEMINI, AIProvider.OPENROUTER},
+    )
+    attempts: list[AIProvider] = []
+
+    def provider_factory(provider: AIProvider, model: str | None):
+        attempts.append(provider)
+
+        if provider == AIProvider.OLLAMA:
+            return _TimingOutProvider(
+                model=model,
+                clock=clock,
+                timeout=get_provider_timeout(AIProvider.OLLAMA),
+            )
+
+        if attempts.count(provider) == 1:
+            return _RateLimitedProvider(model=model, retry_after='30')
+
+        return _SuccessfulProvider(model=model)
+
+    result = await generate_metadata_with_fallback(
+        selected_provider=AIProvider.OLLAMA,
+        image_path=Path('image.jpg'),
+        provider_factory=provider_factory,
+    )
+
+    assert result.provider in {AIProvider.GEMINI, AIProvider.OPENROUTER}
+    # В локальную модель зашли ровно один раз: после таймаута она остывает.
+    assert attempts.count(AIProvider.OLLAMA) == 1
+    assert clock.value <= AI_FALLBACK_BUDGET_SECONDS
+
+
+@pytest.mark.asyncio
+async def test_attempt_is_skipped_when_timeout_exceeds_budget(
+    monkeypatch,
+    clock,
+):
+    """Провайдер, чей таймаут не влезает в остаток бюджета, не запускается."""
+    _set_added_providers(monkeypatch, {AIProvider.OLLAMA})
+    attempts: list[AIProvider] = []
+
+    def provider_factory(provider: AIProvider, model: str | None):
+        attempts.append(provider)
+        return _TimingOutProvider(
+            model=model,
+            clock=clock,
+            timeout=get_provider_timeout(AIProvider.OLLAMA),
+        )
+
+    with pytest.raises(httpx.ReadTimeout):
+        await generate_metadata_with_fallback(
+            selected_provider=AIProvider.OLLAMA,
+            image_path=Path('image.jpg'),
+            provider_factory=provider_factory,
+        )
+
+    # Второй заход не влезал в бюджет, поэтому его не начинали.
+    assert attempts == [AIProvider.OLLAMA]
     assert clock.value <= AI_FALLBACK_BUDGET_SECONDS
 
 

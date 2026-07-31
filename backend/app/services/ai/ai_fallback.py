@@ -26,7 +26,9 @@ from app.services.ai.constants import (
     AI_FALLBACK_MAX_CYCLES,
     FALLBACK_NEXT_PROVIDER,
     PROVIDER_COOLDOWN_DEFAULT_SECONDS,
+    PROVIDER_TIMEOUT_COOLDOWN_SECONDS,
     RETRYABLE_HTTP_STATUSES,
+    get_provider_timeout,
 )
 from app.services.ai.provider_availability import (
     is_local_provider_available,
@@ -190,6 +192,8 @@ async def generate_metadata_with_fallback(
         if not available:
             break
 
+        attempted_in_cycle = False
+
         for index, attempt in enumerate(available):
             cooldown_wait = _resolve_cooldown_wait(attempt, available)
 
@@ -207,6 +211,24 @@ async def generate_metadata_with_fallback(
                     break
 
                 await _sleep(cooldown_wait)
+
+            # Бюджет должен быть честным: провайдер, чей таймаут заведомо не
+            # умещается в остаток, не запускается — иначе один длинный заход
+            # съедает время, отведённое на весь файл. Первая попытка
+            # выполняется всегда, чтобы файл не падал без единого запроса.
+            is_first_attempt = cycle == 0 and index == 0
+            provider_timeout = get_provider_timeout(attempt.provider)
+
+            if not is_first_attempt and _now() + provider_timeout > deadline:
+                logger.info(
+                    'ai_provider_budget_skipped',
+                    provider=attempt.provider,
+                    cycle=cycle,
+                    file_number=file_number,
+                )
+                continue
+
+            attempted_in_cycle = True
 
             # Адаптивная ёмкость провайдера: если свободного слота нет, но в
             # кольце есть другой доступный кандидат — пропускаем остывающего;
@@ -288,6 +310,11 @@ async def generate_metadata_with_fallback(
                 )
             finally:
                 await release(attempt.provider)
+
+        # Круг, в котором никто не запустился из-за исчерпанного бюджета,
+        # повторять бессмысленно: времени дальше только меньше.
+        if not attempted_in_cycle:
+            break
 
         cycle += 1
         cycle_delay = _resolve_cycle_delay(cycle)
@@ -379,6 +406,14 @@ def _penalize_provider(error: Exception, provider: AIProvider) -> None:
     Штраф провайдеру за retryable-ошибку: cooldown-пауза и сужение адаптивной
     ёмкости. Конфиг-ошибки (4xx) сюда не попадают.
     """
+    # Таймаут — такая же временная недоступность, как 429: провайдер, который
+    # не уложился в своё время, обязан остыть. Иначе он остаётся «свободной
+    # альтернативой», круг снова упирается в него и файл падает, хотя рядом
+    # дожидается снятия cooldown рабочий провайдер.
+    if isinstance(error, httpx.TimeoutException):
+        mark_provider_cooldown(provider, PROVIDER_TIMEOUT_COOLDOWN_SECONDS)
+        return
+
     status_code = get_provider_error_status_code(error)
 
     if status_code not in RETRYABLE_HTTP_STATUSES:
