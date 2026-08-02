@@ -114,21 +114,20 @@ export const ValidationSummary: React.FC<ValidationSummaryProps> = ({
           </button>
         )}
 
-        <button
-          type="button"
-          className={styles.exportAction}
-          disabled={readyCount === 0 || isApplyingSelection}
-          title={
-            readyCount === 0
-              ? 'No files without errors or recommendations'
-              : 'Keep only fully ready files selected for export'
-          }
-          onClick={onExportReadyOnly}
-        >
-          {isApplyingSelection
-            ? 'Selecting...'
-            : `Select ready only (${readyCount})`}
-        </button>
+        {/* Готовых файлов нет — выбирать нечего, кнопку не показываем */}
+        {readyCount > 0 && (
+          <button
+            type="button"
+            className={styles.exportAction}
+            disabled={isApplyingSelection}
+            title="Keep only fully ready files selected for export"
+            onClick={onExportReadyOnly}
+          >
+            {isApplyingSelection
+              ? 'Selecting...'
+              : `Select ready only (${readyCount})`}
+          </button>
+        )}
       </div>
     </div>
   );

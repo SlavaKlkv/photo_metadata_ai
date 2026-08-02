@@ -235,15 +235,15 @@ test('ошибка запроса возвращает прежний выбор
   });
 });
 
-test('«Select ready only» недоступен, когда готовых файлов нет', () => {
+test('«Select ready only» скрыт, когда готовых файлов нет', () => {
   useAppStore.setState({
     jobs: [makeJob('err-1', { preview: makePreview([error]) })],
   });
   render(<ResultsTable />);
 
   expect(
-    screen.getByRole('button', { name: 'Select ready only (0)' }),
-  ).toBeDisabled();
+    screen.queryByRole('button', { name: /Select ready only/ }),
+  ).not.toBeInTheDocument();
 });
 
 test('при активном фильтре «выбрать все» меняет только видимую группу', async () => {
