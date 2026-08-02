@@ -32,6 +32,11 @@ from app.storage.jobs import storage
 ai_requests_semaphore = asyncio.Semaphore(MAX_CONCURRENT_AI_REQUESTS)
 logger = structlog.get_logger(__name__)
 
+# Задачи, у которых сейчас отменяется повторный прогон упавших файлов.
+# Такая отмена не должна показывать наружу статус cancelled даже на миг:
+# фронтенд трактует его как отмену всего батча и сбрасывает результаты.
+_retry_cancellation_job_ids: set[UUID] = set()
+
 
 async def regenerate_metadata_for_file(
     file: ProcessingJobFile,
@@ -317,6 +322,26 @@ async def cancel_job_processing(job_id: UUID) -> None:
     await _mark_job_as_cancelled(job.job_id)
 
 
+async def cancel_retry_of_failed_files(job_id: UUID) -> None:
+    """
+    Отменяет только повторный прогон упавших файлов.
+
+    В отличие от полной отмены, результаты уже обработанных файлов остаются
+    нетронутыми: перезапущенные файлы возвращаются в failed — то состояние,
+    из которого их и запустили повторно.
+
+    Задача при этом ни на мгновение не попадает в статус cancelled: опрос
+    статуса, поймавший его, сбросил бы на фронтенде весь батч.
+    """
+    _retry_cancellation_job_ids.add(job_id)
+
+    try:
+        await job_task_manager.cancel_and_wait(job_id)
+        await _restore_cancelled_files_to_failed(job_id)
+    finally:
+        _retry_cancellation_job_ids.discard(job_id)
+
+
 async def cancel_and_reset_job(job_id: UUID) -> None:
     """
     Отменяет обработку и возвращает задачу в состояние «до старта».
@@ -570,6 +595,12 @@ async def _mark_job_as_cancelled(job_id: UUID) -> None:
     """
     Переводит задачу и все незавершённые файлы в cancelled.
     """
+    if job_id in _retry_cancellation_job_ids:
+        # Отмена повторного прогона: прерванные файлы возвращаются в failed,
+        # минуя статус cancelled.
+        await _restore_cancelled_files_to_failed(job_id)
+        return
+
     job = await storage.get_job(job_id)
 
     if job is None:
@@ -584,6 +615,43 @@ async def _mark_job_as_cancelled(job_id: UUID) -> None:
     logger.info(
         'job_marked_as_cancelled',
         job_id=str(job.job_id),
+    )
+    await storage.update_job(job)
+
+
+async def _restore_cancelled_files_to_failed(job_id: UUID) -> None:
+    """
+    Возвращает прерванные файлы повторного прогона в failed.
+
+    Отмена помечает незавершённые файлы cancelled; в частичном прогоне это
+    ровно те файлы, которые перезапускали, поэтому им возвращается исходный
+    статус, а задача снова становится failed — кнопка повтора остаётся
+    доступной.
+    """
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        return
+
+    for file in job.files:
+        if file.status in {
+            FileStatus.CANCELLED,
+            FileStatus.QUEUED,
+            FileStatus.PROCESSING,
+        }:
+            file.status = FileStatus.FAILED
+            file.error_message = 'Processing cancelled'
+
+    job.status = (
+        JobStatus.FAILED
+        if any(file.status == FileStatus.FAILED for file in job.files)
+        else JobStatus.COMPLETED
+    )
+
+    logger.info(
+        'retry_failed_files_cancel_restored',
+        job_id=str(job.job_id),
+        status=job.status,
     )
     await storage.update_job(job)
 

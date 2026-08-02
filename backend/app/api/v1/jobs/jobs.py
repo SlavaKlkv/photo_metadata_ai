@@ -69,6 +69,7 @@ from app.services.metadata.stock_validation import (
 from app.services.processing.processing import (
     apply_generated_metadata_to_file,
     cancel_and_reset_job,
+    cancel_retry_of_failed_files,
     process_job,
     regenerate_metadata_for_file,
     retry_failed_files,
@@ -306,6 +307,35 @@ async def cancel_job(job_id: UUID):
         )
 
     await cancel_and_reset_job(job.job_id)
+
+    cancelled_job = await storage.get_job(job.job_id)
+
+    if cancelled_job is None:
+        raise HTTPException(
+            status_code=404,
+            detail='Job not found',
+        )
+
+    return cancelled_job
+
+
+@router.post('/{job_id}/cancel-retry', response_model=ProcessingJob)
+async def cancel_retry_failed_job_files(job_id: UUID):
+    """
+    Останавливает только повторный прогон упавших файлов.
+
+    Уже готовые файлы задачи сохраняют свои metadata, а прерванные
+    возвращаются в failed — их можно запустить повторно снова.
+    """
+    job = await storage.get_job(job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail='Job not found',
+        )
+
+    await cancel_retry_of_failed_files(job.job_id)
 
     cancelled_job = await storage.get_job(job.job_id)
 
