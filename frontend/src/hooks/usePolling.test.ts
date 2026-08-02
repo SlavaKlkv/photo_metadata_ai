@@ -250,3 +250,46 @@ test('restores the pre-generation state when the job comes back cancelled', asyn
   // Результаты отменённого прогона не подтягиваются.
   expect(mockedJobsApi.getResultsByStock).not.toHaveBeenCalled();
 });
+
+test('keeps finished results when a cancelled status arrives during a retry', async () => {
+  useAppStore.getState().addJobs([
+    {
+      id: 'file-1',
+      filename: 'done.jpg',
+      originalFilename: 'done.jpg',
+      status: 'done',
+      title: 'Generated title',
+    },
+    {
+      id: 'file-2',
+      filename: 'retried.jpg',
+      originalFilename: 'retried.jpg',
+      status: 'processing',
+    },
+  ]);
+  useUIStore.setState({
+    isPollingActive: true,
+    isProcessing: true,
+    isProgressModalOpen: true,
+    processingScopeIds: ['file-2'],
+  });
+  mockedJobsApi.getStatus.mockResolvedValue({
+    data: { status: 'cancelled', files: [] },
+  } as never);
+
+  renderHook(() => usePolling('job-1'));
+
+  await waitFor(() => {
+    expect(useUIStore.getState().isProcessing).toBe(false);
+  });
+
+  // Батч не сбрасывается: metadata готового файла на месте.
+  expect(useAppStore.getState().jobs[0]).toMatchObject({
+    status: 'done',
+    title: 'Generated title',
+  });
+  expect(useUIStore.getState()).toMatchObject({
+    isPollingActive: false,
+    isProgressModalOpen: false,
+  });
+});

@@ -17,8 +17,19 @@ export const ProgressModal: React.FC = () => {
     (state) => state.currentProcessingProvider,
   );
 
-  const total = jobs.length;
-  const current = jobs.filter(
+  // При частичном прогоне (повтор упавших) считаем только его файлы, иначе
+  // счётчик сразу показывал бы готовые файлы предыдущего прогона.
+  const scopeIds = useUIStore((state) => state.processingScopeIds);
+  const scopedJobs = React.useMemo(() => {
+    if (!scopeIds) return jobs;
+
+    const scope = new Set(scopeIds);
+
+    return jobs.filter((job) => scope.has(job.id));
+  }, [jobs, scopeIds]);
+
+  const total = scopedJobs.length;
+  const current = scopedJobs.filter(
     (j) => j.status === "done" || j.status === "error",
   ).length;
   const percent = total > 0 ? Math.round((current / total) * 100) : 0;
@@ -27,12 +38,19 @@ export const ProgressModal: React.FC = () => {
   const resetProcessingState = useUIStore(
     (state) => state.resetProcessingState,
   );
+  const finishPartialRun = useUIStore((state) => state.finishPartialRun);
   const cancelBatchProcessing = useAppStore(
     (state) => state.cancelBatchProcessing,
   );
+  const updateJobStatus = useAppStore((state) => state.updateJobStatus);
+  const setAppProcessing = useAppStore((state) => state.setIsProcessing);
   const addToast = useToastStore((state) => state.addToast);
 
   const [isCancelling, setIsCancelling] = useState(false);
+
+  // Повтор упавших файлов отменяется отдельной ручкой: сброс всего батча
+  // здесь уничтожил бы metadata уже готовых файлов прошлого прогона.
+  const isPartialRun = scopeIds !== null;
 
   const handleCancel = async () => {
     if (isCancelling) return;
@@ -41,7 +59,9 @@ export const ProgressModal: React.FC = () => {
 
     try {
       if (currentJobId) {
-        await jobsApi.cancel(currentJobId);
+        await (isPartialRun
+          ? jobsApi.cancelRetryFailed(currentJobId)
+          : jobsApi.cancel(currentJobId));
       }
     } catch (error) {
       console.error("[ProgressModal] Cancel request failed:", error);
@@ -49,8 +69,23 @@ export const ProgressModal: React.FC = () => {
     } finally {
       // Локальный сброс делаем в любом случае — пользователь не должен
       // остаться в залипшей модалке из-за сетевой ошибки.
-      cancelBatchProcessing();
-      resetProcessingState();
+      if (isPartialRun) {
+        // Прерванные файлы возвращаются в исходное failed — кнопка повтора
+        // снова доступна, остальные результаты не тронуты.
+        scopedJobs
+          .filter((job) => job.status !== 'done')
+          .forEach((job) =>
+            updateJobStatus(job.id, 'error', 'Processing cancelled'),
+          );
+        setAppProcessing(false);
+        // Экран Review остаётся на месте: сбрасывать isExportReady нельзя,
+        // иначе пользователя выбрасывает на шаг Upload.
+        finishPartialRun();
+      } else {
+        cancelBatchProcessing();
+        resetProcessingState();
+      }
+
       setIsCancelling(false);
     }
   };
@@ -74,7 +109,11 @@ export const ProgressModal: React.FC = () => {
             disabled={isCancelling}
             onClick={handleCancel}
           >
-            {isCancelling ? "Cancelling..." : "Cancel"}
+            {isCancelling
+              ? "Cancelling..."
+              : isPartialRun
+                ? "Cancel retry"
+                : "Cancel"}
           </Button>
         </div>
         {currentProcessingProvider && (

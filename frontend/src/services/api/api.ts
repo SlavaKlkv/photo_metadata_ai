@@ -118,6 +118,10 @@ export const jobsApi = {
   retryFailed: (jobId: string) =>
     apiClient.post(`/api/v1/jobs/${jobId}/retry-failed`),
 
+  // отмена только повторного прогона: готовые файлы сохраняются
+  cancelRetryFailed: (jobId: string) =>
+    apiClient.post(`/api/v1/jobs/${jobId}/cancel-retry`),
+
   providerDiscovery: () => apiClient.get("/api/v1/desktop/providers/discovery"),
   validateAndSaveProviderApiKey: (provider: AIProvider, apiKey: string) =>
     apiClient.post<AIProviderApiKeyValidationResponse>(
