@@ -1,16 +1,36 @@
 # Photo Metadata AI
 
-AI-сервис для автоматической обработки фотографий: анализ изображений, генерация метаданных и экспорт информации в CSV и IPTC.
+Десктопное приложение для macOS, которое готовит фотографии к загрузке на фотостоки:
+анализирует каждый кадр с помощью AI, генерирует название, описание, ключевые слова
+и категорию по правилам конкретного стока, вшивает метаданные в файлы (IPTC/XMP/EXIF)
+и выгружает CSV в формате Adobe Stock, Shutterstock или Getty Images.
 
-Проект предназначен для фотографов, которые продают фотографии на стоках. Пользователь загружает фотографии, сервис анализирует каждое изображение с помощью AI, генерирует название, описание,  ключевые слова и сток-ориентированные данные. после чего подготавливает их для загрузки на Getty, Shutterstock и Adobe Stock.
-
-## Скриншоты
-
-Загрузка фотографий — шаг 1, зона drag & drop и панель настроек контекста:
+Приложение работает локально: фотографии не покидают компьютер, кроме кадров,
+отправляемых выбранному AI-провайдеру. При использовании локальной Ollama обработка
+полностью офлайн.
 
 ![Загрузка фотографий](docs/screenshots/04_start_screen.png)
 
-Проверка и правка метаданных — шаг 4, таблица результатов и панель «Metadata Preview»:
+## Возможности
+
+- **Пакетная обработка.** Загрузка сотен фотографий за раз, прогресс с возможностью
+  отмены, повтор только упавших файлов.
+- **Три AI-провайдера.** Локальная Ollama (Qwen2.5-VL), Google Gemini, OpenRouter.
+  Провайдеры образуют кольцо fallback: при таймауте, 429 или ошибке файл автоматически
+  уходит к следующему, с cooldown и адаптивным ограничением параллельных запросов.
+- **Правила стоков.** Ограничения по длине title, числу и составу ключевых слов,
+  категориям и editorial-полям применяются под выбранную площадку; автофикс исправляет
+  то, что можно исправить автоматически.
+- **Проверка перед экспортом.** Таблица результатов, панель Metadata Preview, быстрые
+  фильтры и сводка валидации, ручная правка любого поля, перегенерация отдельных файлов.
+- **Экспорт.** CSV под формат выбранного стока + копии фотографий со вшитыми
+  IPTC/XMP/EXIF; можно выгрузить только файлы со статусом Ready.
+- **Онбординг и ключи.** Приложение само находит доступные провайдеры, проверяет ключи
+  и хранит их в пользовательском каталоге данных, вне бандла приложения.
+
+## Скриншоты
+
+Проверка и правка метаданных — шаг 4, таблица результатов и панель Metadata Preview:
 
 ![Проверка метаданных](docs/screenshots/07_review_metadata_preview.png)
 
@@ -18,53 +38,77 @@ AI-сервис для автоматической обработки фото�
 
 ![Экспорт завершён](docs/screenshots/12_export_completed.png)
 
-Остальные экраны — в [docs/screenshots/](docs/screenshots/README.md).
+Все экраны с описаниями — в [docs/screenshots/](docs/screenshots/README.md).
 
-## Стек
+## Установка
 
-### Backend
+1. Скачайте `.dmg` из [Releases](https://github.com/SlavaKlkv/photo_metadata_ai/releases).
+2. Откройте образ и перетащите **Photo Metadata AI.app** в `Applications`.
+3. При первом запуске приложение проведёт через AI Setup: подключение локальной Ollama
+   и/или ввод ключей Gemini и OpenRouter.
 
-- Python
-- FastAPI
-- Uvicorn
-- uv
-- Ruff
+Сборка universal2 — работает и на Apple Silicon, и на Intel.
 
-### Frontend
+Приложение проверяет опубликованные GitHub Releases и сообщает о новой версии баннером.
+Загрузка и установка ручные: `.dmg` открывается в системном браузере, приложение
+заменяется в `Applications`. Пользовательские данные хранятся вне бандла
+(`~/Library/Application Support/Photo Metadata AI`, `~/Documents/Photo Metadata AI/results`)
+и переживают обновление.
 
-- React
-- TypeScript
-- npm
-- react-scripts
+### Локальная модель (опционально)
 
-## Локальная разработка на хосте
+```bash
+brew install ollama
+ollama serve
+ollama pull qwen2.5vl
+```
 
-### Подготовка переменных окружения
+## Как это устроено
+
+```
+Electron (desktop/)
+  └─ запускает бинарник бэкенда и открывает http://127.0.0.1:8000
+       └─ FastAPI (backend/) — API + раздача собранного React-фронтенда
+            ├─ services/ai         — провайдеры, fallback, throttling
+            ├─ services/metadata   — правила стоков, валидация, автофикс, вшивание IPTC
+            └─ services/export     — CSV и выгрузка файлов
+React + TypeScript (frontend/) — мастер из пяти шагов: Upload → Context → Process → Review → Export
+```
+
+Бэкенд сам раздаёт фронтенд, поэтому в собранном приложении один origin и нет CORS.
+Подробности сборки и релиза — в [`desktop/README.md`](desktop/README.md).
+
+### Стек
+
+| Слой | Технологии |
+| --- | --- |
+| Backend | Python, FastAPI, Uvicorn, uv, Ruff, pytest |
+| Frontend | React, TypeScript, react-scripts, Jest |
+| Desktop | Electron, electron-builder, PyInstaller (universal2), Jest |
+
+## Разработка
+
+### Переменные окружения
 
 ```bash
 cp .env.example .env
 ```
 
-Если используете Ollama локально на этой же машине, задайте в `.env`:
+Для локальной Ollama на этой же машине:
 
 ```bash
 OLLAMA_BASE_URL=http://localhost:11434
 ```
 
-### Перейти в backend
+### Backend
 
 ```bash
 cd backend
-```
-
-### Запуск backend (uv + FastAPI)
-
-```bash
 uv sync --dev
 uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Запуск frontend
+### Frontend
 
 ```bash
 cd frontend
@@ -72,36 +116,26 @@ npm install
 npm start
 ```
 
+### Desktop
 
-## Адреса локально
-
-Frontend
-
-```text
-http://localhost:3000
+```bash
+cd desktop
+npm install
+npm run dev
 ```
 
-Backend
+### Адреса
 
-```text
-http://localhost:8000
-```
-
-Swagger UI
-
-```text
-http://localhost:8000/docs
-```
-
-ReDoc
-
-```text
-http://localhost:8000/redoc
-```
+| Что | Адрес |
+| --- | --- |
+| Frontend | http://localhost:3000 |
+| Backend | http://localhost:8000 |
+| Swagger UI | http://localhost:8000/docs |
+| ReDoc | http://localhost:8000/redoc |
 
 ## Проверки
 
-### Backend: форматирование и линтинг (ruff)
+Линтинг и форматирование бэкенда:
 
 ```bash
 cd backend
@@ -109,75 +143,40 @@ uv run ruff format
 uv run ruff check --fix
 ```
 
-### Frontend: production-сборка
+Тесты с покрытием:
 
 ```bash
-cd frontend
-npm run build
+cd backend   && uv run pytest --cov=app --cov-report=term-missing
+cd frontend  && npm test -- --coverage --runInBand
+cd desktop   && npm test -- --coverage
 ```
 
-### Desktop: полная сборка macOS-приложения
+Production-сборка фронтенда:
 
 ```bash
-cd desktop
-./scripts/build-mac.sh
+cd frontend && npm run build
 ```
 
-Готовые `.app` и `.dmg` будут сохранены в `desktop/out/`.
-
-Desktop-приложение проверяет опубликованные GitHub Releases и сообщает
-о новой версии баннером. Загрузка и установка остаются ручными:
-пользователь открывает `.dmg` в системном браузере и заменяет приложение
-в `Applications`; пользовательские данные хранятся вне бандла и
-сохраняются при обновлении. Инструкции по сборке и публикации релиза —
-в [`desktop/README.md`](desktop/README.md).
-
-### Тесты с проверкой покрытия
-
-#### Backend
+Полная сборка macOS-приложения — `.app` и `.dmg` появятся в `desktop/out/`:
 
 ```bash
-cd backend
-uv run pytest --cov=app --cov-report=term-missing
+desktop/scripts/build-mac.sh
 ```
 
-#### Frontend
+### Новые зависимости
 
 ```bash
-cd frontend
-npm test -- --coverage --runInBand
+cd backend  && uv add <lib>          # runtime
+cd backend  && uv add --dev <lib>    # dev
+cd frontend && npm install <lib>
 ```
 
-#### Desktop
+## Релизы
 
-```bash
-cd desktop
-npm test -- --coverage
-```
+Релиз собирается GitHub Actions по тегу `v*`: срезы бэкенда собираются нативно на
+arm64 и x86_64, склеиваются в universal2, затем упаковываются в `.dmg` и публикуются
+в Releases.
 
-## Установка новых зависимостей
+## Лицензия
 
-Backend (runtime)
-```bash
-uv add <new_lib_name>
-```
-
-Backend (dev)
-```bash
-uv add --dev <new_lib_name>
-```
-
-Frontend
-```bash
-cd ..
-cd frontend
-npm install <new_lib_name>
-```
-
-## Установка Ollama и модели Qwen2.5-VL
-
-```bash
-brew install ollama
-ollama serve
-ollama pull qwen2.5vl
-```
+MIT
