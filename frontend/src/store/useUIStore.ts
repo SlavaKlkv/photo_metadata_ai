@@ -32,6 +32,10 @@ export interface UIState {
   exportArtifacts: ExportArtifact[];
   currentProcessingProvider: AIProvider | null;
   currentProcessingModel: string | null;
+  // Файлы текущего прогона: null — обрабатывается весь батч, массив id —
+  // частичный прогон (повтор упавших). По нему считается прогресс, иначе
+  // счётчик стартовал бы с уже готовых файлов предыдущего прогона.
+  processingScopeIds: string[] | null;
 
   // Actions
   openAiSetup: () => void;
@@ -39,7 +43,8 @@ export interface UIState {
   toggleFileList: () => void;
   setIsProcessing: (isProcessing: boolean) => void;
   resetProcessingState: () => void;
-  openProgressModal: () => void;
+  finishPartialRun: () => void;
+  openProgressModal: (scopeIds?: string[] | null) => void;
   closeProgressModal: () => void;
   setIsUploaded: (val: boolean) => void;
   setIsExportReady: (val: boolean) => void;
@@ -81,7 +86,8 @@ export const useUIStore = create<UIState>()(
       exportArtifacts: [],
       currentProcessingProvider: null,
       currentProcessingModel: null,
-      
+      processingScopeIds: null,
+
       // actions
       openAiSetup: () => set({ isAiSetupOpen: true }),
       closeAiSetup: () => set({ isAiSetupOpen: false }),
@@ -102,8 +108,25 @@ export const useUIStore = create<UIState>()(
           currentProcessingProvider: null,
           currentProcessingModel: null,
         }),
-      openProgressModal: () =>
-        set({ isProgressModalOpen: true }),
+      // Завершение частичного прогона (повтор упавших) снимает только флаги
+      // обработки. isExportReady трогать нельзя: по нему рендерится экран
+      // Review, и его сброс выбрасывал пользователя обратно на Upload, хотя
+      // результаты батча никуда не делись.
+      finishPartialRun: () =>
+        set({
+          isProcessing: false,
+          isPollingActive: false,
+          isProgressModalOpen: false,
+          currentProcessingProvider: null,
+          currentProcessingModel: null,
+        }),
+      // Область прогона переживает его завершение и отмену: ответ опроса,
+      // отправленный до остановки, приходит уже после сброса флагов, и по
+      // обнулённой области его приняли бы за отмену всего батча — с потерей
+      // результатов. Область задаётся заново при старте следующего прогона.
+      // Без аргумента прогон считается полным: прогресс идёт по всему батчу.
+      openProgressModal: (scopeIds = null) =>
+        set({ isProgressModalOpen: true, processingScopeIds: scopeIds }),
       closeProgressModal: () =>
         set({ isProgressModalOpen: false }),
       setIsUploaded: (val) =>

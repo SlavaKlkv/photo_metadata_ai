@@ -80,22 +80,6 @@ export const ValidationSummary: React.FC<ValidationSummaryProps> = ({
       </div>
 
       <div className={styles.actions}>
-        {/* Повтор упавших файлов: перезапускает разом все failed файлы
-            задачи, а не выбранные, — поэтому счётчик в подписи. */}
-        {counts.failed > 0 && (
-          <button
-            type="button"
-            className={styles.retryAction}
-            disabled={isRetryingFailed}
-            title="Process every file that failed again, without re-running the whole batch"
-            onClick={onRetryFailed}
-          >
-            {isRetryingFailed
-              ? 'Retrying...'
-              : `Retry failed (${counts.failed})`}
-          </button>
-        )}
-
         {showExportWithoutErrors && (
           <button
             type="button"
@@ -126,6 +110,23 @@ export const ValidationSummary: React.FC<ValidationSummaryProps> = ({
             {isApplyingSelection
               ? 'Selecting...'
               : `Select ready only (${readyCount})`}
+          </button>
+        )}
+
+        {/* Повтор упавших файлов: перезапускает разом все failed файлы
+            задачи, а не выбранные, — поэтому счётчик в подписи. Держим
+            последним в ряду — это действие обработки, а не выбора. */}
+        {counts.failed > 0 && (
+          <button
+            type="button"
+            className={styles.retryAction}
+            disabled={isRetryingFailed}
+            title="Process every file that failed again, without re-running the whole batch"
+            onClick={onRetryFailed}
+          >
+            {isRetryingFailed
+              ? 'Retrying...'
+              : `Retry failed (${counts.failed})`}
           </button>
         )}
       </div>

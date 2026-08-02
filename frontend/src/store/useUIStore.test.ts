@@ -115,3 +115,20 @@ test('keeps the results page at one or above', () => {
   state.setResultsPage(0);
   expect(useUIStore.getState().resultsPage).toBe(1);
 });
+
+test('область частичного прогона переживает сброс и обнуляется новым прогоном', () => {
+  useUIStore.getState().openProgressModal(['file-2']);
+
+  expect(useUIStore.getState().processingScopeIds).toEqual(['file-2']);
+
+  // Ответ опроса приходит уже после сброса — область должна уцелеть,
+  // иначе его примут за отмену всего батча.
+  useUIStore.getState().resetProcessingState();
+
+  expect(useUIStore.getState().processingScopeIds).toEqual(['file-2']);
+
+  // Полный прогон открывает модалку без области — прогресс снова по батчу.
+  useUIStore.getState().openProgressModal();
+
+  expect(useUIStore.getState().processingScopeIds).toBeNull();
+});

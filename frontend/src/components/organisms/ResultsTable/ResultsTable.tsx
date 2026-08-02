@@ -35,6 +35,7 @@ const resolveRetryFailedErrorMessage = (error: unknown): string => {
 export const ResultsTable: React.FC = () => {
   const jobs = useAppStore((state) => state.jobs);
   const updateJobSelection = useAppStore((state) => state.updateJobSelection);
+  const updateJobStatus = useAppStore((state) => state.updateJobStatus);
   const updateAllJobsSelection = useAppStore(
     (state) => state.updateAllJobsSelection,
   );
@@ -156,12 +157,20 @@ export const ResultsTable: React.FC = () => {
     if (!currentJobId || isRetryingFailed) return;
 
     setIsRetryingFailed(true);
+    // Прогресс считаем по перезапускаемым файлам, а не по всему батчу:
+    // иначе счётчик открывался бы на уже готовых файлах прошлого прогона.
+    const retriedIds = getJobsInValidationGroup(jobs, 'failed').map(
+      (job) => job.id,
+    );
 
     try {
       setIsProcessing(true);
       await jobsApi.retryFailed(currentJobId);
+      // До первого ответа опроса файлы ещё числятся упавшими — без сброса
+      // прогресс открывался бы сразу на 100%.
+      retriedIds.forEach((id) => updateJobStatus(id, 'queued'));
       setIsPollingActive(true);
-      openProgressModal();
+      openProgressModal(retriedIds);
     } catch (error) {
       setIsProcessing(false);
       addToast(resolveRetryFailedErrorMessage(error), 'error');

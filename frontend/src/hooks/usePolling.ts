@@ -27,6 +27,7 @@ export const usePolling = (jobId: string | null) => {
   const resetProcessingState = useUIStore(
     (state) => state.resetProcessingState,
   );
+  const finishPartialRun = useUIStore((state) => state.finishPartialRun);
 
   const updateJobPreview = useAppStore((state) => state.updateJobPreview);
   const setStockOptions = useAppStore((state) => state.setStockOptions);
@@ -77,7 +78,17 @@ export const usePolling = (jobId: string | null) => {
           stopPolling();
 
           // Отмена могла прийти и помимо кнопки Cancel — приводим UI
-          // к тому же состоянию «до старта».
+          // к тому же состоянию «до старта». Частичный прогон (повтор
+          // упавших) так сбрасывать нельзя: результаты остальных файлов
+          // должны уцелеть, поэтому просто снимаем флаги обработки.
+          if (
+            statusData.status === "cancelled" &&
+            useUIStore.getState().processingScopeIds !== null
+          ) {
+            finishPartialRun();
+            return;
+          }
+
           if (statusData.status === "cancelled") {
             cancelBatchProcessing();
             resetProcessingState();
@@ -171,6 +182,7 @@ export const usePolling = (jobId: string | null) => {
     setCurrentProcessingProvider,
     cancelBatchProcessing,
     resetProcessingState,
+    finishPartialRun,
   ]);
 };
 

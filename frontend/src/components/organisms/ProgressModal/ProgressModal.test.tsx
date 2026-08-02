@@ -9,6 +9,7 @@ import { ProgressModal } from './ProgressModal';
 jest.mock('services/api/api', () => ({
   jobsApi: {
     cancel: jest.fn(),
+    cancelRetryFailed: jest.fn(),
   },
 }));
 
@@ -23,6 +24,7 @@ const lockedSettings = {
 beforeEach(() => {
   jest.clearAllMocks();
   mockedJobsApi.cancel.mockResolvedValue({} as never);
+  mockedJobsApi.cancelRetryFailed.mockResolvedValue({} as never);
 
   useAppStore.setState({
     jobs: [
@@ -51,6 +53,7 @@ beforeEach(() => {
     isPollingActive: true,
     currentJobId: 'job-1',
     currentProcessingProvider: 'gemini',
+    processingScopeIds: null,
   });
 
   useToastStore.setState({ toasts: [] });
@@ -85,6 +88,130 @@ test('progress bar is full when all files are processed', () => {
   render(<ProgressModal />);
 
   expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '100');
+});
+
+test('counts only the retried files during a partial run', () => {
+  // 10 файлов, 8 из прошлого прогона готовы, перезапускаются два упавших.
+  const jobs = makeJobs(10, 8);
+  useAppStore.setState({
+    jobs: jobs.map((job, index) =>
+      index >= 8 ? { ...job, status: 'queued' as const } : job,
+    ),
+  });
+  useUIStore.setState({ processingScopeIds: ['file-9', 'file-10'] });
+
+  render(<ProgressModal />);
+
+  expect(screen.getByText('Processing: 0/2')).toBeInTheDocument();
+  expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
+});
+
+test('advances the partial run counter as retried files finish', () => {
+  const jobs = makeJobs(10, 8);
+  useAppStore.setState({
+    jobs: jobs.map((job, index) =>
+      index === 8
+        ? { ...job, status: 'done' as const }
+        : index === 9
+          ? { ...job, status: 'processing' as const }
+          : job,
+    ),
+  });
+  useUIStore.setState({ processingScopeIds: ['file-9', 'file-10'] });
+
+  render(<ProgressModal />);
+
+  expect(screen.getByText('Processing: 1/2')).toBeInTheDocument();
+  expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '50');
+});
+
+test('falls back to the whole batch when no scope is set', () => {
+  useAppStore.setState({ jobs: makeJobs(10, 8) });
+  useUIStore.setState({ processingScopeIds: null });
+
+  render(<ProgressModal />);
+
+  expect(screen.getByText('Processing: 8/10')).toBeInTheDocument();
+});
+
+describe('cancelling a partial run', () => {
+  beforeEach(() => {
+    useAppStore.setState({
+      jobs: [
+        {
+          id: 'file-1',
+          filename: 'a.jpg',
+          originalFilename: 'a.jpg',
+          status: 'done',
+          title: 'Generated title',
+        },
+        {
+          id: 'file-2',
+          filename: 'b.jpg',
+          originalFilename: 'b.jpg',
+          status: 'processing',
+        },
+      ],
+    });
+    // Экран Review открыт: по этому флагу App рендерит результаты.
+    useUIStore.setState({
+      processingScopeIds: ['file-2'],
+      isExportReady: true,
+    });
+  });
+
+  test('uses the retry-specific cancel endpoint', async () => {
+    const user = userEvent.setup();
+    render(<ProgressModal />);
+
+    await user.click(screen.getByRole('button', { name: /cancel retry/i }));
+
+    await waitFor(() => {
+      expect(mockedJobsApi.cancelRetryFailed).toHaveBeenCalledWith('job-1');
+    });
+    // Полный сброс батча не вызывается — иначе готовые файлы обнулятся.
+    expect(mockedJobsApi.cancel).not.toHaveBeenCalled();
+  });
+
+  test('keeps finished files and returns retried ones to failed', async () => {
+    const user = userEvent.setup();
+    render(<ProgressModal />);
+
+    await user.click(screen.getByRole('button', { name: /cancel retry/i }));
+
+    await waitFor(() => {
+      expect(useUIStore.getState().isProgressModalOpen).toBe(false);
+    });
+
+    const [doneJob, retriedJob] = useAppStore.getState().jobs;
+    expect(doneJob).toMatchObject({ status: 'done', title: 'Generated title' });
+    expect(retriedJob).toMatchObject({
+      status: 'error',
+      error: 'Processing cancelled',
+    });
+    expect(useAppStore.getState().isProcessing).toBe(false);
+    // Область прогона переживает отмену: запоздавший ответ опроса иначе
+    // принял бы её за отмену всего батча и стёр результаты.
+    expect(useUIStore.getState().processingScopeIds).toEqual(['file-2']);
+    // Пользователь остаётся на экране Review, а не улетает на Upload.
+    expect(useUIStore.getState().isExportReady).toBe(true);
+  });
+
+  test('still unblocks the UI when the request fails', async () => {
+    mockedJobsApi.cancelRetryFailed.mockRejectedValue(new Error('network'));
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const user = userEvent.setup();
+    render(<ProgressModal />);
+
+    await user.click(screen.getByRole('button', { name: /cancel retry/i }));
+
+    await waitFor(() => {
+      expect(useToastStore.getState().toasts).toHaveLength(1);
+    });
+    expect(useUIStore.getState().isProcessing).toBe(false);
+    expect(useAppStore.getState().jobs[0].status).toBe('done');
+  });
 });
 
 test('cancels the job on the server and unblocks the UI', async () => {

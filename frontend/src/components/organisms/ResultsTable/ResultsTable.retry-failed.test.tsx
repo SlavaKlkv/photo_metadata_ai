@@ -69,6 +69,7 @@ beforeEach(() => {
     isProcessing: false,
     isPollingActive: false,
     isProgressModalOpen: false,
+    processingScopeIds: null,
   });
   useToastStore.setState({ toasts: [] });
 });
@@ -77,6 +78,18 @@ test('кнопка повтора показывает число упавших
   render(<ResultsTable />);
 
   expect(getRetryButton()).toHaveTextContent('Retry failed (2)');
+});
+
+test('кнопка повтора стоит последней в ряду действий сводки', () => {
+  render(<ResultsTable />);
+
+  const retryButton = getRetryButton();
+  const actionButtons = Array.from(
+    retryButton.parentElement?.querySelectorAll('button') ?? [],
+  );
+
+  expect(actionButtons.length).toBeGreaterThan(1);
+  expect(actionButtons[actionButtons.length - 1]).toBe(retryButton);
 });
 
 test('без упавших файлов кнопки повтора нет', () => {
@@ -102,6 +115,44 @@ test('клик перезапускает упавшие файлы и пере�
   expect(uiState.isProcessing).toBe(true);
   expect(uiState.isPollingActive).toBe(true);
   expect(uiState.isProgressModalOpen).toBe(true);
+});
+
+test('прогресс ограничивается перезапускаемыми файлами', async () => {
+  render(<ResultsTable />);
+
+  await userEvent.click(getRetryButton());
+
+  await waitFor(() => {
+    expect(useUIStore.getState().processingScopeIds).toEqual([
+      'failed-1',
+      'failed-2',
+    ]);
+  });
+
+  // Упавшие файлы сразу возвращаются в очередь, иначе прогресс
+  // открылся бы на 100%.
+  const statuses = Object.fromEntries(
+    useAppStore.getState().jobs.map((job) => [job.id, job.status]),
+  );
+  expect(statuses).toMatchObject({
+    'ready-1': 'done',
+    'failed-1': 'queued',
+    'failed-2': 'queued',
+  });
+});
+
+test('сорвавшийся перезапуск не оставляет область прогресса', async () => {
+  mockedRetryFailed.mockRejectedValue(httpError(409));
+
+  render(<ResultsTable />);
+
+  await userEvent.click(getRetryButton());
+
+  await waitFor(() => {
+    expect(useToastStore.getState().toasts).toHaveLength(1);
+  });
+  expect(useUIStore.getState().processingScopeIds).toBeNull();
+  expect(useAppStore.getState().jobs[1].status).toBe('error');
 });
 
 test.each([
