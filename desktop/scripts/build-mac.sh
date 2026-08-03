@@ -142,6 +142,36 @@ run_smoke() {
   uv run --project "$BACKEND_DIR" python "$SMOKE_TEST" "$binary"
 }
 
+# Находит dmgbuild в кэше electron-builder, при отсутствии — скачивает
+# его тем же кодом, что и сам electron-builder (dmg-builder знает нужную
+# версию и её контрольные суммы, поэтому URL здесь не хардкодится).
+# Результат — путь в REAL_DMGBUILD.
+find_cached_dmgbuild() {
+  find "$HOME/Library/Caches/electron-builder" \
+    -type f -name dmgbuild -path '*dmgbuild-bundle*' 2>/dev/null | head -1
+}
+
+ensure_dmgbuild() {
+  REAL_DMGBUILD="$(find_cached_dmgbuild)"
+  if [[ -n "$REAL_DMGBUILD" ]]; then
+    echo "  dmgbuild: $REAL_DMGBUILD"
+    return
+  fi
+
+  echo "==> dmgbuild нет в кэше — скачиваю"
+  if ! REAL_DMGBUILD="$(cd "$DESKTOP_DIR" && node scripts/fetch-dmgbuild.js)"; then
+    echo "ОШИБКА: не удалось скачать dmgbuild." >&2
+    echo "Без него DMG собрался бы с дефолтным фоном и без стрелки." >&2
+    exit 1
+  fi
+
+  if [[ ! -x "$REAL_DMGBUILD" ]]; then
+    echo "ОШИБКА: $REAL_DMGBUILD не исполняем." >&2
+    exit 1
+  fi
+  echo "  dmgbuild: $REAL_DMGBUILD"
+}
+
 build_app() {
   echo "==> electron-builder --mac"
   local arch
@@ -159,19 +189,19 @@ build_app() {
   # Обёртка dmgbuild убирает дефолтный фон DMG (любой кастомный фон
   # делает подписи Finder чёрными независимо от темы), добавляет
   # файлы-иконки стрелки и подсказки (build/dmg-*.icns) и отодвигает
-  # служебные файлы тома от иконок. Настоящий dmgbuild лежит в кэше
-  # electron-builder после первой сборки; без него обёртка не
-  # подключается — DMG соберётся с дефолтным фоном и без стрелки.
-  REAL_DMGBUILD="$(find "$HOME/Library/Caches/electron-builder" \
-    -type f -name dmgbuild -path '*dmgbuild-bundle*' 2>/dev/null | head -1)"
-  if [[ -n "$REAL_DMGBUILD" ]]; then
-    export REAL_DMGBUILD
-    export CUSTOM_DMGBUILD_PATH="$DESKTOP_DIR/scripts/dmgbuild-wrapper.sh"
-  else
-    echo "ВНИМАНИЕ: dmgbuild не найден в кэше electron-builder;" >&2
-    echo "DMG соберётся с дефолтным фоном и без стрелки. Повторите" >&2
-    echo "сборку после первой успешной — кэш появится." >&2
-  fi
+  # служебные файлы тома от иконок.
+  #
+  # Обёртке нужен настоящий dmgbuild, который electron-builder скачивает
+  # в свой кэш. Раньше при пустом кэше сборка молча продолжалась без
+  # обёртки — именно так релизный DMG уехал с дефолтным фоном: на чистом
+  # раннере CI кэша нет по определению, а первая же сборка и была
+  # релизной. Теперь бандл при необходимости скачивается заранее
+  # штатным механизмом (с проверкой контрольной суммы), а если и это не
+  # удалось — сборка падает, вместо того чтобы выпустить дефолтный DMG.
+  ensure_dmgbuild
+
+  export REAL_DMGBUILD
+  export CUSTOM_DMGBUILD_PATH="$DESKTOP_DIR/scripts/dmgbuild-wrapper.sh"
 
   npx electron-builder --mac "${BUILDER_ARGS[@]+"${BUILDER_ARGS[@]}"}"
 }
