@@ -1,6 +1,6 @@
 # Скриншоты приложения
 
-Снято 30 июля — 3 августа 2026 года на macOS, сборка Photo Metadata AI 1.0.1-universal.
+Снято 3 августа 2026 года на macOS, сборка Photo Metadata AI 1.1.0-universal.
 
 | Файл | Что изображено |
 | --- | --- |
@@ -10,8 +10,8 @@
 | [04_start_screen.png](04_start_screen.png) | Шаг 1 «Upload»: пустая зона drag & drop, панель «Context & Settings», карточки возможностей. |
 | [05_upload_and_context.png](05_upload_and_context.png) | Шаг 2 «Context»: загружено 113 фотографий, заполнены заметки съёмки, активна кнопка «Start processing». |
 | [06_processing.png](06_processing.png) | Шаг 3 «Process»: модальное окно прогресса «Processing: 73/113», обработка через QWEN 2.5 VL. |
-| [07_review_metadata_preview.png](07_review_metadata_preview.png) | Шаг 4 «Review»: таблица результатов и панель «Metadata Preview» с заголовком, описанием, ключевыми словами и категорией; 2 файла с ошибками обработки и ссылка «Retry failed (2)». |
-| [08_retry_failed.png](08_retry_failed.png) | Повтор упавших файлов: прогресс «Processing: 1/2» через Gemini с отдельной кнопкой «Cancel retry» — отменяется только повтор, а не весь пакет. |
+| [07_review_metadata_preview.png](07_review_metadata_preview.png) | Шаг 4 «Review»: таблица результатов и панель «Metadata Preview» с заголовком, описанием, ключевыми словами и категорией; поле Keywords отредактировано вручную — его подпись подсвечена; 2 файла с ошибками обработки и ссылка «Retry failed (2)». |
+| [08_retry_failed.png](08_retry_failed.png) | Повтор упавших файлов: прогресс «Processing: 1/2» отмена по «Cancel» останавливает только повторный прогон. |
 | [09_review_recommendations_filter.png](09_review_recommendations_filter.png) | Быстрый фильтр «Recommendations»: 16 из 113 фотографий, навигация по группе (7 of 16) и подсказка о релизах для съёмок с людьми. |
 | [10_review_regenerating.png](10_review_regenerating.png) | Перегенерация метаданных для выбранного файла: поля в состоянии «Regenerating…». |
 | [11_select_ready_only.png](11_select_ready_only.png) | Редакционные поля: License Type = Editorial, подпись, локация и ошибка об обязательной editorial-дате; экспорт в CSV и IPTC, выбраны только Ready (66 из 113). |

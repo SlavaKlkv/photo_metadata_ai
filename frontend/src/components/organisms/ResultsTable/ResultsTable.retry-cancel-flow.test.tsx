@@ -146,12 +146,12 @@ test('отмена повтора не сбрасывает батч, пока �
   await user.click(screen.getByRole('button', { name: /Retry failed/ }));
 
   await waitFor(() => {
-    expect(screen.getByRole('button', { name: /Cancel retry/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });
 
   // Отмена и ответ опроса приходят вперемешку — так и ловится гонка.
   mockedJobsApi.getStatus.mockResolvedValue(statusAfterCancel as never);
-  await user.click(screen.getByRole('button', { name: /Cancel retry/i }));
+  await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
   await waitFor(() => {
     expect(mockedJobsApi.cancelRetryFailed).toHaveBeenCalledWith('job-1');
@@ -178,11 +178,11 @@ test('отмена повтора оставляет пользователя н
   await user.click(screen.getByRole('button', { name: /Retry failed/ }));
 
   await waitFor(() => {
-    expect(screen.getByRole('button', { name: /Cancel retry/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });
 
   mockedJobsApi.getStatus.mockImplementation(() => new Promise(() => undefined));
-  await user.click(screen.getByRole('button', { name: /Cancel retry/i }));
+  await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
   await waitFor(() => {
     expect(useUIStore.getState().isProgressModalOpen).toBe(false);
