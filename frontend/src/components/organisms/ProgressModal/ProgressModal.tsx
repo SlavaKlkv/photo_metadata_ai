@@ -9,6 +9,7 @@ import { useUIStore } from 'store/useUIStore';
 import { useToastStore } from 'store/useToastStore';
 import { jobsApi } from 'services/api/api';
 import { AI_PROVIDER_LABELS } from 'types';
+import { useCatchUpCounter } from 'hooks/useCatchUpCounter';
 
 export const ProgressModal: React.FC = () => {
   const isOpen = useUIStore((state) => state.isProgressModalOpen);
@@ -32,7 +33,30 @@ export const ProgressModal: React.FC = () => {
   const current = scopedJobs.filter(
     (j) => j.status === "done" || j.status === "error",
   ).length;
-  const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+
+  // Быстрые файлы завершались пачкой между опросами, и номера
+  // перескакивали: догоняем цель по одному. Правило одно для полного
+  // прогона и для повтора упавших — оба идут через этот же счётчик
+  const [isStopped, setIsStopped] = useState(false);
+  const { displayed, reset: resetDisplayed } = useCatchUpCounter(current, {
+    enabled: !isStopped,
+  });
+
+  // Модалка переиспользуется между прогонами: без сброса следующий запуск
+  // стартовал бы с замороженным счётчиком и номерами прошлого прогона.
+  // Встаём сразу на актуальное число готовых файлов — догонять на старте
+  // нечего, а «доигрывать» результаты прошлого прогона нельзя
+  const currentRef = React.useRef(current);
+  currentRef.current = current;
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+
+    setIsStopped(false);
+    resetDisplayed(currentRef.current);
+  }, [isOpen, resetDisplayed]);
+
+  const percent = total > 0 ? Math.round((displayed / total) * 100) : 0;
 
   const currentJobId = useUIStore((state) => state.currentJobId);
   const resetProcessingState = useUIStore(
@@ -56,6 +80,8 @@ export const ProgressModal: React.FC = () => {
     if (isCancelling) return;
 
     setIsCancelling(true);
+    // Счётчик замирает сразу: доигрывать номера отменённых файлов нельзя
+    setIsStopped(true);
 
     try {
       if (currentJobId) {
@@ -101,7 +127,7 @@ export const ProgressModal: React.FC = () => {
       <div className={styles.content}>
         <div className={styles.row}>
           <p className={styles.label}>
-            Processing: {current}/{total}
+            Processing: {displayed}/{total}
           </p>
           <Button
             variant="secondary"
@@ -123,7 +149,7 @@ export const ProgressModal: React.FC = () => {
               currentProcessingProvider}
           </p>
         )}
-        <ProgressBar value={percent} animated={percent < 100} />
+        <ProgressBar value={percent} animated={percent < 100} smooth={false} />
       </div>
     </Modal>
   );

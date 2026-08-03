@@ -53,6 +53,8 @@ test('starts export, stores artifacts and opens success modal', async () => {
     data: {
       export_status: 'completed',
       export_progress: 100,
+      export_processed_files: 1,
+      export_total_files: 1,
       export_artifacts: [
         {
           export_format: 'csv',
@@ -76,6 +78,11 @@ test('starts export, stores artifacts and opens success modal', async () => {
   });
   expect(useUIStore.getState().exportArtifacts).toHaveLength(1);
 
+  // Первый прогон таймеров доводит счётчик до конца, второй — отрабатывает
+  // задержку перед закрытием модалки
+  act(() => {
+    jest.advanceTimersByTime(500);
+  });
   act(() => {
     jest.advanceTimersByTime(500);
   });
@@ -91,7 +98,9 @@ test('progress bar matches the server export progress', async () => {
   mockedJobsApi.getExportStatus.mockResolvedValue({
     data: {
       export_status: 'processing',
-      export_progress: 40,
+      export_progress: 50,
+      export_processed_files: 1,
+      export_total_files: 2,
       export_artifacts: [],
     },
   } as never);
@@ -118,13 +127,13 @@ test('progress bar matches the server export progress', async () => {
   render(<ExportModal />);
 
   await waitFor(() => {
-    expect(screen.getByRole('progressbar')).toHaveAttribute(
-      'aria-valuenow',
-      '40',
-    );
+    expect(screen.getByText('Exporting: 1/2')).toBeInTheDocument();
   });
-  // Счётчик согласован с процентом: round(40% * 2) = 1 из 2.
-  expect(screen.getByText('Exporting: 1/2')).toBeInTheDocument();
+  // Полоса считается из отображаемого числа, а не из отдельного процента
+  expect(screen.getByRole('progressbar')).toHaveAttribute(
+    'aria-valuenow',
+    '50',
+  );
 });
 
 test('completes export after a previous cancel (no stale cancelled flag)', async () => {
@@ -133,6 +142,8 @@ test('completes export after a previous cancel (no stale cancelled flag)', async
     data: {
       export_status: 'completed',
       export_progress: 100,
+      export_processed_files: 1,
+      export_total_files: 1,
       export_artifacts: [],
     },
   } as never);
@@ -154,6 +165,11 @@ test('completes export after a previous cancel (no stale cancelled flag)', async
   await waitFor(() => {
     expect(mockedJobsApi.getExportStatus).toHaveBeenCalled();
   });
+  // Первый прогон таймеров доводит счётчик до конца, второй — отрабатывает
+  // задержку перед закрытием модалки
+  act(() => {
+    jest.advanceTimersByTime(500);
+  });
   act(() => {
     jest.advanceTimersByTime(500);
   });
@@ -172,7 +188,13 @@ test('keeps polling when the server reports the export is already running', asyn
   });
   mockedJobsApi.startExport.mockRejectedValue(conflict);
   mockedJobsApi.getExportStatus.mockResolvedValue({
-    data: { export_status: 'completed', export_progress: 100, export_artifacts: [] },
+    data: {
+      export_status: 'completed',
+      export_progress: 100,
+      export_processed_files: 1,
+      export_total_files: 1,
+      export_artifacts: [],
+    },
   } as never);
   useToastStore.setState({ toasts: [] });
 
@@ -180,6 +202,11 @@ test('keeps polling when the server reports the export is already running', asyn
 
   await waitFor(() => {
     expect(mockedJobsApi.getExportStatus).toHaveBeenCalled();
+  });
+  // Первый прогон таймеров доводит счётчик до конца, второй — отрабатывает
+  // задержку перед закрытием модалки
+  act(() => {
+    jest.advanceTimersByTime(500);
   });
   act(() => {
     jest.advanceTimersByTime(500);
@@ -192,13 +219,22 @@ test('keeps polling when the server reports the export is already running', asyn
 test('re-exports the same job after a completed export', async () => {
   mockedJobsApi.startExport.mockResolvedValue({} as never);
   mockedJobsApi.getExportStatus.mockResolvedValue({
-    data: { export_status: 'completed', export_progress: 100, export_artifacts: [] },
+    data: {
+      export_status: 'completed',
+      export_progress: 100,
+      export_processed_files: 1,
+      export_total_files: 1,
+      export_artifacts: [],
+    },
   } as never);
 
   render(<ExportModal />);
 
   await waitFor(() => {
     expect(mockedJobsApi.startExport).toHaveBeenCalledTimes(1);
+  });
+  await act(async () => {
+    jest.advanceTimersByTime(500);
   });
   await act(async () => {
     jest.advanceTimersByTime(500);
@@ -220,7 +256,12 @@ test('re-exports the same job after a completed export', async () => {
 test('cancels the server job when Cancel is clicked', async () => {
   mockedJobsApi.startExport.mockResolvedValue({} as never);
   mockedJobsApi.getExportStatus.mockResolvedValue({
-    data: { export_status: 'processing', export_progress: 10 },
+    data: {
+      export_status: 'processing',
+      export_progress: 10,
+      export_processed_files: 0,
+      export_total_files: 1,
+    },
   } as never);
   mockedJobsApi.cancelExport.mockResolvedValue({} as never);
 
@@ -242,7 +283,12 @@ test('cancels the server job when Cancel is clicked', async () => {
 test('cancels the export on Escape', async () => {
   mockedJobsApi.startExport.mockResolvedValue({} as never);
   mockedJobsApi.getExportStatus.mockResolvedValue({
-    data: { export_status: 'processing', export_progress: 10 },
+    data: {
+      export_status: 'processing',
+      export_progress: 10,
+      export_processed_files: 0,
+      export_total_files: 1,
+    },
   } as never);
 
   render(<ExportModal />);
@@ -274,7 +320,12 @@ test('ignores Escape when the modal is closed', () => {
 test('stops polling after cancel', async () => {
   mockedJobsApi.startExport.mockResolvedValue({} as never);
   mockedJobsApi.getExportStatus.mockResolvedValue({
-    data: { export_status: 'processing', export_progress: 10 },
+    data: {
+      export_status: 'processing',
+      export_progress: 10,
+      export_processed_files: 0,
+      export_total_files: 1,
+    },
   } as never);
   mockedJobsApi.cancelExport.mockResolvedValue({} as never);
 
@@ -312,7 +363,12 @@ test('closes the modal when there is no current job id', () => {
 test('closes the modal even if the cancel request fails', async () => {
   mockedJobsApi.startExport.mockResolvedValue({} as never);
   mockedJobsApi.getExportStatus.mockResolvedValue({
-    data: { export_status: 'processing', export_progress: 10 },
+    data: {
+      export_status: 'processing',
+      export_progress: 10,
+      export_processed_files: 0,
+      export_total_files: 1,
+    },
   } as never);
   mockedJobsApi.cancelExport.mockRejectedValue(new Error('500'));
   const consoleError = jest
@@ -387,4 +443,92 @@ test('shows error toast and resets export state when export fails', async () => 
   expect(useToastStore.getState().toasts).toMatchObject([
     { message: 'Export failed', type: 'error' },
   ]);
+});
+
+test('plays every intermediate number even when the export is instant', async () => {
+  // Регрессия: сервер отдавал 66/66 первым же ответом, и пользователь видел
+  // «Exporting: 66/66» при пустой полосе — промежуточных номеров не было
+  mockedJobsApi.startExport.mockResolvedValue({} as never);
+  mockedJobsApi.getExportStatus.mockResolvedValue({
+    data: {
+      export_status: 'completed',
+      export_progress: 100,
+      export_processed_files: 66,
+      export_total_files: 66,
+      export_artifacts: [],
+    },
+  } as never);
+
+  render(<ExportModal />);
+
+  await waitFor(() => {
+    expect(mockedJobsApi.getExportStatus).toHaveBeenCalled();
+  });
+
+  const seen: number[] = [];
+
+  for (let tick = 0; tick < 60; tick += 1) {
+    act(() => {
+      jest.advanceTimersByTime(40);
+    });
+
+    const label = screen.queryByText(/^Exporting: /);
+    if (!label) break;
+
+    const [displayed, total] = label
+      .textContent!.replace('Exporting: ', '')
+      .split('/')
+      .map(Number);
+
+    seen.push(displayed);
+    // Цифра и полоса всегда из одного числа
+    expect(screen.getByRole('progressbar')).toHaveAttribute(
+      'aria-valuenow',
+      String(Math.round((displayed / total) * 100)),
+    );
+  }
+
+  // Шаг адаптивный: 66 файлов проходят примерно за 25 кадров, но
+  // промежуточные номера пользователь видит, а не один финальный скачок
+  expect(seen.length).toBeGreaterThan(10);
+  expect(seen[0]).toBeLessThan(10);
+  expect(seen).toEqual([...seen].sort((a, b) => a - b));
+  expect(seen).toContain(66);
+  // Модалка не закрывается, пока счётчик не дошёл до конца
+  expect(seen.indexOf(66)).toBeGreaterThan(10);
+});
+
+test('freezes the counter after cancel', async () => {
+  mockedJobsApi.startExport.mockResolvedValue({} as never);
+  mockedJobsApi.getExportStatus.mockResolvedValue({
+    data: {
+      export_status: 'processing',
+      export_progress: 10,
+      export_processed_files: 50,
+      export_total_files: 66,
+    },
+  } as never);
+
+  render(<ExportModal />);
+
+  await waitFor(() => {
+    expect(mockedJobsApi.getExportStatus).toHaveBeenCalled();
+  });
+
+  act(() => {
+    jest.advanceTimersByTime(40);
+  });
+
+  act(() => {
+    screen.getByText('Cancel').click();
+  });
+  act(() => {
+    jest.advanceTimersByTime(5000);
+  });
+
+  // Счётчик не доигрывает до конца и не открывает успех: файлы больше
+  // не пишутся, экспорт остановлен
+  expect(useUIStore.getState().isExportModalOpen).toBe(false);
+  expect(useUIStore.getState().isSuccessModalOpen).toBe(false);
+  expect(useUIStore.getState().isExporting).toBe(false);
 });

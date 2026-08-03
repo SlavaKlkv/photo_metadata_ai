@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { jobsApi } from 'services/api/api';
 import { useAppStore } from 'store/useAppStore';
@@ -323,5 +323,103 @@ test('ignores repeated clicks while cancelling', async () => {
   resolveCancel();
   await waitFor(() => {
     expect(useUIStore.getState().isProcessing).toBe(false);
+  });
+});
+
+describe('stepwise counter', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  const advance = (ms: number) => {
+    act(() => {
+      jest.advanceTimersByTime(ms);
+    });
+  };
+
+  test('plays intermediate numbers when a batch of files finishes at once', () => {
+    useAppStore.setState({ jobs: makeJobs(10, 0) });
+    const { rerender } = render(<ProgressModal />);
+
+    expect(screen.getByText('Processing: 0/10')).toBeInTheDocument();
+
+    // Опрос принёс сразу шесть готовых файлов — раньше номер прыгал 0 → 6
+    act(() => {
+      useAppStore.setState({ jobs: makeJobs(10, 6) });
+    });
+    rerender(<ProgressModal />);
+
+    advance(40);
+    expect(screen.getByText('Processing: 1/10')).toBeInTheDocument();
+    // Полоса считается из показанного числа, а не из отдельного процента
+    expect(screen.getByRole('progressbar')).toHaveAttribute(
+      'aria-valuenow',
+      '10',
+    );
+
+    advance(40);
+    expect(screen.getByText('Processing: 2/10')).toBeInTheDocument();
+
+    advance(400);
+    expect(screen.getByText('Processing: 6/10')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toHaveAttribute(
+      'aria-valuenow',
+      '60',
+    );
+  });
+
+  test('advances the retry-failed counter the same way', () => {
+    // Повтор упавших идёт через тот же счётчик: своя область, но
+    // те же пошаговые номера
+    const jobs = makeJobs(10, 8).map((job, index) =>
+      index >= 8 ? { ...job, status: 'processing' as const } : job,
+    );
+    useAppStore.setState({ jobs });
+    useUIStore.setState({ processingScopeIds: ['file-9', 'file-10'] });
+
+    const { rerender } = render(<ProgressModal />);
+    expect(screen.getByText('Processing: 0/2')).toBeInTheDocument();
+
+    act(() => {
+      useAppStore.setState({
+        jobs: jobs.map((job, index) =>
+          index >= 8 ? { ...job, status: 'done' as const } : job,
+        ),
+      });
+    });
+    rerender(<ProgressModal />);
+
+    advance(40);
+    expect(screen.getByText('Processing: 1/2')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toHaveAttribute(
+      'aria-valuenow',
+      '50',
+    );
+
+    advance(40);
+    expect(screen.getByText('Processing: 2/2')).toBeInTheDocument();
+  });
+
+  test('freezes the counter once cancel is pressed', () => {
+    useAppStore.setState({ jobs: makeJobs(10, 0) });
+    const { rerender } = render(<ProgressModal />);
+
+    act(() => {
+      screen.getByRole('button', { name: /cancel/i }).click();
+    });
+
+    act(() => {
+      useAppStore.setState({ jobs: makeJobs(10, 9) });
+    });
+    rerender(<ProgressModal />);
+
+    advance(2000);
+
+    // Отменённый прогон не доигрывает номера
+    expect(screen.getByText('Processing: 0/10')).toBeInTheDocument();
   });
 });
