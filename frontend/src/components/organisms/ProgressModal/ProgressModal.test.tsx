@@ -160,11 +160,18 @@ describe('cancelling a partial run', () => {
     });
   });
 
+  test('оставляет на кнопке обычный «Cancel» и при повторном прогоне', () => {
+    render(<ProgressModal />);
+
+    const button = screen.getByRole('button', { name: 'Cancel' });
+    expect(button).toHaveTextContent(/^Cancel$/);
+  });
+
   test('uses the retry-specific cancel endpoint', async () => {
     const user = userEvent.setup();
     render(<ProgressModal />);
 
-    await user.click(screen.getByRole('button', { name: /cancel retry/i }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     await waitFor(() => {
       expect(mockedJobsApi.cancelRetryFailed).toHaveBeenCalledWith('job-1');
@@ -177,7 +184,7 @@ describe('cancelling a partial run', () => {
     const user = userEvent.setup();
     render(<ProgressModal />);
 
-    await user.click(screen.getByRole('button', { name: /cancel retry/i }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     await waitFor(() => {
       expect(useUIStore.getState().isProgressModalOpen).toBe(false);
@@ -204,7 +211,7 @@ describe('cancelling a partial run', () => {
     const user = userEvent.setup();
     render(<ProgressModal />);
 
-    await user.click(screen.getByRole('button', { name: /cancel retry/i }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     await waitFor(() => {
       expect(useToastStore.getState().toasts).toHaveLength(1);

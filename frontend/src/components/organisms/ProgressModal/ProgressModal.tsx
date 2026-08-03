@@ -135,11 +135,7 @@ export const ProgressModal: React.FC = () => {
             disabled={isCancelling}
             onClick={handleCancel}
           >
-            {isCancelling
-              ? "Cancelling..."
-              : isPartialRun
-                ? "Cancel retry"
-                : "Cancel"}
+            {isCancelling ? "Cancelling..." : "Cancel"}
           </Button>
         </div>
         {currentProcessingProvider && (
