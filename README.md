@@ -36,7 +36,7 @@
 
 Завершённый экспорт — шаг 5, готовые к загрузке на сток фотографии и CSV:
 
-![Экспорт завершён](docs/screenshots/12_export_completed.png)
+![Экспорт завершён](docs/screenshots/13_export_completed.png)
 
 Все экраны с описаниями — в [docs/screenshots/](docs/screenshots/README.md).
 
