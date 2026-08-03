@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Photo Metadata AI — метаданные для фотостоков за минуты</title>
+<meta name="description" content="Десктопное приложение для macOS: AI генерирует полный набор метаданных для фотостоков — заголовок, описание, ключевые слова, категории, лицензию, локацию, editorial-блок и релизы. Под Adobe Stock, Shutterstock и Getty Images они пересобираются автоматически, вшиваются в IPTC и выгружаются в CSV.">
+<link rel="icon" href="../../desktop/build/icon.svg">
+<style>
+  :root {
+    --bg: #0b0b0f;
+    --bg-soft: #121218;
+    --panel: #17171d;
+    --panel-2: #1d1d25;
+    --line: rgba(255, 255, 255, 0.09);
+    --line-strong: rgba(255, 255, 255, 0.16);
+    --text: #ececf1;
+    --muted: #a1a1ae;
+    --dim: #77778a;
+    --accent: #8b88f8;
+    --accent-2: #aaa8ff;
+    --accent-dim: rgba(139, 136, 248, 0.14);
+    --green: #4ac48a;
+    --radius: 16px;
+    --maxw: 1120px;
+    --header-h: 64px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  a { color: var(--accent-2); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  img { max-width: 100%; display: block; }
+
+  .wrap { width: 100%; max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+
+  /* Якоря не должны уезжать под липкую шапку */
+  section[id], div[id] { scroll-margin-top: calc(var(--header-h) + 8px); }
+
+  /* ---------- header ---------- */
+
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: rgba(11, 11, 15, 0.82);
+    backdrop-filter: saturate(160%) blur(14px);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .nav {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    height: var(--header-h);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    font-weight: 600;
+    color: var(--text);
+    margin-right: auto;
+  }
+  .brand:hover { text-decoration: none; }
+  .brand img { width: 30px; height: 30px; border-radius: 8px; }
+
+  .nav-links { display: flex; gap: 22px; font-size: 14.5px; }
+  .nav-links a {
+    position: relative;
+    color: var(--muted);
+    padding: 4px 0;
+    transition: color .18s ease;
+  }
+  .nav-links a::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -2px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transition: transform .2s ease;
+  }
+  .nav-links a:hover { color: var(--text); text-decoration: none; }
+  .nav-links a.active { color: var(--text); }
+  .nav-links a.active::after { transform: scaleX(1); }
+
+  /* ---------- buttons ---------- */
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 12px 22px;
+    border-radius: 11px;
+    font-size: 15px;
+    font-weight: 550;
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
+  .btn:hover { text-decoration: none; }
+  .btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+
+  .btn-primary {
+    background: linear-gradient(180deg, #8f8cfa, #6f6ce4);
+    color: #0d0d14;
+    box-shadow: 0 8px 24px -10px rgba(126, 122, 240, 0.9);
+  }
+  .btn-primary:hover { filter: brightness(1.07); }
+
+  .btn-ghost {
+    border-color: var(--line-strong);
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.03);
+  }
+  .btn-ghost:hover { background: rgba(255, 255, 255, 0.07); }
+
+  .btn-sm { padding: 9px 16px; font-size: 14px; }
+
+  /* ---------- hero ---------- */
+
+  .hero {
+    position: relative;
+    padding: 88px 0 0;
+    text-align: center;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: "";
+    position: absolute;
+    top: -280px;
+    left: 50%;
+    width: 900px;
+    height: 620px;
+    transform: translateX(-50%);
+    background: radial-gradient(closest-side, rgba(129, 125, 240, 0.28), transparent);
+    pointer-events: none;
+  }
+  .hero > * { position: relative; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--line-strong);
+    background: var(--accent-dim);
+    color: var(--accent-2);
+    font-size: 13.5px;
+    margin-bottom: 26px;
+  }
+
+  h1 {
+    margin: 0 auto 20px;
+    max-width: 15ch;
+    font-size: clamp(38px, 6.2vw, 62px);
+    line-height: 1.08;
+    letter-spacing: -0.025em;
+    font-weight: 680;
+  }
+  h1 .grad {
+    background: linear-gradient(120deg, var(--accent-2), #6f6ce4);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .lede {
+    margin: 0 auto;
+    max-width: 64ch;
+    font-size: clamp(16.5px, 2vw, 19px);
+    color: var(--muted);
+  }
+
+  .cta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    margin: 34px 0 12px;
+  }
+
+  .cta-note { color: var(--dim); font-size: 13.5px; }
+
+  .shot {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--panel);
+    overflow: hidden;
+    box-shadow: 0 40px 80px -40px rgba(0, 0, 0, 0.9);
+  }
+
+  .hero-shot {
+    margin-top: 44px;
+    mask-image: linear-gradient(180deg, #000 72%, transparent);
+    -webkit-mask-image: linear-gradient(180deg, #000 72%, transparent);
+  }
+  .hero-shot img { border-radius: var(--radius); }
+
+  /* ---------- sections ---------- */
+
+  /* Отступ одинаковый у всех разделов — иначе шаг между ними «плавает». */
+  section { padding: 72px 0; }
+
+  .eyebrow {
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    margin: 0 0 12px;
+  }
+
+  h2 {
+    margin: 0 0 14px;
+    font-size: clamp(27px, 3.6vw, 36px);
+    line-height: 1.18;
+    letter-spacing: -0.02em;
+    font-weight: 640;
+  }
+
+  .section-lede {
+    margin: 0 0 36px;
+    max-width: 66ch;
+    color: var(--muted);
+    font-size: 17px;
+  }
+
+  /* ---------- cards ---------- */
+
+  .grid {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+
+  .card {
+    padding: 26px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  }
+
+  .card h3 {
+    margin: 0 0 9px;
+    font-size: 17.5px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .card p { margin: 0; color: var(--muted); font-size: 15px; }
+
+  .icon {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    margin-bottom: 18px;
+    border-radius: 11px;
+    background: var(--accent-dim);
+    border: 1px solid rgba(139, 136, 248, 0.24);
+  }
+  .icon svg { width: 21px; height: 21px; stroke: var(--accent-2); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ---------- steps ---------- */
+
+  .steps {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  }
+
+  .step {
+    padding: 22px;
+    border: 1px solid var(--line);
+    border-radius: 13px;
+    background: var(--panel);
+  }
+  .step .n {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    margin-bottom: 14px;
+    border-radius: 50%;
+    border: 1px solid rgba(139, 136, 248, 0.5);
+    color: var(--accent-2);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .step h4 { margin: 0 0 6px; font-size: 15.5px; font-weight: 600; }
+  .step p { margin: 0; color: var(--dim); font-size: 14px; line-height: 1.5; }
+
+  /* ---------- showcase ---------- */
+
+  .showcase { display: grid; gap: 56px; }
+  .showcase figure { margin: 0; }
+  .showcase figcaption { margin-top: 14px; color: var(--dim); font-size: 14.5px; }
+
+  /* ---------- gallery ---------- */
+
+  .gallery {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    margin-top: 26px;
+  }
+
+  .gallery a {
+    display: block;
+    border: 1px solid var(--line);
+    border-radius: 13px;
+    background: var(--panel);
+    overflow: hidden;
+    color: inherit;
+    transition: border-color .18s ease, transform .18s ease;
+  }
+  .gallery a:hover {
+    text-decoration: none;
+    border-color: var(--line-strong);
+    transform: translateY(-2px);
+  }
+  .gallery img {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    object-position: top center;
+    background: #0a0a0e;
+    border-bottom: 1px solid var(--line);
+  }
+  .gallery .meta { padding: 14px 16px 16px; }
+  .gallery .meta b {
+    display: block;
+    font-size: 14.5px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .gallery .meta span { color: var(--dim); font-size: 13.5px; line-height: 1.45; }
+
+  /* ---------- split / privacy ---------- */
+
+  .split {
+    display: grid;
+    gap: 40px;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    align-items: center;
+  }
+
+  .list { margin: 0; padding: 0; list-style: none; display: grid; gap: 14px; }
+  .list li { display: flex; gap: 12px; color: var(--muted); font-size: 15.5px; }
+  .list .tick {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin-top: 2px;
+    border-radius: 50%;
+    background: rgba(74, 196, 138, 0.14);
+    display: grid;
+    place-items: center;
+  }
+  .list .tick svg { width: 11px; height: 11px; stroke: var(--green); fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  .list b { color: var(--text); font-weight: 600; }
+
+  /* ---------- chips ---------- */
+
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip {
+    padding: 9px 16px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: var(--panel);
+    color: var(--muted);
+    font-size: 14.5px;
+  }
+  .chip b { color: var(--text); font-weight: 600; }
+
+  /* ---------- panels / code ---------- */
+
+  .panel {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: linear-gradient(180deg, var(--panel-2), var(--bg-soft));
+    padding: 40px;
+  }
+
+  code, pre {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+    font-size: 14px;
+  }
+  code { color: var(--accent-2); }
+
+  pre {
+    margin: 20px 0 0;
+    padding: 18px 20px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #0a0a0e;
+    color: var(--muted);
+    overflow-x: auto;
+    line-height: 1.75;
+  }
+  pre code { color: inherit; }
+
+  .stack {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    font-size: 15px;
+  }
+  .stack th, .stack td {
+    text-align: left;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  .stack th { color: var(--dim); font-weight: 600; white-space: nowrap; }
+  .stack td { color: var(--muted); }
+  .stack tr:last-child th, .stack tr:last-child td { border-bottom: 0; }
+
+  .table-scroll { overflow-x: auto; }
+
+  /* ---------- final cta ---------- */
+
+  .final {
+    text-align: center;
+    padding: 72px 24px;
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    background:
+      radial-gradient(closest-side at 50% 0%, rgba(129, 125, 240, 0.2), transparent),
+      linear-gradient(180deg, var(--panel-2), var(--bg-soft));
+  }
+  .final h2 { max-width: 20ch; margin-inline: auto; }
+  .final p { color: var(--muted); max-width: 55ch; margin: 0 auto 28px; }
+
+  /* ---------- footer ---------- */
+
+  footer {
+    border-top: 1px solid var(--line);
+    padding: 34px 0;
+    color: var(--dim);
+    font-size: 14px;
+  }
+  .foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .foot-links { display: flex; flex-wrap: wrap; gap: 20px; }
+  .foot-links a { color: var(--muted); }
+
+  @media (max-width: 860px) {
+    .nav-links { display: none; }
+  }
+  @media (max-width: 720px) {
+    .hero { padding-top: 56px; }
+    section { padding: 56px 0; }
+    .panel { padding: 26px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .gallery a, .nav-links a, .nav-links a::after { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="#top">
+      <img src="../../desktop/build/icon.svg" alt="">
+      Photo Metadata AI
+    </a>
+    <nav class="nav-links" id="nav-links">
+      <a href="#features">Возможности</a>
+      <a href="#fields">Метаданные</a>
+      <a href="#how">Как работает</a>
+      <a href="#screens">Скриншоты</a>
+      <a href="#install">Установка</a>
+    </nav>
+    <a class="btn btn-ghost btn-sm" href="https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.1.0/Photo-Metadata-AI-1.1.0-universal.dmg">Скачать</a>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="wrap">
+      <span class="badge">macOS · Apple Silicon и Intel</span>
+      <h1>Метаданные для фотостоков <span class="grad">за минуты</span></h1>
+      <p class="lede">
+        Десктопное приложение анализирует каждый кадр с помощью AI и генерирует полный
+        набор полей, которых требуют стоки — от заголовка и ключевых слов до лицензии,
+        локации, editorial-блока и релизов. Под Adobe Stock, Shutterstock или Getty Images
+        они пересобираются автоматически, вшиваются в файлы и выгружаются в CSV.
+      </p>
+    </div>
+    <div class="wrap hero-shot">
+      <div class="shot">
+        <img src="../screenshots/04_start_screen.png" alt="Главный экран приложения: зона drag &amp; drop, панель Context &amp; Settings и карточки возможностей">
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURES -->
+  <section id="features">
+    <div class="wrap">
+      <p class="eyebrow">Возможности</p>
+      <h2>Весь путь от папки с кадрами до готовой загрузки</h2>
+      <p class="section-lede">
+        Приложение закрывает рутину, которая обычно съедает вечер после съёмки: описания,
+        ключевые слова, категории, проверку под требования площадки и подготовку файлов.
+      </p>
+
+      <div class="grid">
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+          <h3>Пакетная обработка</h3>
+          <p>Загрузка сотен фотографий за раз, прогресс с возможностью отмены и повтор только упавших файлов.</p>
+        </div>
+
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></div>
+          <h3>Несколько AI-провайдеров</h3>
+          <p>Локальная модель и облачные сервисы образуют кольцо fallback: при таймауте, 429 или ошибке файл уходит к следующему — с cooldown и адаптивным ограничением параллельных запросов.</p>
+        </div>
+
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/><path d="M15.5 17.5l2 2 4-4.5"/></svg></div>
+          <h3>Правила стоков — после генерации</h3>
+          <p>Модель не знает про площадку. Лимиты title, число и состав ключевых слов, словари категорий, типы лицензий и editorial-поля накладываются при маппинге, а автофикс правит формальные ошибки. Смена площадки не требует перегенерации.</p>
+        </div>
+
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></svg></div>
+          <h3>Проверка перед экспортом</h3>
+          <p>Таблица результатов, панель Metadata Preview, быстрые фильтры и сводка валидации, ручная правка любого поля и перегенерация отдельных файлов. Отредактированные поля отмечены подсветкой подписи — видно, что правил человек, а что сгенерировал AI.</p>
+        </div>
+
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 3v11"/><path d="M8 10.5l4 4 4-4"/><path d="M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17"/></svg></div>
+          <h3>Экспорт</h3>
+          <p>CSV под формат выбранного стока плюс копии фотографий со вшитыми IPTC-метаданными. Можно выгрузить только файлы со статусом Ready или без ошибок.</p>
+        </div>
+
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 3l7.5 3.5v5c0 4.5-3 8-7.5 9.5-4.5-1.5-7.5-5-7.5-9.5v-5L12 3Z"/><path d="M9 12l2 2 4-4"/></svg></div>
+          <h3>Онбординг и ключи</h3>
+          <p>Приложение само находит доступные провайдеры, проверяет ключи и хранит их в пользовательском каталоге данных — вне бандла приложения.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FIELDS -->
+  <section id="fields">
+    <div class="wrap">
+      <p class="eyebrow">Метаданные</p>
+      <h2>Не только заголовок и ключевые слова</h2>
+      <p class="section-lede">
+        За один проход по кадру AI возвращает набор полей намеренно с запасом — чтобы под
+        конкретный сток их можно было урезать, а не догенерировать. Все текстовые поля
+        только на английском, как требуют площадки.
+      </p>
+
+      <div class="grid">
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/></svg></div>
+          <h3>Основное</h3>
+          <p><code>title</code> минимум из 5 значимых слов, <code>description</code> с законченным фактическим предложением, <code>keywords</code> — не менее 15 уникальных тегов, упорядоченных по убыванию важности.</p>
+        </div>
+
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/></svg></div>
+          <h3>Классификация</h3>
+          <p><code>categories</code> — 1–2 широких кандидата, <code>license_type</code> (commercial или editorial), а также флаги <code>is_illustration</code>, <code>mature_content</code> и раскрытие AI-контента.</p>
+        </div>
+
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg></div>
+          <h3>Локация</h3>
+          <p>Структурные <code>sublocation</code>, <code>city</code>, <code>province_state</code>, <code>country</code> и читаемая строка. Заполняются только когда место действительно известно — модель не догадывается.</p>
+        </div>
+
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z"/><path d="M8 12h8M8 16h5"/></svg></div>
+          <h3>Editorial</h3>
+          <p>Признак editorial-съёмки, полная фактическая подпись и дата события — заполняются, когда контекст съёмки действительно указывает на editorial.</p>
+        </div>
+
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M16 6.5a3 3 0 0 1 0 5.6M18 19a5.4 5.4 0 0 0-2.2-4.4"/></svg></div>
+          <h3>Люди и права</h3>
+          <p>Есть ли люди в кадре и сколько их, известен ли model release, список имеющихся релизов — площадки требуют этого для съёмок с людьми и узнаваемой собственностью.</p>
+        </div>
+
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M4 7h16v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7Z"/><path d="M9 7V4h6v3"/><path d="M8 12h8M8 16h5"/></svg></div>
+          <h3>IPTC прямо в файле</h3>
+          <p>Метаданные вшиваются в копии фотографий, а не живут отдельной таблицей: описание, название, ключевые слова, категория и локация едут вместе с кадром.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MAPPING -->
+  <section>
+    <div class="wrap">
+      <p class="eyebrow">Маппинг</p>
+      <h2>Один набор — три формата площадок</h2>
+      <p class="section-lede">
+        Правила стока применяются к уже сгенерированным полям, поэтому переключение
+        площадки — это пересборка, а не новый прогон через AI.
+      </p>
+
+      <div class="panel" style="padding:8px 28px">
+        <div class="table-scroll">
+          <table class="stack">
+            <tr>
+              <th style="width:200px">Лимит title</th>
+              <td>Adobe Stock — 70 символов, Getty Images — 200, Shutterstock — 2048 с предупреждением после 150</td>
+            </tr>
+            <tr>
+              <th>Ключевые слова</th>
+              <td>Adobe Stock — до 49, Getty и Shutterstock — до 50. Дубликаты удаляются, порядок по важности сохраняется</td>
+            </tr>
+            <tr>
+              <th>Категории</th>
+              <td>«wildlife» → <code>Nature</code> у Getty, <code>Animals/Wildlife</code> у Shutterstock, <code>Animals</code> у Adobe Stock. Adobe принимает одну категорию, остальные — две</td>
+            </tr>
+            <tr>
+              <th>Тип лицензии</th>
+              <td>Getty — creative / editorial, Adobe Stock — standard / extended / editorial, Shutterstock — commercial / editorial</td>
+            </tr>
+            <tr>
+              <th>Колонки CSV</th>
+              <td>У Getty есть <code>Category 2</code>, <code>License Type</code> и <code>Editorial Date</code>; у Adobe Stock — <code>AI Disclosure</code>; у Shutterstock — <code>Illustration</code> и <code>Mature Content</code></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <p style="margin-top:22px;color:var(--dim);font-size:14.5px;max-width:70ch">
+        Валидация делит замечания на ошибки и рекомендации, а автофикс чинит формальные:
+        добивает короткий title, обрезает длинный, приводит число ключевых слов к границам,
+        убирает дубликаты, подставляет категорию по умолчанию. Поля, которые вы правили
+        руками, автофикс не трогает.
+      </p>
+    </div>
+  </section>
+
+  <!-- HOW -->
+  <section id="how">
+    <div class="wrap">
+      <p class="eyebrow">Как работает</p>
+      <h2>Мастер из пяти шагов</h2>
+      <p class="section-lede">Линейный сценарий без скрытых настроек: на каждом шаге видно, что уже сделано и что осталось.</p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="n">1</div>
+          <h4>Upload</h4>
+          <p>Перетащите JPEG-файлы в окно или выберите их в диалоге.</p>
+        </div>
+        <div class="step">
+          <div class="n">2</div>
+          <h4>Context</h4>
+          <p>Заметки о съёмке, AI-провайдер, сток и формат экспорта.</p>
+        </div>
+        <div class="step">
+          <div class="n">3</div>
+          <h4>Process</h4>
+          <p>Генерация полей без привязки к площадке, прогресс, отмена и повтор упавших.</p>
+        </div>
+        <div class="step">
+          <div class="n">4</div>
+          <h4>Review</h4>
+          <p>Поля пересобраны под сток: проверка, правка, фильтры, перегенерация.</p>
+        </div>
+        <div class="step">
+          <div class="n">5</div>
+          <h4>Export</h4>
+          <p>CSV и копии фотографий с метаданными — в папку результатов.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SCREENS -->
+  <section id="screens">
+    <div class="wrap">
+      <p class="eyebrow">Скриншоты</p>
+      <h2>Как это выглядит в работе</h2>
+      <p class="section-lede">Снято 3 августа 2026 года на macOS, сборка Photo Metadata AI 1.1.0-universal.</p>
+
+      <div class="showcase">
+        <figure>
+          <div class="shot">
+            <img src="../screenshots/07_review_metadata_preview.png" alt="Шаг Review: таблица результатов и панель Metadata Preview с заголовком, описанием, ключевыми словами и категорией">
+          </div>
+          <figcaption>
+            Шаг 4 «Review»: таблица результатов и панель Metadata Preview с заголовком, описанием,
+            ключевыми словами и категорией. Поле Keywords отредактировано вручную — его подпись
+            подсвечена. Рядом — быстрые фильтры и ссылка «Retry failed» для упавших файлов.
+          </figcaption>
+        </figure>
+
+        <figure>
+          <div class="shot">
+            <img src="../screenshots/13_export_completed.png" alt="Экспорт завершён: фотографии готовы к загрузке на сток, кнопки «Open CSV file» и «Open folder»" loading="lazy">
+          </div>
+          <figcaption>
+            Шаг 5 «Export»: экспорт завершён — фотографии готовы к загрузке на сток,
+            CSV и папку результатов можно открыть прямо из приложения.
+          </figcaption>
+        </figure>
+
+        <figure>
+          <div class="shot">
+            <img src="../screenshots/15_exported_file_iptc_metadata.png" alt="Экспортированный JPEG в «Просмотре» macOS с вшитыми IPTC-полями" loading="lazy">
+          </div>
+          <figcaption>
+            Метаданные действительно внутри файла: экспортированный JPEG в «Просмотре» macOS —
+            описание, город, страна, ключевые слова, название и категория.
+          </figcaption>
+        </figure>
+      </div>
+
+      <p style="margin-top:40px">
+        <a class="btn btn-ghost" href="screens.html" target="_blank" rel="noopener">
+          Посмотреть все экраны
+          <svg viewBox="0 0 24 24"><path d="M5 12h13"/><path d="M12.5 6.5L18 12l-5.5 5.5"/></svg>
+        </a>
+      </p>
+    </div>
+  </section>
+
+  <!-- PRIVACY -->
+  <section>
+    <div class="wrap split">
+      <div>
+        <p class="eyebrow">Приватность</p>
+        <h2>Работает локально</h2>
+        <p class="section-lede" style="margin-bottom:28px">
+          Фотографии не покидают компьютер — кроме кадров, которые вы сами отправляете
+          выбранному AI-провайдеру. С локальной моделью обработка полностью офлайн.
+        </p>
+        <ul class="list">
+          <li><span class="tick"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></svg></span><span><b>Ключи хранятся у вас</b> — в пользовательском каталоге данных, вне бандла приложения.</span></li>
+          <li><span class="tick"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></svg></span><span><b>Никакого сервера посередине</b> — бэкенд запускается на вашей машине на <code>127.0.0.1</code>.</span></li>
+          <li><span class="tick"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></svg></span><span><b>Данные переживают обновление</b> — результаты и настройки лежат вне <code>.app</code>.</span></li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="card" style="padding:28px">
+          <h3 style="margin-bottom:16px">AI-провайдеры</h3>
+          <div class="chips" style="margin-bottom:26px">
+            <span class="chip"><b>Локальная модель</b> — Qwen2.5-VL через Ollama</span>
+            <span class="chip"><b>Google Gemini</b></span>
+            <span class="chip"><b>OpenRouter</b></span>
+          </div>
+          <h3 style="margin-bottom:16px">Форматы стоков</h3>
+          <div class="chips">
+            <span class="chip"><b>Adobe Stock</b></span>
+            <span class="chip"><b>Shutterstock</b></span>
+            <span class="chip"><b>Getty Images</b></span>
+          </div>
+          <p style="margin-top:26px;color:var(--dim);font-size:14.5px">
+            Провайдеры образуют кольцо fallback, поэтому один упавший ключ или таймаут
+            не останавливает пакет: файл уходит к следующему провайдеру.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- INSTALL -->
+  <section id="install">
+    <div class="wrap">
+      <p class="eyebrow">Установка</p>
+      <h2>Две минуты до первой обработки</h2>
+      <div class="panel">
+        <div class="steps" style="margin-bottom:32px">
+          <div class="step">
+            <div class="n">1</div>
+            <h4>Откройте образ</h4>
+            <p>Скачанный <code>.dmg</code> монтируется двойным щелчком.</p>
+          </div>
+          <div class="step">
+            <div class="n">2</div>
+            <h4>Перетащите в Applications</h4>
+            <p>Перенесите «Photo Metadata AI.app» в папку программ.</p>
+          </div>
+          <div class="step">
+            <div class="n">3</div>
+            <h4>Пройдите AI Setup</h4>
+            <p>Подключите локальную модель и/или введите ключи облачных провайдеров.</p>
+          </div>
+        </div>
+
+        <p style="color:var(--muted);margin:0">
+          Сборка universal2 — работает и на Apple Silicon, и на Intel. Приложение само
+          сообщает баннером о новой версии; загрузка и установка ручные.
+        </p>
+
+        <h3 style="margin:34px 0 0;font-size:17px">Локальная модель (опционально)</h3>
+        <pre><code>brew install ollama
+ollama serve
+ollama pull qwen2.5vl</code></pre>
+
+        <h3 style="margin:34px 0 8px;font-size:17px">Под капотом</h3>
+        <div class="table-scroll">
+          <table class="stack">
+            <tr><th>Backend</th><td>Python 3.11+, FastAPI, Uvicorn, Pydantic, aiohttp, httpx, Pillow, structlog, iptcinfo3, uv, Ruff, pytest</td></tr>
+            <tr><th>Frontend</th><td>React 18, TypeScript, Zustand, Sass, axios, react-scripts, Jest и Testing Library</td></tr>
+            <tr><th>Desktop</th><td>Electron 33, electron-builder, PyInstaller (universal2), Jest</td></tr>
+          </table>
+        </div>
+        <p style="color:var(--dim);font-size:14.5px;margin:16px 0 0">
+          Electron запускает бинарник бэкенда, FastAPI раздаёт собранный React-фронтенд —
+          один origin, без CORS.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FINAL CTA -->
+  <section>
+    <div class="wrap">
+      <div class="final">
+        <h2>Освободите вечер после съёмки</h2>
+        <p>Загрузите папку с кадрами, проверьте сгенерированные поля и выгрузите готовый пакет для стока.</p>
+        <div class="cta" style="margin-bottom:0">
+          <a class="btn btn-primary" href="https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.1.0/Photo-Metadata-AI-1.1.0-universal.dmg">
+            <svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7.5 11l4.5 4.5 4.5-4.5"/><path d="M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17"/></svg>
+            Скачать для macOS
+          </a>
+          <a class="btn btn-ghost" href="https://github.com/SlavaKlkv/photo_metadata_ai" target="_blank" rel="noopener">Смотреть на GitHub</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <span>Photo Metadata AI</span>
+    <nav class="foot-links">
+      <a href="https://github.com/SlavaKlkv/photo_metadata_ai" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.1.0/Photo-Metadata-AI-1.1.0-universal.dmg">Скачать</a>
+      <a href="screens.html" target="_blank" rel="noopener">Все экраны</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+  // Подсветка активного пункта меню: берём самую верхнюю секцию,
+  // которая уже пересекла нижнюю границу шапки.
+  (function () {
+    var links = Array.prototype.slice.call(
+      document.querySelectorAll('#nav-links a')
+    );
+    var sections = links
+      .map(function (link) {
+        return document.querySelector(link.getAttribute('href'));
+      })
+      .filter(Boolean);
+
+    if (!sections.length) return;
+
+    function setActive(index) {
+      links.forEach(function (link, i) {
+        link.classList.toggle('active', i === index);
+      });
+    }
+
+    function update() {
+      // Линия переключения — в верхней трети окна, а не у самой шапки:
+      // иначе раздел подсвечивается только когда его заголовок уже
+      // уехал под шапку, и подсветка заметно отстаёт от того, что
+      // человек видит на экране.
+      var offset = window.innerHeight * 0.34;
+      var current = -1;
+
+      sections.forEach(function (section, i) {
+        if (section.getBoundingClientRect().top <= offset) current = i;
+      });
+
+      // У самого низа страницы активен последний пункт: короткая
+      // финальная секция иначе никогда не доезжает до границы.
+      if (
+        window.innerHeight + window.scrollY >=
+        document.body.scrollHeight - 2
+      ) {
+        current = sections.length - 1;
+      }
+
+      setActive(current);
+    }
+
+    var ticking = false;
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(function () {
+        update();
+        ticking = false;
+      });
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    update();
+  })();
+</script>
+
+</body>
+</html>

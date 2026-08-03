@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Photo Metadata AI — все экраны приложения</title>
+<meta name="description" content="Все экраны Photo Metadata AI: онбординг, загрузка, обработка, проверка метаданных и экспорт. Сборка 1.1.0-universal.">
+<link rel="icon" href="../../desktop/build/icon.svg">
+<style>
+  :root {
+    --bg: #0b0b0f;
+    --bg-soft: #121218;
+    --panel: #17171d;
+    --panel-2: #1d1d25;
+    --line: rgba(255, 255, 255, 0.09);
+    --line-strong: rgba(255, 255, 255, 0.16);
+    --text: #ececf1;
+    --muted: #a1a1ae;
+    --dim: #77778a;
+    --accent: #8b88f8;
+    --accent-2: #aaa8ff;
+    --accent-dim: rgba(139, 136, 248, 0.14);
+    --radius: 16px;
+    --maxw: 1120px;
+    --header-h: 64px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  a { color: var(--accent-2); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  img { max-width: 100%; display: block; }
+
+  .wrap { width: 100%; max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: rgba(11, 11, 15, 0.82);
+    backdrop-filter: saturate(160%) blur(14px);
+    border-bottom: 1px solid var(--line);
+  }
+  .nav { display: flex; align-items: center; gap: 20px; height: var(--header-h); }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    font-weight: 600;
+    color: var(--text);
+    margin-right: auto;
+  }
+  .brand:hover { text-decoration: none; }
+  .brand img { width: 30px; height: 30px; border-radius: 8px; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 16px;
+    border-radius: 11px;
+    font-size: 14px;
+    font-weight: 550;
+    border: 1px solid var(--line-strong);
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.03);
+    white-space: nowrap;
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.07); text-decoration: none; }
+  .btn-primary {
+    background: linear-gradient(180deg, #8f8cfa, #6f6ce4);
+    border-color: transparent;
+    color: #0d0d14;
+  }
+  .btn-primary:hover { filter: brightness(1.07); background: linear-gradient(180deg, #8f8cfa, #6f6ce4); }
+
+  .intro { padding: 56px 0 28px; }
+  .eyebrow {
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    margin: 0 0 12px;
+  }
+  h1 {
+    margin: 0 0 12px;
+    font-size: clamp(30px, 4.4vw, 42px);
+    line-height: 1.14;
+    letter-spacing: -0.022em;
+    font-weight: 660;
+  }
+  .lede { margin: 0; max-width: 68ch; color: var(--muted); font-size: 17px; }
+
+  .gallery {
+    display: grid;
+    gap: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    padding-bottom: 80px;
+  }
+
+  .gallery button {
+    display: block;
+    width: 100%;
+    padding: 0;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    cursor: zoom-in;
+    border: 1px solid var(--line);
+    border-radius: 13px;
+    background: var(--panel);
+    overflow: hidden;
+    transition: border-color .18s ease, transform .18s ease;
+  }
+  .gallery button:hover { border-color: var(--line-strong); transform: translateY(-2px); }
+  .gallery button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  .gallery img {
+    width: 100%;
+    aspect-ratio: 16 / 11;
+    object-fit: cover;
+    object-position: top center;
+    background: #0a0a0e;
+    border-bottom: 1px solid var(--line);
+  }
+  .gallery .meta { padding: 15px 17px 17px; }
+  .gallery .meta b { display: block; font-size: 15px; font-weight: 600; margin-bottom: 5px; }
+  .gallery .meta span { color: var(--dim); font-size: 14px; line-height: 1.5; }
+
+  /* ---------- lightbox ---------- */
+
+  dialog.lightbox {
+    width: min(96vw, 1500px);
+    max-width: 96vw;
+    max-height: 94vh;
+    padding: 0;
+    border: 1px solid var(--line-strong);
+    border-radius: 16px;
+    background: var(--bg-soft);
+    color: var(--text);
+    overflow: hidden;
+  }
+  dialog.lightbox::backdrop { background: rgba(6, 6, 9, 0.86); }
+
+  .lb-bar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 14px 12px 20px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+  }
+  .lb-title { font-size: 15px; font-weight: 600; margin-right: auto; }
+  .lb-count { color: var(--dim); font-size: 13.5px; font-variant-numeric: tabular-nums; }
+
+  .lb-btn {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    border: 1px solid var(--line-strong);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .lb-btn:hover { background: rgba(255, 255, 255, 0.09); }
+  .lb-btn:disabled { opacity: .35; cursor: default; }
+  .lb-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  .lb-body { padding: 16px; background: #0a0a0e; }
+  .lb-body img {
+    width: 100%;
+    max-height: calc(94vh - 150px);
+    object-fit: contain;
+    border-radius: 8px;
+  }
+  .lb-caption {
+    padding: 0 20px 18px;
+    color: var(--dim);
+    font-size: 14.5px;
+  }
+
+  @media (max-width: 720px) {
+    .intro { padding-top: 40px; }
+    .lb-title { font-size: 14px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .gallery button { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="index.html" target="_blank" rel="noopener">
+      <img src="../../desktop/build/icon.svg" alt="">
+      Photo Metadata AI
+    </a>
+    <a class="btn" href="index.html" target="_blank" rel="noopener">← На главную</a>
+    <a class="btn btn-primary" href="https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.1.0/Photo-Metadata-AI-1.1.0-universal.dmg">Скачать</a>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="intro">
+    <p class="eyebrow">Скриншоты</p>
+    <h1>Все экраны приложения</h1>
+    <p class="lede">
+      Полный путь от установки до готового CSV. Снято 3 августа 2026 года на macOS,
+      сборка Photo Metadata AI 1.1.0-universal. Нажмите на любой экран, чтобы открыть
+      в полном размере — листать можно стрелками.
+    </p>
+  </div>
+
+  <div class="gallery" id="gallery">
+    <button type="button" data-src="../screenshots/01_dmg_installer.png" data-title="Установка" data-caption="Смонтированный DMG: перетаскивание «Photo Metadata AI.app» в папку Applications.">
+      <img src="../screenshots/01_dmg_installer.png" alt="Смонтированный DMG" loading="lazy">
+      <span class="meta"><b>Установка</b><span>Перетаскивание «Photo Metadata AI.app» в папку Applications.</span></span>
+    </button>
+    <button type="button" data-src="../screenshots/02_onboarding.png" data-title="Онбординг" data-caption="«Checking your AI setup»: найдена локальная модель QWEN 2.5 VL и ключ Gemini, поле для ключа OpenRouter.">
+      <img src="../screenshots/02_onboarding.png" alt="Онбординг Checking your AI setup" loading="lazy">
+      <span class="meta"><b>Онбординг</b><span>Приложение само находит доступные провайдеры и проверяет ключи.</span></span>
+    </button>
+    <button type="button" data-src="../screenshots/03_ai_setup.png" data-title="AI Setup" data-caption="Окно «AI Setup»: локальная модель отключена, ввод ключа OpenRouter с ошибкой «invalid key».">
+      <img src="../screenshots/03_ai_setup.png" alt="Окно AI Setup" loading="lazy">
+      <span class="meta"><b>AI Setup</b><span>Подключение провайдеров и проверка ключа с понятной ошибкой.</span></span>
+    </button>
+    <button type="button" data-src="../screenshots/04_start_screen.png" data-title="Шаг 1 — Upload" data-caption="Пустая зона drag &amp; drop, панель «Context &amp; Settings» и карточки возможностей.">
+      <img src="../screenshots/04_start_screen.png" alt="Шаг Upload" loading="lazy">
+      <span class="meta"><b>Шаг 1 — Upload</b><span>Пустая зона drag &amp; drop и панель «Context &amp; Settings».</span></span>
+    </button>
+    <button type="button" data-src="../screenshots/05_upload_and_context.png" data-title="Шаг 2 — Context" data-caption="Загружено 113 фотографий, заполнены заметки съёмки, активна кнопка «Start processing».">
+      <img src="../screenshots/05_upload_and_context.png" alt="Шаг Context" loading="lazy">
+      <span class="meta"><b>Шаг 2 — Context</b><span>113 фотографий загружены, заметки съёмки заполнены.</span></span>
+    </button>
+    <button type="button" data-src="../screenshots/06_processing.png" data-title="Шаг 3 — Process" data-caption="Модальное окно прогресса «Processing: 73/113», обработка через локальную модель QWEN 2.5 VL.">
+      <img src="../screenshots/06_processing.png" alt="Шаг Process" loading="lazy">
+      <span class="meta"><b>Шаг 3 — Process</b><span>Прогресс «Processing: 73/113» с возможностью отмены.</span></span>
+    </button>
+    <button type="button" data-src="../screenshots/07_review_metadata_preview.png" data-title="Шаг 4 — Review" data-caption="Таблица результатов и панель «Metadata Preview» с заголовком, описанием, ключевыми словами и категорией. Поле Keywords отредактировано вручную — его подпись подсвечена. 2 файла с ошибками и ссылка «Retry failed (2)».">
+      <img src="../screenshots/07_review_metadata_preview.png" alt="Шаг Review" loading="lazy">
+      <span class="meta"><b>Шаг 4 — Review</b><span>Таблица результатов и панель «Metadata Preview».</span></span>
+    </button>
+    <button type="button" data-src="../screenshots/08_retry_failed.png" data-title="Повтор упавших файлов" data-caption="Прогресс «Processing: 1/2» отмена по «Cancel» останавливает только повторный прогон.">
+      <img src="../screenshots/08_retry_failed.png" alt="Повтор упавших файлов" loading="lazy">
+      <span class="meta"><b>Повтор упавших</b><span>Прогресс «Processing: 1/2» отмена по «Cancel» останавливает только повторный прогон.</span></span>
+    </button>
+    <button type="button" data-src="../screenshots/09_review_recommendations_filter.png" data-title="Фильтр рекомендаций" data-caption="Быстрый фильтр «Recommendations»: 16 из 113 фотографий, навигация по группе и подсказка о релизах для съёмок с людьми.">
+      <img src="../screenshots/09_review_recommendations_filter.png" alt="Фильтр рекомендаций" loading="lazy">
+      <span class="meta"><b>Фильтр рекомендаций</b><span>Навигация по группе и подсказка о релизах для съёмок с людьми.</span></span>
+    </button>
+    <button type="button" data-src="../screenshots/10_review_regenerating.png" data-title="Перегенерация" data-caption="Перегенерация метаданных для выбранного файла: поля в состоянии «Regenerating…».">
+      <img src="../screenshots/10_review_regenerating.png" alt="Перегенерация метаданных" loading="lazy">
+      <span class="meta"><b>Перегенерация</b><span>Поля отдельного файла в состоянии «Regenerating…».</span></span>
+    </button>
+    <button type="button" data-src="../screenshots/11_select_ready_only.png" data-title="Editorial-поля" data-caption="License Type = Editorial, подпись, локация и ошибка об обязательной editorial-дате; экспорт в CSV и IPTC, выбраны только Ready (66 из 113).">
+      <img src="../screenshots/11_select_ready_only.png" alt="Редакционные поля" loading="lazy">
+      <span class="meta"><b>Editorial-поля</b><span>Подпись, локация и ошибка об обязательной editorial-дате.</span></span>
+    </button>
+    <button type="button" data-src="../screenshots/12_export_in_progress.png" data-title="Шаг 5 — Export" data-caption="Модальное окно прогресса «Exporting: 48/70» с возможностью отмены.">
+      <img src="../screenshots/12_export_in_progress.png" alt="Экспорт в процессе" loading="lazy">
+      <span class="meta"><b>Шаг 5 — Export</b><span>Прогресс «Exporting: 48/70» с возможностью отмены.</span></span>
+    </button>
+    <button type="button" data-src="../screenshots/13_export_completed.png" data-title="Экспорт завершён" data-caption="70 фотографий готовы к загрузке на сток, кнопки «Open CSV file» и «Open folder».">
+      <img src="../screenshots/13_export_completed.png" alt="Экспорт завершён" loading="lazy">
+      <span class="meta"><b>Экспорт завершён</b><span>70 фотографий готовы, CSV и папка открываются из приложения.</span></span>
+    </button>
+    <button type="button" data-src="../screenshots/14_exported_csv_adobe_stock.png" data-title="Готовый CSV" data-caption="Выгруженный CSV для Adobe Stock, открытый в Numbers: колонки Filename, Title, Description, Keywords, Category и флаги.">
+      <img src="../screenshots/14_exported_csv_adobe_stock.png" alt="Выгруженный CSV для Adobe Stock" loading="lazy">
+      <span class="meta"><b>Готовый CSV</b><span>Колонки Filename, Title, Description, Keywords, Category и флаги.</span></span>
+    </button>
+    <button type="button" data-src="../screenshots/15_exported_file_iptc_metadata.png" data-title="IPTC в файле" data-caption="Экспортированный JPEG в «Просмотре» macOS: вшитые IPTC-поля — описание, город, страна, ключевые слова, название, категория.">
+      <img src="../screenshots/15_exported_file_iptc_metadata.png" alt="IPTC-метаданные в экспортированном файле" loading="lazy">
+      <span class="meta"><b>IPTC в файле</b><span>Описание, город, страна, ключевые слова, название и категория.</span></span>
+    </button>
+  </div>
+</main>
+
+<dialog class="lightbox" id="lightbox">
+  <div class="lb-bar">
+    <span class="lb-title" id="lb-title"></span>
+    <span class="lb-count" id="lb-count"></span>
+    <button type="button" class="lb-btn" id="lb-prev" aria-label="Предыдущий экран">
+      <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <button type="button" class="lb-btn" id="lb-next" aria-label="Следующий экран">
+      <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+    </button>
+    <button type="button" class="lb-btn" id="lb-close" aria-label="Закрыть">
+      <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <div class="lb-body"><img id="lb-img" src="" alt=""></div>
+  <p class="lb-caption" id="lb-caption"></p>
+</dialog>
+
+<script>
+  (function () {
+    var items = Array.prototype.slice.call(
+      document.querySelectorAll('#gallery button')
+    );
+    var dialog = document.getElementById('lightbox');
+    var img = document.getElementById('lb-img');
+    var title = document.getElementById('lb-title');
+    var caption = document.getElementById('lb-caption');
+    var count = document.getElementById('lb-count');
+    var prev = document.getElementById('lb-prev');
+    var next = document.getElementById('lb-next');
+    var current = 0;
+
+    function show(index) {
+      if (index < 0 || index >= items.length) return;
+      current = index;
+      var item = items[index];
+      img.src = item.getAttribute('data-src');
+      img.alt = item.getAttribute('data-title');
+      title.textContent = item.getAttribute('data-title');
+      caption.textContent = item.getAttribute('data-caption');
+      count.textContent = (index + 1) + ' / ' + items.length;
+      prev.disabled = index === 0;
+      next.disabled = index === items.length - 1;
+    }
+
+    items.forEach(function (item, index) {
+      item.addEventListener('click', function () {
+        show(index);
+        dialog.showModal();
+      });
+    });
+
+    prev.addEventListener('click', function () { show(current - 1); });
+    next.addEventListener('click', function () { show(current + 1); });
+    document.getElementById('lb-close').addEventListener('click', function () {
+      dialog.close();
+    });
+
+    dialog.addEventListener('keydown', function (event) {
+      if (event.key === 'ArrowRight') { event.preventDefault(); show(current + 1); }
+      if (event.key === 'ArrowLeft') { event.preventDefault(); show(current - 1); }
+    });
+
+    // Клик по подложке вокруг картинки закрывает окно.
+    dialog.addEventListener('click', function (event) {
+      if (event.target === dialog) dialog.close();
+    });
+  })();
+</script>
+
+</body>
+</html>
