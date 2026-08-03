@@ -8,6 +8,7 @@ import { useUIStore } from '../../../store/useUIStore';
 import { useAppStore } from '../../../store/useAppStore';
 import { jobsApi } from '../../../services/api/api';
 import { useToastStore } from '../../../store/useToastStore';
+import { useCatchUpCounter } from '../../../hooks/useCatchUpCounter';
 import styles from './ExportModal.module.scss';
 
 // Бэкенд отдаёт detail либо строкой, либо объектом с message и списком файлов
@@ -66,7 +67,25 @@ export const ExportModal: React.FC = () => {
   const setIsExporting = useUIStore((state) => state.setIsExporting);
   const addToast = useToastStore((state) => state.addToast);
 
-  const [progress, setProgress] = useState(0);
+  // Прогресс храним в файлах, а не в процентах: из процентов счётчик
+  // восстанавливался по чужому знаменателю и расходился с полосой
+  const [processed, setProcessed] = useState(0);
+  const [serverTotal, setServerTotal] = useState<number | null>(null);
+  const [isFinished, setIsFinished] = useState(false);
+  // Отмена и ошибка замораживают счётчик: доигрывать номера после остановки
+  // экспорта нельзя — пользователь решит, что файлы всё ещё пишутся
+  const [isStopped, setIsStopped] = useState(false);
+
+  const selectedJobs = jobs.filter(
+    (job) => job.status === "done" && job.selected_for_export !== false,
+  );
+  // До первого ответа сервера знаменатель берём из стора, чтобы модалка
+  // не показывала «0/0»
+  const total = serverTotal ?? selectedJobs.length;
+
+  const { displayed, reset: resetDisplayed } = useCatchUpCounter(processed, {
+    enabled: !isStopped,
+  });
 
   // Контроллер текущего экспорта: abort глушит и опрос, и паузу между опросами
   const abortRef = useRef<AbortController | null>(null);
@@ -78,7 +97,11 @@ export const ExportModal: React.FC = () => {
     abortRef.current = controller;
     const { signal } = controller;
 
-    setProgress(0);
+    setProcessed(0);
+    setServerTotal(null);
+    setIsFinished(false);
+    setIsStopped(false);
+    resetDisplayed(0);
 
     const sleep = (ms: number) =>
       new Promise<void>((resolve, reject) => {
@@ -112,12 +135,19 @@ export const ExportModal: React.FC = () => {
 
           if (signal.aborted) return;
 
-          setProgress(data.export_progress);
+          if (data.export_total_files > 0) {
+            setServerTotal(data.export_total_files);
+          }
 
           if (data.export_status === "completed") {
             setExportArtifacts(data.export_artifacts ?? []);
+            // На финале цель — весь объём: сервер мог не успеть отчитаться
+            // по последним файлам, а счётчик обязан дойти до конца
+            setProcessed(data.export_total_files || data.export_processed_files);
             break;
           }
+
+          setProcessed(data.export_processed_files);
 
           if (data.export_status === "failed") {
             throw new ExportFailedError(
@@ -125,17 +155,17 @@ export const ExportModal: React.FC = () => {
             );
           }
 
-          await sleep(1000);
+          // Опрос чаще прежней секунды: счётчику нужны свежие цели, иначе
+          // он упирается в устаревшее значение и стоит
+          await sleep(250);
         }
 
-        setProgress(100);
-
-        setTimeout(() => {
-          closeExportModal();
-          openSuccessModal();
-        }, 500);
+        // Модалку закрывает отдельный эффект — сначала счётчик должен
+        // доиграть до конца, иначе финальные номера пользователь не увидит
+        setIsFinished(true);
       } catch (error) {
         if (signal.aborted) return;
+        setIsStopped(true);
         setIsExporting(false);
         closeExportModal();
         addToast(describeExportError(error), "error");
@@ -149,11 +179,24 @@ export const ExportModal: React.FC = () => {
     };
   }, [isOpen, currentJobId]);
 
+  useEffect(() => {
+    if (!isFinished || total <= 0 || displayed < total) return;
+
+    const timer = setTimeout(() => {
+      closeExportModal();
+      openSuccessModal();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [isFinished, displayed, total, closeExportModal, openSuccessModal]);
+
   const handleCancel = useCallback(() => {
+    // Сначала стоп счётчика, потом abort: иначе он успевал доиграть
+    // несколько номеров уже после нажатия Cancel
+    setIsStopped(true);
     abortRef.current?.abort();
 
     const jobId = currentJobId;
-    setProgress(0);
 
     if (jobId) {
       // Именно cancelExport, а не cancel: последний сбрасывает файлы
@@ -178,22 +221,18 @@ export const ExportModal: React.FC = () => {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, handleCancel]);
 
-  const selectedJobs = jobs.filter(
-    (job) => job.status === "done" && job.selected_for_export !== false,
-  );
-  const total = selectedJobs.length;
-  const current = Math.round((progress / 100) * total);
+  const percent = total > 0 ? Math.round((displayed / total) * 100) : 0;
 
   return (
     <Modal isOpen={isOpen} onClose={handleCancel} closeOnBackdrop={false} size="md">
       <div className={styles.content}>
         <div className={styles.row}>
-          <p className={styles.label}>Exporting: {current}/{total}</p>
+          <p className={styles.label}>Exporting: {displayed}/{total}</p>
           <Button variant="secondary" size="sm" onClick={handleCancel}>
             Cancel
           </Button>
         </div>
-        <ProgressBar value={progress} animated={progress < 100} />
+        <ProgressBar value={percent} animated={percent < 100} smooth={false} />
       </div>
     </Modal>
   );

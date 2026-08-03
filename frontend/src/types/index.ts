@@ -189,3 +189,23 @@ export interface StockOptions {
   people_supported: boolean;
   model_release_required_when_people: boolean;
 }
+
+export interface ExportArtifact {
+  export_format: "csv" | "iptc" | "json";
+  filename: string;
+  path: string;
+  size_bytes: number;
+  count: number;
+}
+
+// Ответ polling-эндпоинта статуса экспорта. Прогресс в файлах —
+// первичен: из processed/total рисуются и счётчик, и полоса
+export interface ExportStatusResponse {
+  export_status: "queued" | "processing" | "completed" | "failed" | "cancelled" | null;
+  export_progress: number;
+  export_processed_files: number;
+  export_total_files: number;
+  export_format?: string | null;
+  export_error_message?: string | null;
+  export_artifacts?: ExportArtifact[];
+}

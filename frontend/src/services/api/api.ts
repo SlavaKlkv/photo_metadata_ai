@@ -1,7 +1,8 @@
 // frontend/src/services/api/api.ts
-import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import type {
   AIProvider,
+  ExportStatusResponse,
   AIProviderApiKeyValidationResponse,
   StockPlatform,
   DesktopHealthResponse,
@@ -72,7 +73,10 @@ export const jobsApi = {
     }),
 
   // статус экспорта
-  getExportStatus: (jobId: string, signal?: AbortSignal) =>
+  getExportStatus: (
+    jobId: string,
+    signal?: AbortSignal,
+  ): Promise<AxiosResponse<ExportStatusResponse>> =>
     apiClient.get(`/api/v1/jobs/${jobId}/export/status`, { signal }),
 
   // отмена обработки: возвращает задачу в состояние «до старта»

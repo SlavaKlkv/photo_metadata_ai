@@ -161,7 +161,10 @@ async def test_cancel_removes_artifacts_written_by_the_aborted_run(
     written_artifact = job_results_dir / 'partial.csv'
 
     def fake_exports(
-        current_job, requested_export_format, progress_callback=None
+        current_job,
+        requested_export_format,
+        progress_callback=None,
+        files_progress_callback=None,
     ):
         # Имитируем прогон, который успел записать файл и был отменён
         written_artifact.write_text('partial', encoding='utf-8')
@@ -206,7 +209,10 @@ async def test_cancel_keeps_artifacts_of_a_previous_successful_export(
     previous_artifact.write_text('previous run', encoding='utf-8')
 
     def fake_exports(
-        current_job, requested_export_format, progress_callback=None
+        current_job,
+        requested_export_format,
+        progress_callback=None,
+        files_progress_callback=None,
     ):
         request_export_cancellation(current_job.job_id)
         raise ExportCancelledError
@@ -267,3 +273,46 @@ async def test_run_job_export_starts_progress_from_zero():
     assert stored_job is not None
     assert stored_job.export_status == ExportStatus.COMPLETED
     assert stored_job.export_progress == 100
+
+
+@pytest.mark.asyncio
+async def test_export_endpoints_report_files_progress():
+    """
+    Счётчик в UI строится из файлов, поэтому знаменатель должен приезжать
+    уже с первым ответом — до первого опроса статуса.
+    """
+    job = _exportable_job()
+    job.files.append(
+        ProcessingJobFile(
+            filename='skipped.jpg',
+            original_filename='skipped.jpg',
+            status=FileStatus.COMPLETED,
+            selected_for_export=False,
+        )
+    )
+    await storage.create_job(job)
+
+    with TestClient(app) as client:
+        start_response = client.post(
+            f'/api/v1/jobs/{job.job_id}/export',
+            params={'csv': True},
+        )
+        status_response = client.get(
+            f'/api/v1/jobs/{job.job_id}/export/status'
+        )
+        cancel_response = client.post(
+            f'/api/v1/jobs/{job.job_id}/export/cancel'
+        )
+
+    start_payload = start_response.json()
+    # Невыбранный файл в знаменатель не попадает
+    assert start_payload['export_total_files'] == 1
+    assert start_payload['export_processed_files'] == 0
+
+    status_payload = status_response.json()
+    assert status_payload['export_total_files'] == 1
+    assert 'export_processed_files' in status_payload
+
+    cancel_payload = cancel_response.json()
+    assert cancel_payload['export_processed_files'] == 0
+    assert cancel_payload['export_total_files'] == 0

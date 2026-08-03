@@ -1,16 +1,12 @@
 //frontend/src/store/useUIStore.ts
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { AIProvider } from 'types';
+import type { AIProvider, ExportArtifact } from 'types';
 import type { ValidationGroup } from 'utils/validationGroups';
 
-export interface ExportArtifact {
-  export_format: "csv" | "iptc" | "json";
-  filename: string;
-  path: string;
-  size_bytes: number;
-  count: number;
-}
+// Тип живёт в types: им пользуются и стор, и типизация ответов API.
+// Реэкспорт оставлен, чтобы не править импорты во всех потребителях
+export type { ExportArtifact };
 
 export interface UIState {
   isAiSetupOpen: boolean;

@@ -1,4 +1,5 @@
 import csv
+from collections.abc import Callable
 from io import StringIO
 
 import structlog
@@ -17,6 +18,8 @@ logger = structlog.get_logger(__name__)
 def generate_metadata_csv(
     job: ProcessingJob,
     export_platform: StockPlatform | None = None,
+    *,
+    on_row_written: Callable[[], None] | None = None,
 ) -> str:
     """
     Генерирует CSV с метаданными файлов в формате выбранной платформы.
@@ -35,6 +38,11 @@ def generate_metadata_csv(
 
     for file in export_files:
         writer.writerow(_build_csv_row(file, export_platform))
+
+        # Колбэк только на строках файлов: заголовок единицей прогресса
+        # не является, иначе счётчик уходил бы вперёд на единицу
+        if on_row_written is not None:
+            on_row_written()
 
     csv_content = output.getvalue()
 
