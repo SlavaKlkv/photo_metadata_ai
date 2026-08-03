@@ -10,9 +10,11 @@ from app.core.enums import (
     FileStatus,
     StockPlatform,
 )
+from app.core.runtime import get_runtime_directories
 from app.schemas.export import ExportArtifact
 from app.schemas.job import ProcessingJob, ProcessingJobFile
 from app.services.export import export as export_service
+from app.services.export.csv import generate_metadata_csv
 from app.storage.jobs import storage
 
 
@@ -224,3 +226,120 @@ async def test_run_job_export_marks_cancellation(monkeypatch):
 
     assert job.export_status == ExportStatus.CANCELLED
     assert job.export_error_message == 'Export cancelled'
+
+
+def _multi_file_job(files_count: int = 3) -> ProcessingJob:
+    """
+    Готовая к экспорту задача из нескольких выбранных файлов.
+    """
+    template = _completed_job().files[0]
+
+    return ProcessingJob(
+        stock_platform=StockPlatform.SHUTTERSTOCK,
+        files=[
+            ProcessingJobFile(
+                **template.model_dump(
+                    exclude={'file_id', 'filename', 'original_filename'}
+                ),
+                filename=f'photo{index}.jpg',
+                original_filename=f'photo{index}.jpg',
+            )
+            for index in range(files_count)
+        ],
+    )
+
+
+def test_csv_row_callback_fires_once_per_exported_file():
+    """
+    Заголовок CSV единицей прогресса не является — иначе счётчик уходил бы
+    вперёд ровно на один файл.
+    """
+    job = _multi_file_job()
+    job.files[0].selected_for_export = False
+
+    calls = 0
+
+    def on_row_written() -> None:
+        nonlocal calls
+        calls += 1
+
+    generate_metadata_csv(job, on_row_written=on_row_written)
+
+    assert calls == 2
+
+
+def test_csv_only_export_reports_every_file():
+    """
+    Регрессия: CSV считался одной единицей на весь батч, и прогресс прыгал
+    с 0 сразу на 100 — промежуточных номеров пользователь не видел.
+    """
+    job = _multi_file_job()
+    job.export_formats = [ExportFormat.CSV]
+
+    steps: list[tuple[int, int]] = []
+
+    export_service.ensure_job_exports(
+        job,
+        ExportFormat.CSV,
+        None,
+        lambda processed, total: steps.append((processed, total)),
+    )
+
+    assert steps == [(1, 3), (2, 3), (3, 3)]
+
+
+def test_csv_and_iptc_export_counts_each_file_once(monkeypatch):
+    """
+    При CSV+IPTC файл не должен считаться дважды: шагов ровно по числу
+    файлов, а знаменатель равен их количеству.
+    """
+    job = _multi_file_job()
+    job.export_formats = [ExportFormat.CSV, ExportFormat.IPTC]
+
+    uploads_dir = get_runtime_directories().uploads_dir
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+
+    for file in job.files:
+        (uploads_dir / file.filename).write_bytes(b'jpeg')
+
+    monkeypatch.setattr(
+        'app.services.export.export.embed_metadata_into_jpg',
+        lambda *_args, **_kwargs: None,
+    )
+
+    steps: list[tuple[int, int]] = []
+
+    export_service.ensure_job_exports(
+        job,
+        ExportFormat.CSV,
+        None,
+        lambda processed, total: steps.append((processed, total)),
+    )
+
+    assert steps == [(1, 3), (2, 3), (3, 3)]
+
+
+@pytest.mark.asyncio
+async def test_run_job_export_reports_files_progress():
+    job = _multi_file_job()
+    job.export_formats = [ExportFormat.CSV]
+    await storage.create_job(job)
+
+    await export_service.run_job_export(job.job_id, ExportFormat.CSV)
+
+    assert job.export_status == ExportStatus.COMPLETED
+    assert job.export_total_files == 3
+    assert job.export_processed_files == job.export_total_files
+
+
+@pytest.mark.asyncio
+async def test_rollback_export_resets_files_progress():
+    job = _multi_file_job()
+    job.export_processed_files = 2
+    job.export_total_files = 3
+    await storage.create_job(job)
+
+    await export_service.rollback_export(job)
+
+    assert job.export_processed_files == 0
+    assert job.export_total_files == 0

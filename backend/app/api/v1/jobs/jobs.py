@@ -51,6 +51,7 @@ from app.services.desktop.app_settings import (
 )
 from app.services.export.export import (
     clear_export_cancellation,
+    count_selected_completed_files,
     ensure_job_exports,
     request_export_cancellation,
     rollback_export,
@@ -912,6 +913,10 @@ async def start_job_export(
     job.stock_platform = export_stock_platform
     job.export_status = ExportStatus.QUEUED
     job.export_progress = 0
+    # total проставляем до старта задачи: клиент должен увидеть верный
+    # знаменатель уже в ответе на POST, не дожидаясь первого опроса
+    job.export_processed_files = 0
+    job.export_total_files = count_selected_completed_files(job)
     job.export_formats = selected_export_formats
     trigger_export_format = selected_export_formats[0]
     job.export_format = trigger_export_format
@@ -933,6 +938,8 @@ async def start_job_export(
         job_id=job.job_id,
         export_status=job.export_status,
         export_progress=job.export_progress,
+        export_processed_files=job.export_processed_files,
+        export_total_files=job.export_total_files,
         export_format=job.export_format,
         export_error_message=job.export_error_message,
         export_artifacts=job.export_artifacts,
@@ -959,6 +966,8 @@ async def get_job_export_status(job_id: UUID):
         job_id=job.job_id,
         export_status=job.export_status,
         export_progress=job.export_progress,
+        export_processed_files=job.export_processed_files,
+        export_total_files=job.export_total_files,
         export_format=job.export_format,
         export_error_message=job.export_error_message,
         export_artifacts=job.export_artifacts,
@@ -1012,6 +1021,8 @@ async def cancel_job_export(job_id: UUID):
         job_id=cancelled_job.job_id,
         export_status=cancelled_job.export_status,
         export_progress=cancelled_job.export_progress,
+        export_processed_files=cancelled_job.export_processed_files,
+        export_total_files=cancelled_job.export_total_files,
         export_format=cancelled_job.export_format,
         export_error_message=cancelled_job.export_error_message,
         export_artifacts=cancelled_job.export_artifacts,

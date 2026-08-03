@@ -163,6 +163,10 @@ class ExportStatusMixin(BaseModel):
 
     export_status: ExportStatus | None = None
     export_progress: int = 0
+    # Прогресс в файлах: из этих чисел клиент рисует и счётчик, и полосу,
+    # чтобы они не расходились. Проценты остаются для совместимости
+    export_processed_files: int = 0
+    export_total_files: int = 0
     export_format: ExportFormat | None = None
     export_error_message: str | None = None
     export_artifacts: list[ExportArtifact] = Field(default_factory=list)

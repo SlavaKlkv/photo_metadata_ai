@@ -182,6 +182,8 @@ async def rollback_export(job: ProcessingJob) -> ProcessingJob:
 
     job.export_status = ExportStatus.CANCELLED
     job.export_progress = 0
+    job.export_processed_files = 0
+    job.export_total_files = 0
     job.export_error_message = 'Export cancelled'
     job.export_artifacts = snapshot.artifacts
     job.export_format = snapshot.export_format
@@ -193,26 +195,49 @@ async def rollback_export(job: ProcessingJob) -> ProcessingJob:
 
 class _ExportProgress:
     """
-    Считает долю записанных единиц экспорта и репортит её в проценты.
+    Считает обработанные файлы экспорта и репортит их наружу.
 
-    Единица — один IPTC-файл или один CSV: прогресс отражает реально
-    записанное, а не фиксированные 50%, как было раньше.
+    Единица прогресса — файл, а не «единица экспорта»: раньше CSV считался
+    одной единицей на весь батч, и экспорт только в CSV прыгал с 0 сразу
+    на 100 %, без промежуточных номеров.
+
+    Колбэков два, а не один с расширенной сигнатурой: прежний
+    `callback(percent)` остаётся ради обратной совместимости с внешними
+    вызовами и тестами, новый `files_callback(processed, total)` отдаёт
+    сырые числа, из которых клиент рисует и счётчик, и полосу.
     """
 
     def __init__(
         self,
-        total_units: int,
+        total_files: int,
         callback: Callable[[int], None] | None,
+        files_callback: Callable[[int, int], None] | None = None,
     ) -> None:
-        self._total = max(total_units, 1)
+        self._total = max(total_files, 1)
         self._done = 0
         self._callback = callback
+        self._files_callback = files_callback
+
+    @property
+    def total(self) -> int:
+        return self._total
+
+    @property
+    def processed(self) -> int:
+        return self._done
 
     def advance(self, units: int = 1) -> None:
-        self._done += units
+        if units <= 0:
+            return
+
+        self._done = min(self._done + units, self._total)
+
         if self._callback is not None:
             percent = min(int(self._done / self._total * 100), 100)
             self._callback(percent)
+
+        if self._files_callback is not None:
+            self._files_callback(self._done, self._total)
 
 
 class ExportValidationError(TypedDict):
@@ -223,6 +248,8 @@ class ExportValidationError(TypedDict):
 def generate_job_export(
     job: ProcessingJob,
     export_format: ExportFormat,
+    *,
+    on_row_written: Callable[[], None] | None = None,
 ) -> tuple[str, str, str]:
     """
     Генерирует экспорт задачи в выбранном формате.
@@ -244,7 +271,10 @@ def generate_job_export(
                 _format_export_validation_error(validation_errors)
             )
 
-        csv_content = generate_metadata_csv(job)
+        csv_content = generate_metadata_csv(
+            job,
+            on_row_written=on_row_written,
+        )
         filename = get_export_filename(job, export_format)
         return csv_content, filename, 'text/csv; charset=utf-8'
 
@@ -309,11 +339,17 @@ def get_job_iptc_export_path(
 def store_job_export(
     job: ProcessingJob,
     export_format: ExportFormat,
+    *,
+    on_row_written: Callable[[], None] | None = None,
 ) -> Path:
     """
     Генерирует и сохраняет экспорт задачи на диск.
     """
-    content, _, _ = generate_job_export(job, export_format)
+    content, _, _ = generate_job_export(
+        job,
+        export_format,
+        on_row_written=on_row_written,
+    )
     export_path = get_job_export_path(job, export_format)
 
     export_path.parent.mkdir(parents=True, exist_ok=True)
@@ -331,11 +367,13 @@ def store_job_export(
 def ensure_job_export(
     job: ProcessingJob,
     export_format: ExportFormat,
+    *,
+    on_row_written: Callable[[], None] | None = None,
 ) -> Path:
     """
     Всегда пересобирает export на основе актуального состояния metadata.
     """
-    return store_job_export(job, export_format)
+    return store_job_export(job, export_format, on_row_written=on_row_written)
 
 
 def load_stored_job_export(
@@ -383,16 +421,22 @@ async def run_job_export(
 
     job.export_status = ExportStatus.PROCESSING
     job.export_progress = 0
+    job.export_processed_files = 0
+    job.export_total_files = count_selected_completed_files(job)
     job.export_format = requested_export_format
     job.export_error_message = None
     job.export_artifacts = []
     await storage.update_job(job)
 
-    # Колбэк вызывается из потока run_in_threadpool. Хранилище держит тот же
+    # Колбэки вызываются из потока run_in_threadpool. Хранилище держит тот же
     # объект job в памяти, что читает polling-эндпоинт, поэтому мутации
-    # export_progress достаточно — присваивание int атомарно под GIL
+    # полей достаточно — присваивание int атомарно под GIL
     def report_progress(percent: int) -> None:
         job.export_progress = percent
+
+    def report_files(processed: int, total: int) -> None:
+        job.export_processed_files = processed
+        job.export_total_files = total
 
     try:
         export_artifacts = await run_in_threadpool(
@@ -400,6 +444,7 @@ async def run_job_export(
             job,
             requested_export_format,
             report_progress,
+            report_files,
         )
     except ExportCancelledError:
         await rollback_export(job)
@@ -433,6 +478,7 @@ async def run_job_export(
 
     job.export_status = ExportStatus.COMPLETED
     job.export_progress = 100
+    job.export_processed_files = job.export_total_files
     job.export_error_message = None
     job.export_artifacts = export_artifacts
     await storage.update_job(job)
@@ -443,11 +489,12 @@ def ensure_job_exports(
     job: ProcessingJob,
     requested_export_format: ExportFormat,
     progress_callback: Callable[[int], None] | None = None,
+    files_progress_callback: Callable[[int, int], None] | None = None,
 ) -> list[ExportArtifact]:
     """
     Обеспечивает экспорт всех форматов, выбранных в настройках задачи.
     """
-    completed_files_count = _count_selected_completed_files(job)
+    completed_files_count = count_selected_completed_files(job)
     if completed_files_count == 0:
         raise ValueError('No selected completed files available for export')
 
@@ -470,14 +517,23 @@ def ensure_job_exports(
         requested_export_format,
     )
 
-    # Единиц прогресса: CSV — одна на весь файл, IPTC — по файлу
-    total_units = sum(
-        completed_files_count
-        if export_format == ExportFormat.IPTC
-        else 1
-        for export_format in export_formats
+    # Единица прогресса — файл, независимо от набора форматов: пользователь
+    # считает файлы, а не внутренние «единицы экспорта»
+    progress = _ExportProgress(
+        completed_files_count,
+        progress_callback,
+        files_progress_callback,
     )
-    progress = _ExportProgress(total_units, progress_callback)
+
+    # Когда есть IPTC, шаги идут по его циклу — иначе каждый файл посчитался
+    # бы дважды (и в CSV, и в IPTC). При CSV-only шаги даёт запись строк
+    csv_drives_progress = ExportFormat.IPTC not in export_formats
+
+    def on_csv_row_written() -> None:
+        # Отмена посреди CSV раньше не срабатывала: между форматами проверка
+        # есть, а внутри длинной записи строк — не было
+        _raise_if_export_cancelled(job.job_id)
+        progress.advance()
 
     export_artifacts: list[ExportArtifact] = []
 
@@ -485,7 +541,13 @@ def ensure_job_exports(
         _raise_if_export_cancelled(job.job_id)
 
         if export_format == ExportFormat.CSV:
-            csv_path = ensure_job_export(job, ExportFormat.CSV)
+            csv_path = ensure_job_export(
+                job,
+                ExportFormat.CSV,
+                on_row_written=(
+                    on_csv_row_written if csv_drives_progress else None
+                ),
+            )
             export_artifacts.append(
                 _build_file_export_artifact(
                     csv_path,
@@ -493,7 +555,6 @@ def ensure_job_exports(
                     count=completed_files_count,
                 )
             )
-            progress.advance()
             continue
 
         if export_format == ExportFormat.IPTC:
@@ -501,6 +562,10 @@ def ensure_job_exports(
             continue
 
         raise ValueError(f'Unsupported export format: {export_format}')
+
+    # Добиваем остаток: если цикл по какой-то причине пропустил файлы,
+    # финальный колбэк всё равно должен дать 100 % и processed == total
+    progress.advance(progress.total - progress.processed)
 
     return export_artifacts
 
@@ -620,7 +685,7 @@ def _collect_export_validation_errors(
     return validation_errors
 
 
-def _count_selected_completed_files(job: ProcessingJob) -> int:
+def count_selected_completed_files(job: ProcessingJob) -> int:
     return sum(
         1
         for file in job.files
