@@ -13,7 +13,8 @@ import { createThumbnails } from "../../../utils/imagePreview";
 
 const ALLOWED_FORMATS = ["image/jpeg"];
 const ALLOWED_EXTENSIONS = [".jpg", ".jpeg"];
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB (бэкенд лимит)
+// Должен совпадать с MAX_UPLOAD_FILE_SIZE_MB в backend/app/core/config.py
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
 export const FileUploadSection: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
