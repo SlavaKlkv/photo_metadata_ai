@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import apiClient from 'services/api/api';
 import { useAppStore } from 'store/useAppStore';
+import { useToastStore } from 'store/useToastStore';
 import { useUIStore } from 'store/useUIStore';
 import { FileUploadSection } from './FileUploadSection';
 
@@ -20,6 +21,13 @@ const mockedPost = apiClient.post as jest.Mock;
 const jpeg = (name: string) =>
   new File(['x'], name, { type: 'image/jpeg' });
 
+// Файл заданного размера без реального выделения памяти под содержимое.
+const jpegOfSize = (name: string, sizeBytes: number) => {
+  const file = jpeg(name);
+  Object.defineProperty(file, 'size', { value: sizeBytes });
+  return file;
+};
+
 const fileInput = () =>
   document.querySelector<HTMLInputElement>('input[type="file"]')!;
 
@@ -30,6 +38,7 @@ beforeEach(() => {
   });
 
   useAppStore.setState({ jobs: [], previews: {} });
+  useToastStore.setState({ toasts: [] });
   useUIStore.setState({
     isUploaded: false,
     isProcessing: false,
@@ -53,6 +62,38 @@ test('resets the input value after a selection so an identical reselection can f
   // Без сброса браузер не диспатчит повторный change для того же набора файлов
   // (например Cmd+A в той же папке) — и загрузка молча не происходит.
   expect(input.value).toBe('');
+});
+
+// Регрессия: фронт отклонял файлы больше 10 МБ, хотя бэкенд принимает до 50 МБ
+// (MAX_UPLOAD_FILE_SIZE_MB в backend/app/core/config.py).
+test('accepts files up to the 50MB backend limit', async () => {
+  render(<FileUploadSection />);
+
+  await userEvent.upload(
+    fileInput(),
+    jpegOfSize('big.jpg', 50 * 1024 * 1024),
+  );
+
+  await waitFor(() => expect(mockedPost).toHaveBeenCalledTimes(1));
+});
+
+test('rejects files larger than 50MB', async () => {
+  render(<FileUploadSection />);
+
+  await userEvent.upload(
+    fileInput(),
+    jpegOfSize('huge.jpg', 50 * 1024 * 1024 + 1),
+  );
+
+  // Контейнер тостов здесь не рендерится — проверяем через стор.
+  await waitFor(() =>
+    expect(
+      useToastStore
+        .getState()
+        .toasts.some((toast) => /skipped/i.test(toast.message)),
+    ).toBe(true),
+  );
+  expect(mockedPost).not.toHaveBeenCalled();
 });
 
 test('resets the input value before opening the dialog', async () => {
