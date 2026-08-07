@@ -215,6 +215,17 @@ test('loads, saves and completes onboarding', async () => {
   expect(localStorage.getItem('onboarding_completed')).toBe('true');
 });
 
+test('completeOnboarding falls back to mock in dev when no provider is selected', async () => {
+  mockedJobsApi.updateDesktopSettings.mockResolvedValue({} as never);
+
+  await useAppStore.getState().completeOnboarding();
+
+  expect(mockedJobsApi.updateDesktopSettings).toHaveBeenCalledWith({
+    selected_provider: 'mock',
+  });
+  expect(localStorage.getItem('onboarding_completed')).toBe('true');
+});
+
 const availableUpdate = {
   status: 'ok' as const,
   update_available: true,
