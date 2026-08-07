@@ -7,6 +7,7 @@ import {
   BatchSettings,
   ProviderDiscoveryItem,
   AIProvider,
+  DEV_MOCK_PROVIDER,
   StockOptions,
   FilePreview,
   StockPlatform,
@@ -14,6 +15,7 @@ import {
 } from "../types";
 import { jobsApi } from "../services/api/api";
 import { fetchAllStockResults } from "../services/api/fetchAllStockResults";
+import { logger } from "../utils/logger";
 
 const defaultSessionSettings: SessionSettings = {
   selectedProvider: null,
@@ -351,7 +353,7 @@ export const useAppStore = create<AppState>()(
           .filter((item) => item.ready && item.enabled)
           .map((item) => item.provider);
 
-        console.log("[Provider Discovery] Found providers:", {
+        logger.log("[Provider Discovery] Found providers:", {
           total: providerDiscoveryItems.length,
           available: availableProviders.length,
           items: availableProviders,
@@ -390,7 +392,7 @@ export const useAppStore = create<AppState>()(
       } catch (error: unknown) {
         const errorMsg =
           error instanceof Error ? error.message : "Provider discovery failed";
-        console.error("[Provider Discovery] Error:", errorMsg, error);
+        logger.error("[Provider Discovery] Error:", errorMsg, error);
 
         if (isSilent) {
           set({ providerDiscoveryError: errorMsg });
@@ -537,7 +539,7 @@ export const useAppStore = create<AppState>()(
           set({ hasAcceptedOnboarding: true });
         }
       } catch (err) {
-        console.error("Failed to load session settings:", err);
+        logger.error("Failed to load session settings:", err);
       }
     },
 
@@ -549,7 +551,7 @@ export const useAppStore = create<AppState>()(
           JSON.stringify(sessionSettings),
         );
       } catch (err) {
-        console.error("Failed to save session settings:", err);
+        logger.error("Failed to save session settings:", err);
       }
     },
 
@@ -557,12 +559,14 @@ export const useAppStore = create<AppState>()(
       const { sessionSettings } = get();
 
       try {
-        // сохраняем выбранный провайдер или mock если ничего не выбрано
+        // сохраняем выбранный провайдер; в dev-сборке без выбора — mock,
+        // в production — null (бэкенд применит DEFAULT_AI_PROVIDER)
         await jobsApi.updateDesktopSettings({
-          selected_provider: sessionSettings.selectedProvider ?? "mock",
+          selected_provider:
+            sessionSettings.selectedProvider ?? DEV_MOCK_PROVIDER,
         });
       } catch (err) {
-        console.error("[completeOnboarding] Failed to save provider:", err);
+        logger.error("[completeOnboarding] Failed to save provider:", err);
       }
 
       set({ hasAcceptedOnboarding: true });
@@ -702,7 +706,7 @@ export const useAppStore = create<AppState>()(
 
         get().saveSessionSettings();
       } catch (error) {
-        console.error("[setProviderEnabled] Failed to save:", error);
+        logger.error("[setProviderEnabled] Failed to save:", error);
       } finally {
         set({ pendingProviderToggle: null });
       }
@@ -833,7 +837,7 @@ export const useAppStore = create<AppState>()(
           setStockOptions(optionsResponse.data);
         }
       } catch (error) {
-        console.error("[switchStockPlatform] Error:", error);
+        logger.error("[switchStockPlatform] Error:", error);
       }
     },
 
@@ -873,7 +877,7 @@ export const useAppStore = create<AppState>()(
 
         return { success: true };
       } catch (err: unknown) {
-        console.warn("[regenerateFile] Failed:", err);
+        logger.warn("[regenerateFile] Failed:", err);
 
         const responseDetail = (
           err as { response?: { data?: { detail?: string } } }

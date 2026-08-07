@@ -69,4 +69,5 @@ desktop/coverage/
 # AI
 .claude/
 .kodik/
+.cursor/
 TASK.md

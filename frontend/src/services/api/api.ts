@@ -146,7 +146,7 @@ export const jobsApi = {
       "/api/v1/desktop/startup/status",
     ),
   updateDesktopSettings: (settings: {
-    selected_provider?: string;
+    selected_provider?: string | null;
     disabled_providers?: string[];
   }) => apiClient.patch("/api/v1/desktop/settings", settings),
 

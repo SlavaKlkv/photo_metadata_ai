@@ -28,8 +28,19 @@ export interface ProcessingJob {
   };
 }
 
-// TODO: remove 'mock' before production; 'ollama' = QWEN 2.5 VL via Ollama
-export type AIProvider = 'mock' | 'ollama' | 'gemini' | 'openrouter';
+// 'ollama' = QWEN 2.5 VL via Ollama. 'mock' в production-тип не входит:
+// он используется только в dev-сборках (см. DEV_MOCK_PROVIDER ниже).
+export type AIProvider = 'ollama' | 'gemini' | 'openrouter';
+
+// Значение mock-провайдера для dev-сборок. В production CRA подставляет
+// NODE_ENV='production' на этапе сборки, ветка с 'mock' вырезается и остаётся
+// только null. Функция вынесена, чтобы обе ветки покрывались тестами.
+export const resolveDevMockProvider = (isProduction: boolean): 'mock' | null =>
+  isProduction ? null : 'mock';
+
+export const DEV_MOCK_PROVIDER: 'mock' | null = resolveDevMockProvider(
+  process.env.NODE_ENV === 'production',
+);
 
 export const AI_PROVIDER_LABELS: Partial<Record<AIProvider, string>> = {
   ollama: 'QWEN 2.5 VL',

@@ -1,6 +1,7 @@
 // frontend/src/services/api/fetchAllStockResults.ts
 import { jobsApi } from "services/api/api";
 import type { StockPlatform } from "types";
+import { logger } from "utils/logger";
 
 // Максимальный page_size, который принимает бэкенд (le=100).
 export const RESULTS_API_PAGE_SIZE = 100;
@@ -38,7 +39,7 @@ export const fetchAllStockResults = async (
         throw error;
       }
 
-      console.error("[fetchAllStockResults] Page fetch failed:", page, error);
+      logger.error("[fetchAllStockResults] Page fetch failed:", page, error);
       break;
     }
 

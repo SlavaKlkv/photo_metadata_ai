@@ -5,6 +5,7 @@ import { fetchAllStockResults } from 'services/api/fetchAllStockResults';
 import { useAppStore } from 'store/useAppStore';
 import { useUIStore } from 'store/useUIStore';
 import type { AIProvider, ProcessingJob, StockPlatform } from 'types';
+import { logger } from 'utils/logger';
 
 
 const POLLING_INTERVAL = 500;
@@ -148,14 +149,14 @@ export const usePolling = (jobId: string | null) => {
               setStockOptions(optionsResponse.data);
             }
           } catch (error) {
-            console.error("[Results fetch error]:", error);
+            logger.error("[Results fetch error]:", error);
           }
 
           closeProgressModal();
           setIsExportReady(true);
         }
       } catch (error) {
-        console.error("[Polling error]:", error);
+        logger.error("[Polling error]:", error);
         stopPolling();
         setIsPollingActive(false);
         setIsProcessing(false);

@@ -1,0 +1,25 @@
+#!/bin/sh
+# landing-og-hook: пересобирает docs/landing/og.png, когда в коммит попал мокап
+# главной страницы. Ставится командой `npm run hooks:install` из desktop/.
+
+if ! git diff --cached --name-only | grep -q '^docs/landing/index\.html$'; then
+  exit 0
+fi
+
+repo_root=$(git rev-parse --show-toplevel)
+
+node "$repo_root/desktop/scripts/build-og.js"
+status=$?
+
+# Код 2 — на машине нет Chrome: предупреждаем, но коммит не рушим.
+if [ "$status" -eq 2 ]; then
+  echo "pre-commit: og.png не пересобран, нечем рендерить (см. CHROME_PATH)." >&2
+  exit 0
+fi
+
+if [ "$status" -ne 0 ]; then
+  echo "pre-commit: сборка og.png упала, коммит остановлен." >&2
+  exit 1
+fi
+
+git add "$repo_root/docs/landing/og.png"
