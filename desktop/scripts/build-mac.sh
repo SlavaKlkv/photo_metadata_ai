@@ -23,12 +23,10 @@
 #                                  resources/backend/{arm64,x86_64}/.
 # Без этих флагов сборка идёт целиком, как раньше (x86_64 через Rosetta).
 #
-# Неподписанная локальная сборка:
-#   CSC_IDENTITY_AUTO_DISCOVERY=false desktop/scripts/build-mac.sh
-#
-# Подпись/нотаризация включаются автоматически при наличии в окружении
-# CSC_LINK/CSC_KEY_PASSWORD и APPLE_ID/APPLE_APP_SPECIFIC_PASSWORD/
-# APPLE_TEAM_ID (см. desktop/README.md).
+# Подпись — ad-hoc (identity: '-' в electron-builder.yml). Учётных
+# данных Apple Developer нет; Developer ID / нотаризация не включаются
+# через CSC_* / APPLE_* — для них нужно сменить identity и
+# hardenedRuntime в yml (см. desktop/README.md).
 
 set -euo pipefail
 

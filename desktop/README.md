@@ -1,15 +1,20 @@
 # Photo Metadata AI — macOS Desktop
 
-Electron-оболочка, упаковывающая FastAPI-бэкенд (PyInstaller, universal2)
-и React-фронтенд в одно macOS-приложение (`.app`/`.dmg`).
+Electron-оболочка, упаковывающая FastAPI-бэкенд (PyInstaller, срезы
+arm64 и x86_64) и React-фронтенд в одно universal macOS-приложение
+(`.app`/`.dmg`).
 
 ## Архитектура
 
 - Бэкенд-бинарник сам раздаёт собранный фронтенд (FastAPI `StaticFiles`
-  на `/`), Electron просто открывает `http://127.0.0.1:8000` — один
+  на `/`), Electron просто открывает `http://localhost:8000` — один
   origin, без CORS.
 - Electron управляет только жизненным циклом: запуск бэкенда, ожидание
   health, окно, завершение процесса при выходе.
+- Срезы backend лежат раздельно (`resources/backend/{arm64,x86_64}/`) —
+  нужный выбирается в рантайме по `process.arch`. Склейка через `lipo`
+  невозможна: PyInstaller onefile хранит Python/dylib overlay в конце
+  файла, а `lipo` сохраняет только один overlay.
 - Данные пользователя живут вне бандла приложения и переживают
   обновления: `~/Library/Application Support/Photo Metadata AI`
   (задачи, настройки, SQLite) и `~/Documents/Photo Metadata AI/results`.
@@ -18,8 +23,8 @@ Electron-оболочка, упаковывающая FastAPI-бэкенд (PyIn
 
 - Node.js 20 LTS (та же версия используется в release workflow)
 - [uv](https://docs.astral.sh/uv/)
-- Xcode Command Line Tools (`lipo`, codesign)
-- Rosetta 2 — для x86_64-части universal2-сборки бэкенда:
+- Xcode Command Line Tools (`lipo` для проверки срезов, codesign)
+- Rosetta 2 — для локальной x86_64-сборки бэкенда на Apple Silicon:
   `softwareupdate --install-rosetta --agree-to-license`
 
 ## Запуск в разработке
@@ -30,7 +35,7 @@ cd desktop && npm install && npm run dev
 
 Оболочка сама выбирает способ запуска бэкенда:
 
-1. Упакованное приложение — бинарник из `resources/backend/`.
+1. Упакованное приложение — бинарник из `resources/backend/<arch>/`.
 2. Dev с собранным бинарником — `backend/dist/photo-metadata-backend`,
    если он существует.
 3. Dev из исходников — `uv run python -m app.desktop_main`
@@ -40,7 +45,7 @@ cd desktop && npm install && npm run dev
 
 После любых доработок фронтенда или бэкенда свежий `.app`/`.dmg`
 со всеми изменениями получается одной командой — скрипт сам пересоберёт
-фронтенд, бэкенд-бинарник и приложение:
+фронтенд, бэкенд-бинарники и приложение:
 
 ```bash
 desktop/scripts/build-mac.sh
@@ -50,10 +55,17 @@ desktop/scripts/build-mac.sh
 `mac-universal/Photo Metadata AI.app`).
 
 Скрипт по шагам: сборка фронтенда → PyInstaller arm64 → PyInstaller
-x86_64 (через Rosetta, отдельный venv `.venv-x86_64`) → `lipo -create`
-в universal2 → копирование в `desktop/resources/backend/` →
-electron-builder. Исходный `build/icon.png` размером 1024×1024
+x86_64 (через Rosetta, отдельный venv `.venv-x86_64`) → дымовой тест
+обоих срезов → копирование в `desktop/resources/backend/{arm64,x86_64}/`
+→ electron-builder (universal). Исходный `build/icon.png` 1024×1024
 конвертируется в ICNS средствами electron-builder.
+
+Частичный запуск (как в release workflow):
+
+- `--backend-only=arm64|x86_64` — только фронтенд + backend этого среза
+  (нативно, хост должен совпадать с целевой архитектурой);
+- `--app-only` — только electron-builder; ожидает готовые оба среза
+  в `resources/backend/`.
 
 ## Дымовой тест бэкенд-бинарника
 
@@ -66,11 +78,19 @@ uv run --project backend python desktop/scripts/smoke-test.py \
 При наличии `OPENROUTER_API_KEY` или `GEMINI_API_KEY` в окружении
 дополнительно прогоняет process → results → export.
 
-## Дистрибуция (без подписи)
+## Дистрибуция (ad-hoc подпись)
 
-Приложение распространяется неподписанным — учётных данных
-Apple Developer нет, подпись и нотаризация не используются
-(`identity: null` в `electron-builder.yml`).
+Учётных данных Apple Developer нет, поэтому полноценная Developer ID
+подпись и нотаризация не используются. Бандл всё же **подписан
+ad-hoc** (`identity: '-'` в `electron-builder.yml`):
+
+- без какой-либо подписи macOS на чужой машине с флагом quarantine
+  показывала «приложение повреждено» и не давала открыть его из GUI;
+- ad-hoc запечатывает Info.plist и ресурсы — остаётся обычное
+  предупреждение неизвестного разработчика с обходом через GUI;
+- `hardenedRuntime` выключен: вместе с library validation ad-hoc
+  .dylib внутри PyInstaller-бинарника backend не проходят проверку,
+  и приложение падало бы на старте.
 
 При первом открытии скачанного приложения Gatekeeper покажет
 предупреждение. Как открыть:
@@ -84,11 +104,12 @@ Apple Developer нет, подпись и нотаризация не испол
 
 ### Обновление (ручной flow)
 
-Авто-установки обновлений нет: electron-updater на macOS работает
-только с подписанным приложением. При появлении новой опубликованной
-версии приложение показывает сверху ненавязчивый баннер. Кнопка
-**Download** открывает `.dmg` из GitHub Releases в системном браузере,
-а **Dismiss** скрывает уведомление именно для этой версии.
+Авто-установки обновлений нет: electron-updater на macOS рассчитан
+на Developer ID / нотаризированный дистрибутив; ad-hoc для этого
+недостаточно. При появлении новой опубликованной версии приложение
+показывает сверху ненавязчивый баннер. Кнопка **Download** открывает
+`.dmg` из GitHub Releases в системном браузере, а **Dismiss** скрывает
+уведомление именно для этой версии.
 
 В нативном меню **Photo Metadata AI** всегда доступен пункт
 **Check for Updates…**. Ручная проверка запрашивает свежие данные
@@ -121,8 +142,8 @@ Draft-релизы не участвуют в проверке обновлен�
 
 ## Известные ограничения v1
 
-- Приложение неподписанное: при первом открытии нужен обход
+- Ad-hoc подпись, без нотаризации: при первом открытии нужен обход
   Gatekeeper (см. «Дистрибуция»), автоматическая установка обновлений
   невозможна.
 - Порт 8000 фиксирован; второй экземпляр приложения не запустится,
-  пока занят порт.
+  пока занят порт (single-instance lock фокусирует уже открытое окно).
