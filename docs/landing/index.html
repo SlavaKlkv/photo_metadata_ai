@@ -2,10 +2,44 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0b0f">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Photo Metadata AI — метаданные для фотостоков за минуты</title>
 <meta name="description" content="Десктопное приложение для macOS: AI генерирует полный набор метаданных для фотостоков — заголовок, описание, ключевые слова, категории, лицензию, локацию, editorial-блок и релизы. Под Adobe Stock, Shutterstock и Getty Images они пересобираются автоматически, вшиваются в IPTC и выгружаются в CSV.">
-<link rel="icon" href="../../desktop/build/icon.svg">
+<link rel="icon" href="icon.svg">
+<link rel="canonical" href="https://slavaklkv.github.io/photo_metadata_ai/landing/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Photo Metadata AI">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:url" content="https://slavaklkv.github.io/photo_metadata_ai/landing/">
+<meta property="og:title" content="Photo Metadata AI — метаданные для фотостоков за минуты">
+<meta property="og:description" content="Десктопное приложение для macOS: AI генерирует заголовок, описание, ключевые слова и категории, пересобирает их под Adobe Stock, Shutterstock и Getty Images, вшивает в IPTC и выгружает в CSV.">
+<meta property="og:image" content="https://slavaklkv.github.io/photo_metadata_ai/landing/og.png">
+<meta property="og:image:width" content="2400">
+<meta property="og:image:height" content="1260">
+<meta property="og:image:alt" content="Photo Metadata AI — приложение для macOS, генерирующее метаданные для фотостоков">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Photo Metadata AI — метаданные для фотостоков за минуты">
+<meta name="twitter:description" content="AI генерирует метаданные для фотостоков, вшивает их в IPTC и выгружает в CSV. Десктопное приложение для macOS.">
+<meta name="twitter:image" content="https://slavaklkv.github.io/photo_metadata_ai/landing/og.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Photo Metadata AI",
+  "applicationCategory": "MultimediaApplication",
+  "operatingSystem": "macOS 11+",
+  "url": "https://slavaklkv.github.io/photo_metadata_ai/landing/",
+  "image": "https://slavaklkv.github.io/photo_metadata_ai/landing/og.png",
+  "description": "Десктопное приложение для macOS: AI генерирует полный набор метаданных для фотостоков, пересобирает их под Adobe Stock, Shutterstock и Getty Images, вшивает в IPTC и выгружает в CSV.",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  }
+}
+</script>
 <style>
   :root {
     --bg: #0b0b0f;
@@ -28,7 +62,9 @@
 
   * { box-sizing: border-box; }
 
-  html { scroll-behavior: smooth; }
+  /* Тёмный canvas задан до первой отрисовки. Межстраничный View Transition намеренно
+     не используется: в Chrome он давал вспышку при возврате из screens.html. */
+  html { scroll-behavior: smooth; background: var(--bg); color-scheme: dark; }
 
   body {
     margin: 0;
@@ -42,7 +78,10 @@
   a { color: var(--accent-2); text-decoration: none; }
   a:hover { text-decoration: underline; }
 
-  img { max-width: 100%; display: block; }
+  /* height: auto обязателен: у снимков проставлены атрибуты width/height (чтобы
+     место под них резервировалось до загрузки), а они действуют как presentational
+     hint и без этого фиксируют высоту, отменяя aspect-ratio в плитках и галерее. */
+  img { max-width: 100%; height: auto; display: block; }
 
   .wrap { width: 100%; max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
 
@@ -58,7 +97,16 @@
     background: rgba(11, 11, 15, 0.82);
     backdrop-filter: saturate(160%) blur(14px);
     border-bottom: 1px solid var(--line);
+    transition: box-shadow .25s ease, background .25s ease;
   }
+  /* Класс ставит JS, когда страница прокручена: шапка отделяется тенью. */
+  header.stuck {
+    background: rgba(11, 11, 15, 0.92);
+    box-shadow: 0 10px 30px -22px rgba(0, 0, 0, 1);
+  }
+
+  .brand img { transition: transform .3s cubic-bezier(.22, .8, .3, 1); }
+  .brand:hover img { transform: rotate(-8deg) scale(1.08); }
 
   .nav {
     display: flex;
@@ -101,6 +149,20 @@
   .nav-links a.active { color: var(--text); }
   .nav-links a.active::after { transform: scaleX(1); }
 
+  /* Кнопка в шапке дублирует те, что в первом экране и в финальном блоке,
+     поэтому появляется, только когда ни одной из них не видно. Класс ставит
+     JS: без скрипта кнопка видна всегда — так безопаснее, чем спрятать её
+     насовсем. */
+  header.hero-cta-visible .nav-cta {
+    opacity: 0;
+    transform: translateY(-6px);
+    pointer-events: none;
+  }
+  .nav-cta {
+    transition: opacity .25s ease, transform .25s cubic-bezier(.22, .8, .3, 1),
+                background .18s ease, border-color .18s ease;
+  }
+
   /* ---------- buttons ---------- */
 
   .btn {
@@ -116,43 +178,192 @@
   }
   .btn:hover { text-decoration: none; }
   .btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  /* Логотип Apple — сплошная заливка, а не обводка, как у остальных иконок. */
+  .btn svg.apple { width: 15px; height: 18px; fill: currentColor; stroke: none; margin-top: -2px; }
 
   .btn-primary {
+    position: relative;
+    overflow: hidden;
     background: linear-gradient(180deg, #8f8cfa, #6f6ce4);
     color: #0d0d14;
     box-shadow: 0 8px 24px -10px rgba(126, 122, 240, 0.9);
+    transition: filter .18s ease, transform .18s ease, box-shadow .18s ease;
   }
-  .btn-primary:hover { filter: brightness(1.07); }
+  .btn-primary:hover {
+    filter: brightness(1.07);
+    transform: translateY(-1px);
+    box-shadow: 0 14px 30px -12px rgba(126, 122, 240, 1);
+  }
+  .btn-primary:active { transform: translateY(0); }
+  /* Блик пробегает по кнопке при наведении — единственная «реклама» на странице. */
+  .btn-primary::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -60%;
+    width: 45%;
+    background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+    transform: skewX(-18deg);
+    opacity: 0;
+  }
+  .btn-primary:hover::after { animation: sheen .75s ease-out; }
+  @keyframes sheen {
+    0% { left: -60%; opacity: 0; }
+    15% { opacity: 1; }
+    100% { left: 120%; opacity: 0; }
+  }
 
   .btn-ghost {
     border-color: var(--line-strong);
     color: var(--text);
     background: rgba(255, 255, 255, 0.03);
+    transition: background .18s ease, border-color .18s ease, transform .18s ease;
   }
-  .btn-ghost:hover { background: rgba(255, 255, 255, 0.07); }
+  .btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+  }
+  .btn-ghost svg { transition: transform .18s ease; }
+  .btn-ghost:hover svg { transform: translateX(3px); }
 
   .btn-sm { padding: 9px 16px; font-size: 14px; }
+  .btn-sm svg.apple { width: 13px; height: 16px; }
 
   /* ---------- hero ---------- */
 
   .hero {
     position: relative;
-    padding: 88px 0 0;
-    text-align: center;
+    padding: 72px 0 92px;
     overflow: hidden;
   }
   .hero::before {
     content: "";
     position: absolute;
-    top: -280px;
-    left: 50%;
+    top: -300px;
+    left: 62%;
     width: 900px;
-    height: 620px;
+    height: 640px;
     transform: translateX(-50%);
-    background: radial-gradient(closest-side, rgba(129, 125, 240, 0.28), transparent);
+    background: radial-gradient(closest-side, rgba(129, 125, 240, 0.26), transparent);
     pointer-events: none;
+    will-change: transform, opacity;
+    animation: aurora 9s cubic-bezier(.45, 0, .55, 1) infinite;
+  }
+  /* Свечение медленно «дышит» — фон не выглядит статичной картинкой. */
+  @keyframes aurora {
+    0%, 100% { opacity: .62; transform: translateX(-50%) scale(.94); }
+    50% { opacity: 1; transform: translateX(-50%) scale(1.16); }
   }
   .hero > * { position: relative; }
+
+  /* Мягкий световой «пылинка-туман»: несколько размытых пятен без хвоста и без
+     чёткой круглой границы — не комета и не точка. */
+  .ambient-particle {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 9;
+    width: 56px;
+    height: 56px;
+    margin-left: -28px;
+    margin-top: -28px;
+    border-radius: 58% 42% 63% 37% / 46% 54% 46% 54%;
+    background:
+      radial-gradient(45% 42% at 38% 40%, rgba(236, 232, 255, .55) 0%, rgba(186, 176, 255, .22) 42%, transparent 72%),
+      radial-gradient(38% 40% at 62% 58%, rgba(148, 136, 248, .28) 0%, transparent 70%),
+      radial-gradient(55% 50% at 52% 48%, rgba(120, 108, 235, .12) 0%, transparent 78%);
+    filter: blur(5px) saturate(1.08);
+    mix-blend-mode: screen;
+    opacity: 0;
+    pointer-events: none;
+    will-change: transform, opacity, filter;
+    transition: opacity .4s cubic-bezier(.2,0,.3,1), filter .4s ease;
+    animation: particle-morph 7.2s ease-in-out infinite alternate;
+  }
+  .ambient-particle::before {
+    content: "";
+    position: absolute;
+    left: 8px;
+    top: 10px;
+    width: 28px;
+    height: 26px;
+    border-radius: 48% 52% 41% 59% / 55% 42% 58% 45%;
+    background: radial-gradient(ellipse at 50% 45%, rgba(255, 252, 255, .42), rgba(198, 190, 255, .16) 48%, transparent 78%);
+    filter: blur(3px);
+    animation: particle-breathe 4.2s ease-in-out infinite alternate;
+  }
+  .ambient-particle::after {
+    content: "";
+    position: absolute;
+    right: 4px;
+    bottom: 6px;
+    width: 24px;
+    height: 22px;
+    border-radius: 61% 39% 52% 48% / 43% 57% 43% 57%;
+    background: radial-gradient(ellipse at 45% 50%, rgba(157, 145, 250, .26), transparent 74%);
+    filter: blur(5.5px);
+    animation: particle-drift 5.4s ease-in-out infinite alternate;
+  }
+  .ambient-particle.is-moving { opacity: .72; }
+
+  @keyframes particle-morph {
+    from { border-radius: 58% 42% 63% 37% / 46% 54% 46% 54%; }
+    to { border-radius: 41% 59% 38% 62% / 57% 40% 60% 43%; }
+  }
+  @keyframes particle-breathe {
+    from { opacity: .55; transform: translate(-2px, 3px) scale(.88); }
+    to { opacity: 1; transform: translate(3px, -2px) scale(1.12); }
+  }
+  @keyframes particle-drift {
+    from { opacity: .4; transform: translate(2px, -3px) scale(.9); }
+    to { opacity: .85; transform: translate(-3px, 2px) scale(1.18); }
+  }
+
+  /* Прозрачность при пролёте над блоками с контентом: частица становится едва заметной, чтобы не мешать чтению */
+  .ambient-particle.is-dimmed {
+    opacity: .08 !important;
+    filter: blur(7px) saturate(.8);
+  }
+
+  /* Рядом с курсором пятно чуть ярче, но остаётся мягким. */
+  .ambient-particle.is-near-cursor {
+    opacity: .86;
+    filter: blur(4px) saturate(1.22) drop-shadow(0 0 8px rgba(159, 146, 255, .32));
+  }
+  .ambient-particle.is-impulsed {
+    filter: blur(3.5px) saturate(1.35) drop-shadow(0 0 12px rgba(181, 170, 255, .4));
+  }
+
+  /* Текст слева, окно приложения справа. Правая колонка чуть шире:
+     мокап несёт больше информации, чем абзац под заголовком. */
+  .hero-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+    gap: 52px;
+    align-items: center;
+  }
+
+  /* Появление первого экрана: элементы въезжают по очереди. */
+  .hero .badge,
+  .hero h1,
+  .hero .lede,
+  .hero .cta,
+  .hero .cta-note,
+  .hero-visual {
+    animation: rise .8s cubic-bezier(.22, .8, .3, 1) both;
+  }
+  .hero h1 { animation-delay: .06s; }
+  .hero .lede { animation-delay: .12s; }
+  .hero .cta { animation-delay: .18s; }
+  .hero .cta-note { animation-delay: .22s; }
+  .hero-visual { animation-delay: .12s; }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(18px); }
+    to { opacity: 1; transform: none; }
+  }
 
   .badge {
     display: inline-flex;
@@ -168,36 +379,130 @@
   }
 
   h1 {
-    margin: 0 auto 20px;
-    max-width: 15ch;
-    font-size: clamp(38px, 6.2vw, 62px);
+    margin: 0 0 20px;
+    max-width: 13ch;
+    font-size: clamp(36px, 4.6vw, 54px);
     line-height: 1.08;
     letter-spacing: -0.025em;
     font-weight: 680;
   }
   h1 .grad {
-    background: linear-gradient(120deg, var(--accent-2), #6f6ce4);
+    /* Градиент шире текста и медленно едет — заголовок мягко переливается. */
+    background: linear-gradient(120deg, var(--accent-2), #6f6ce4, #b7b5ff, var(--accent-2));
+    background-size: 300% 100%;
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+    animation: shift 9s ease-in-out infinite;
+  }
+  @keyframes shift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
   }
 
   .lede {
-    margin: 0 auto;
-    max-width: 64ch;
-    font-size: clamp(16.5px, 2vw, 19px);
+    margin: 0;
+    max-width: 52ch;
+    font-size: clamp(16px, 1.4vw, 17.5px);
     color: var(--muted);
   }
 
   .cta {
     display: flex;
     flex-wrap: wrap;
-    justify-content: center;
     gap: 12px;
-    margin: 34px 0 12px;
+    margin: 30px 0 12px;
   }
 
   .cta-note { color: var(--dim); font-size: 13.5px; }
+
+  /* Объёмная сцена для hero-мокапа. Перспектива живёт на контейнере,
+     scroll/курсор — на .mock-stage, постоянный ракурс — на .mock-depth,
+     а лёгкое плавание — на .mock-float. Разные слои не спорят за transform. */
+  .hero-visual {
+    position: relative;
+    container-type: inline-size;
+    perspective: 1380px;
+    perspective-origin: 22% 48%;
+    isolation: isolate;
+    padding: clamp(14px, 2.4vw, 28px) clamp(5px, .8vw, 10px) clamp(30px, 4.8vw, 54px);
+    overflow: visible;
+  }
+  .hero-visual::before {
+    content: "";
+    position: absolute;
+    z-index: 0;
+    right: 2%;
+    bottom: 3%;
+    width: 84%;
+    height: 16%;
+    border-radius: 50%;
+    background: rgba(2, 2, 8, .82);
+    filter: blur(24px);
+    transform: rotate(-2deg) skewX(-10deg);
+    opacity: .88;
+    pointer-events: none;
+  }
+  .hero-visual::after {
+    content: "";
+    position: absolute;
+    z-index: 0;
+    inset: 18% -7% 2% 16%;
+    border-radius: 45%;
+    background: radial-gradient(closest-side at 62% 52%, rgba(129, 125, 240, .24), transparent 74%);
+    filter: blur(34px);
+    opacity: .88;
+    pointer-events: none;
+  }
+  .mock-stage {
+    --py: 0px;
+    --tilt-x: 0deg;
+    --tilt-y: 0deg;
+    position: relative;
+    z-index: 1;
+    transform:
+      translate3d(0, var(--py), 0)
+      rotateX(var(--tilt-x))
+      rotateY(var(--tilt-y));
+    transform-style: preserve-3d;
+    transition: transform .42s cubic-bezier(.2, .75, .25, 1);
+    will-change: transform;
+  }
+  .mock-depth {
+    --mock-rx: 1.6deg;
+    --mock-ry: -9deg;
+    --mock-rz: -.18deg;
+    transform:
+      rotateX(var(--mock-rx))
+      rotateY(var(--mock-ry))
+      rotateZ(var(--mock-rz));
+    transform-origin: 14% 52%;
+    transform-style: preserve-3d;
+    animation: mock-turn-in 1.08s cubic-bezier(.16, .8, .24, 1) .08s both;
+    will-change: transform, opacity;
+  }
+  .mock-float {
+    transform-style: preserve-3d;
+    animation: mock-float 6.8s ease-in-out 1.16s infinite;
+    will-change: transform;
+  }
+  @keyframes mock-turn-in {
+    from {
+      opacity: 0;
+      transform: translate3d(54px, 28px, -110px) rotateX(6deg) rotateY(-17deg) rotateZ(.6deg);
+    }
+    to {
+      opacity: 1;
+      transform:
+        rotateX(var(--mock-rx))
+        rotateY(var(--mock-ry))
+        rotateZ(var(--mock-rz));
+    }
+  }
+  @keyframes mock-float {
+    0%, 100% { transform: translate3d(0, 0, 0) rotateZ(0); }
+    50% { transform: translate3d(0, -7px, 8px) rotateZ(.12deg); }
+  }
 
   .shot {
     border: 1px solid var(--line);
@@ -207,17 +512,691 @@
     box-shadow: 0 40px 80px -40px rgba(0, 0, 0, 0.9);
   }
 
-  .hero-shot {
-    margin-top: 44px;
-    mask-image: linear-gradient(180deg, #000 72%, transparent);
-    -webkit-mask-image: linear-gradient(180deg, #000 72%, transparent);
+  /* ---------- мокап окна приложения ---------- */
+
+  /* Не скриншот, а вёрстка: на первом экране нужен интерфейс *в работе*,
+     а реальный снимок этого шага нечитаем в таком масштабе. Данные, поля и
+     подписи повторяют настоящий экран Review (см. screens.html). Весь
+     мокап масштабируется от одного --u; единица привязана к ширине
+     .hero-visual, иначе при «развороте» в полную колонку шрифт остаётся
+     9px, а окно — 900px, и вёрстка редеет.
+
+     Пропорции рамки подобраны так, чтобы *в кадре* мокап читался как скриншот
+     из блока «Как это выглядит в работе» (3424×2626 ≈ 1.30). Из-за разворота
+     3D (rotateY -9°, rotateX 1.6°) окно визуально сплющивается по вертикали,
+     поэтому в CSS оно заметно выше — 8:7. Ширина чуть меньше колонки: окно
+     не должно распирать hero от края до края. */
+  .mock {
+    --u: clamp(.78px, calc(100cqi / 620), 1.04px);
+    position: relative;
+    width: 92%;
+    margin-inline: auto;
+    aspect-ratio: 8 / 7.6;
+    display: flex;
+    flex-direction: column;
+    transform: translateZ(0);
+    transform-style: preserve-3d;
+    border: 1px solid rgba(255, 255, 255, .17);
+    border-radius: calc(15 * var(--u));
+    background: linear-gradient(145deg, #18181f, #101016 62%);
+    box-shadow:
+      34px 48px 74px -38px rgba(0, 0, 0, .98),
+      13px 20px 30px -22px rgba(0, 0, 0, .95),
+      inset 1px 0 rgba(255, 255, 255, .08),
+      inset -1px 0 rgba(0, 0, 0, .55);
+    font-size: calc(9 * var(--u));
+    line-height: 1.35;
+    overflow: hidden;
+    user-select: none;
   }
-  .hero-shot img { border-radius: var(--radius); }
+  /* Световая кромка подчёркивает толщину окна в боковом ракурсе. */
+  .mock::before {
+    content: "";
+    position: absolute;
+    z-index: 8;
+    inset: 0;
+    border-radius: inherit;
+    background:
+      linear-gradient(104deg, rgba(255, 255, 255, .12), transparent 11% 76%, rgba(139, 136, 248, .08));
+    box-shadow:
+      inset calc(2 * var(--u)) 0 calc(8 * var(--u)) rgba(255, 255, 255, .035),
+      inset calc(-4 * var(--u)) 0 calc(8 * var(--u)) rgba(0, 0, 0, .34);
+    pointer-events: none;
+  }
+  .mock::after {
+    content: "";
+    position: absolute;
+    z-index: 9;
+    top: 10%;
+    right: 0;
+    bottom: 8%;
+    width: calc(2 * var(--u));
+    background: linear-gradient(transparent, rgba(184, 181, 255, .44), transparent);
+    opacity: .52;
+    pointer-events: none;
+  }
+
+  .mock-bar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: calc(7 * var(--u));
+    padding: calc(10 * var(--u)) calc(14 * var(--u));
+    border-bottom: 1px solid rgba(255, 255, 255, .085);
+    background: linear-gradient(180deg, #222229, #1a1a20);
+    box-shadow: inset 0 1px rgba(255, 255, 255, .035);
+  }
+  .mock-bar i {
+    width: calc(7 * var(--u));
+    height: calc(7 * var(--u));
+    border-radius: 50%;
+    background: #3a3a44;
+  }
+  .mock-bar i:nth-child(1) { background: #e8695f; }
+  .mock-bar i:nth-child(2) { background: #e3b34a; }
+  .mock-bar i:nth-child(3) { background: #57c15a; }
+  .mock-bar b {
+    flex: 1;
+    text-align: center;
+    margin-right: calc(30 * var(--u));
+    color: #b9b8c2;
+    font-weight: 550;
+    font-size: calc(8.5 * var(--u));
+    letter-spacing: .015em;
+  }
+
+  .mock-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: calc(12 * var(--u));
+    background:
+      radial-gradient(circle at 80% 5%, rgba(139, 136, 248, .045), transparent 32%),
+      #0b0b10;
+  }
+
+  .mock-head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: calc(9 * var(--u));
+    padding: calc(10 * var(--u)) calc(12 * var(--u));
+    margin-bottom: calc(10 * var(--u));
+    border: 1px solid var(--line);
+    border-radius: calc(10 * var(--u));
+    background: linear-gradient(135deg, rgba(31, 31, 39, .98), rgba(24, 24, 31, .98));
+    box-shadow: 0 calc(8 * var(--u)) calc(18 * var(--u)) calc(-16 * var(--u)) #000;
+  }
+  .mock-head img {
+    width: calc(20 * var(--u));
+    height: calc(20 * var(--u));
+    filter: drop-shadow(0 0 calc(5 * var(--u)) rgba(139, 136, 248, .28));
+  }
+  .mock-head b { display: block; font-size: calc(10.5 * var(--u)); letter-spacing: -.01em; }
+  .mock-head small { color: #858491; font-size: calc(7.5 * var(--u)); }
+  .mock-head .mock-setup {
+    margin-left: auto;
+    padding: calc(5 * var(--u)) calc(9 * var(--u));
+    border: 1px solid rgba(139, 136, 248, .2);
+    border-radius: calc(6 * var(--u));
+    background: rgba(139, 136, 248, .045);
+    color: #aaa8ba;
+    font-size: calc(8 * var(--u));
+  }
+
+  .mock-cols {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1.34fr 1fr;
+    gap: calc(10 * var(--u));
+    align-items: stretch;
+  }
+  .mock-panel {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: calc(12 * var(--u));
+    border: 1px solid var(--line);
+    border-radius: calc(10 * var(--u));
+    background:
+      linear-gradient(145deg, rgba(29, 29, 37, .98), rgba(23, 23, 30, .98));
+    box-shadow:
+      inset 0 1px rgba(255, 255, 255, .025),
+      0 calc(8 * var(--u)) calc(24 * var(--u)) calc(-22 * var(--u)) #000;
+  }
+
+  .mock-panel-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: calc(8 * var(--u));
+    margin-bottom: calc(10 * var(--u));
+  }
+  .mock-panel-heading {
+    display: flex;
+    align-items: center;
+    gap: calc(7 * var(--u));
+  }
+  .mock-panel-heading svg {
+    flex: 0 0 auto;
+    width: calc(13 * var(--u));
+    height: calc(13 * var(--u));
+    padding: calc(2.5 * var(--u));
+    border: 1px solid rgba(139, 136, 248, .22);
+    border-radius: calc(4 * var(--u));
+    background: rgba(139, 136, 248, .07);
+    stroke: #aaa8ff;
+    fill: none;
+    stroke-width: 1.65;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .mock-panel-heading h4 {
+    margin: 0 0 calc(1 * var(--u));
+    font-size: calc(10.5 * var(--u));
+    font-weight: 650;
+    letter-spacing: -.01em;
+  }
+  .mock-panel-heading span { color: #777681; font-size: calc(7.5 * var(--u)); }
+  .mock-panel-meta {
+    padding: calc(3 * var(--u)) calc(6 * var(--u));
+    border: 1px solid rgba(255, 255, 255, .07);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .035);
+    color: #8c8b98;
+    font-size: calc(6.8 * var(--u));
+    white-space: nowrap;
+  }
+
+  .mock-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(4 * var(--u));
+    margin: 0 0 calc(10 * var(--u));
+  }
+  .mock-chips span {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(4 * var(--u));
+    padding: calc(3.5 * var(--u)) calc(6.5 * var(--u));
+    border: 1px solid rgba(255, 255, 255, .075);
+    border-radius: calc(5.5 * var(--u));
+    background: rgba(255, 255, 255, .022);
+    color: #aaa9b5;
+    font-size: calc(6.8 * var(--u));
+    white-space: nowrap;
+  }
+  .mock-chips .on {
+    background: rgba(139, 136, 248, .13);
+    border-color: rgba(139, 136, 248, .4);
+    color: #e5e4ec;
+    box-shadow: inset 0 0 calc(8 * var(--u)) rgba(139, 136, 248, .05);
+  }
+  .mock-chips i { width: calc(4 * var(--u)); height: calc(4 * var(--u)); border-radius: 50%; }
+  .dot-ok { background: #49bd87; box-shadow: 0 0 calc(4 * var(--u)) rgba(73, 189, 135, .42); }
+  .dot-warn { background: #dda64f; box-shadow: 0 0 calc(4 * var(--u)) rgba(221, 166, 79, .36); }
+  .dot-err { background: #e4696e; box-shadow: 0 0 calc(4 * var(--u)) rgba(228, 105, 110, .34); }
+  .dot-process { background: #8d8b98; }
+
+  .mock-rows {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-auto-rows: minmax(calc(22 * var(--u)), 1fr);
+    gap: calc(4.5 * var(--u));
+    align-content: stretch;
+  }
+  .mock-row {
+    position: relative;
+    display: grid;
+    grid-template-columns:
+      calc(11 * var(--u)) calc(23 * var(--u))
+      minmax(0, 1fr) minmax(0, 1.15fr) auto;
+    align-items: center;
+    gap: calc(7 * var(--u));
+    min-height: calc(22 * var(--u));
+    padding: calc(5 * var(--u)) calc(5.5 * var(--u));
+    border: 1px solid transparent;
+    border-radius: calc(6 * var(--u));
+    overflow: hidden;
+  }
+  .mock-row.on {
+    border-color: rgba(139, 136, 248, .16);
+    background: linear-gradient(90deg, rgba(139, 136, 248, .16), rgba(139, 136, 248, .09));
+    box-shadow: inset calc(2 * var(--u)) 0 #7773eb;
+  }
+  .mock-row.on::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 34%, rgba(190, 187, 255, .1) 49%, transparent 64%);
+    transform: translateX(-130%);
+    animation: mock-row-scan 5.8s ease-in-out 1.8s infinite;
+    pointer-events: none;
+  }
+  @keyframes mock-row-scan {
+    0%, 58% { transform: translateX(-130%); opacity: 0; }
+    66% { opacity: 1; }
+    82%, 100% { transform: translateX(130%); opacity: 0; }
+  }
+  .mock-check {
+    position: relative;
+    width: calc(9 * var(--u));
+    height: calc(9 * var(--u));
+    border-radius: calc(2.5 * var(--u));
+    background: linear-gradient(145deg, #7e7bf0, #6460d8);
+    box-shadow: 0 0 calc(5 * var(--u)) rgba(111, 108, 228, .2);
+  }
+  .mock-check::after {
+    content: "";
+    position: absolute;
+    top: calc(1.1 * var(--u));
+    left: calc(3 * var(--u));
+    width: calc(2.2 * var(--u));
+    height: calc(4.5 * var(--u));
+    border-right: calc(1.1 * var(--u)) solid #fff;
+    border-bottom: calc(1.1 * var(--u)) solid #fff;
+    transform: rotate(41deg);
+  }
+  .mock-thumb {
+    position: relative;
+    height: calc(17 * var(--u));
+    border: 1px solid rgba(255, 255, 255, .09);
+    border-radius: calc(3.5 * var(--u));
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 68% 38%, #e79d52 0 8%, transparent 9%),
+      radial-gradient(ellipse at 59% 52%, #3986a0 0 14%, transparent 15%),
+      linear-gradient(165deg, #9ac6d2 0 42%, #3d7181 43% 62%, #1d3440 63%);
+    box-shadow: inset 0 0 calc(5 * var(--u)) rgba(0, 0, 0, .3);
+  }
+  .mock-thumb::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(130deg, rgba(255, 255, 255, .16), transparent 36% 75%, rgba(0, 0, 0, .22));
+  }
+  .mock-thumb.t1 {
+    background:
+      repeating-conic-gradient(from 25deg at 48% 52%, #b98a53 0 10deg, #674b31 11deg 21deg, #2d241e 22deg 30deg);
+  }
+  .mock-thumb.t2 {
+    background:
+      radial-gradient(ellipse at 62% 43%, #18231b 0 10%, transparent 11%),
+      radial-gradient(circle at 69% 37%, #d6b363 0 4%, transparent 5%),
+      linear-gradient(164deg, #a8b982 0 44%, #5d794d 45% 67%, #253522 68%);
+  }
+  .mock-thumb.t3 {
+    background:
+      radial-gradient(ellipse at 60% 48%, #2f86a8 0 12%, transparent 13%),
+      radial-gradient(circle at 69% 52%, #dd883d 0 6%, transparent 7%),
+      linear-gradient(164deg, #96b5ba 0 43%, #4f6d69 44% 65%, #243b36 66%);
+  }
+  .mock-thumb.t4 {
+    background:
+      linear-gradient(104deg, transparent 0 43%, rgba(247, 240, 255, .95) 44% 46%, transparent 47%),
+      radial-gradient(ellipse at 38% 22%, rgba(225, 210, 255, .6), transparent 42%),
+      linear-gradient(177deg, #8a74a8 0 59%, #43385e 60% 79%, #191322 80%);
+  }
+  .mock-thumb.t5 {
+    background:
+      radial-gradient(ellipse at 72% 31%, #f2c77b 0 7%, transparent 8%),
+      linear-gradient(168deg, #ddaa68 0 45%, #a56e3a 46% 64%, #51341f 65% 78%, #251914 79%);
+  }
+  .mock-thumb.t6 {
+    background:
+      radial-gradient(circle at 63% 45%, #d8c8a4 0 9%, transparent 10%),
+      radial-gradient(circle at 60% 43%, #171714 0 2%, transparent 3%),
+      linear-gradient(165deg, #90a77e 0 42%, #54674b 43% 65%, #263126 66%);
+  }
+  .mock-thumb.t7 {
+    background:
+      radial-gradient(ellipse at 58% 46%, #7f79d8 0 11%, transparent 12%),
+      radial-gradient(circle at 65% 39%, #e8d9a8 0 4%, transparent 5%),
+      linear-gradient(160deg, #b9c6a4 0 41%, #6f8261 42% 66%, #2b3627 67%);
+  }
+  .mock-thumb.t8 {
+    background:
+      radial-gradient(ellipse at 54% 58%, #e7e3d8 0 13%, transparent 14%),
+      radial-gradient(circle at 47% 52%, #4b4034 0 4%, transparent 5%),
+      linear-gradient(172deg, #cfd8e2 0 46%, #8fa0ae 47% 68%, #46525c 69%);
+  }
+  .mock-name,
+  .mock-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: calc(8 * var(--u));
+  }
+  .mock-name { color: #92919d; }
+  .mock-title { display: flex; align-items: center; gap: calc(5 * var(--u)); color: #d1d0d8; }
+  .mock-title span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mock-prov {
+    padding: calc(2.5 * var(--u)) calc(5 * var(--u));
+    border-radius: calc(4 * var(--u));
+    background: rgba(255, 255, 255, .055);
+    color: #9d9ca8;
+    font-size: calc(6.7 * var(--u));
+    white-space: nowrap;
+  }
+  .mock-foot {
+    flex: 0 0 auto;
+    display: flex;
+    gap: calc(9 * var(--u));
+    margin-top: auto;
+    padding-top: calc(8 * var(--u));
+    border-top: 1px solid var(--line);
+    color: var(--dim);
+    font-size: calc(7 * var(--u));
+  }
+  .mock-foot em { color: var(--accent-2); font-style: normal; }
+
+  /* Кадр из выбранной строки: гроза в сумерках с мягко пульсирующим небом
+     и короткой вспышкой молнии. Ширину задаёт доля preview-панели (2/3), а
+     высота считается из неё по 4:3 — так кадр остаётся фотографией, а не
+     панорамой, и его размер не зависит от того, сколько места осталось по
+     вертикали. Раньше было наоборот (высота от flex, ширина из неё), и кадр
+     ужимался до ~55% панели. align-self: center отключает flex-растяжку по
+     ширине и центрует кадр; flex: 0 0 auto не даёт соседям его сплющить.
+     Габариты окна и слои 3D при этом не трогаются. */
+  .mock-photo {
+    position: relative;
+    flex: 0 0 auto;
+    align-self: center;
+    width: 66.6%;
+    max-width: 100%;
+    aspect-ratio: 4 / 3;
+    margin: 0 0 calc(8 * var(--u));
+    border: 1px solid rgba(255, 255, 255, .11);
+    border-radius: calc(6 * var(--u));
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse at 35% 22%, rgba(231, 218, 255, .58), transparent 34%),
+      radial-gradient(ellipse at 70% 42%, rgba(153, 126, 188, .32), transparent 42%),
+      linear-gradient(178deg, #75638f 0 55%, #4b3f68 56% 73%, #28223a 74% 84%, #15121e 85%);
+    box-shadow:
+      inset 0 0 calc(18 * var(--u)) rgba(16, 12, 26, .34),
+      0 calc(7 * var(--u)) calc(15 * var(--u)) calc(-12 * var(--u)) #000;
+  }
+  .mock-photo::before {
+    content: "";
+    position: absolute;
+    z-index: 1;
+    inset: -20% -10% 34%;
+    background:
+      radial-gradient(ellipse at 26% 52%, rgba(221, 208, 245, .2), transparent 32%),
+      radial-gradient(ellipse at 63% 30%, rgba(37, 28, 57, .34), transparent 36%);
+    filter: blur(calc(5 * var(--u)));
+    animation: mock-cloud-pulse 5.6s ease-in-out infinite;
+  }
+  .mock-photo::after {
+    content: "";
+    position: absolute;
+    z-index: 2;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 32%;
+    background: linear-gradient(180deg, #242036, #0f0d16);
+    clip-path: polygon(0 55%, 12% 48%, 24% 62%, 40% 43%, 56% 64%, 69% 47%, 76% 56%, 79% 15%, 82% 57%, 91% 46%, 100% 58%, 100% 100%, 0 100%);
+  }
+  .mock-lightning {
+    position: absolute;
+    z-index: 3;
+    top: 7%;
+    left: 42%;
+    width: calc(7 * var(--u));
+    height: 64%;
+    background: linear-gradient(#fff, #dcd2ff);
+    clip-path: polygon(44% 0, 72% 0, 54% 36%, 83% 36%, 23% 100%, 40% 54%, 14% 54%);
+    filter:
+      drop-shadow(0 0 calc(3 * var(--u)) rgba(255, 255, 255, .88))
+      drop-shadow(0 0 calc(8 * var(--u)) rgba(203, 183, 255, .62));
+    transform: rotate(7deg);
+    animation: mock-lightning-pulse 5.6s ease-in-out infinite;
+  }
+  .mock-lightning::before,
+  .mock-lightning::after {
+    content: "";
+    position: absolute;
+    width: calc(5 * var(--u));
+    height: calc(24 * var(--u));
+    background: rgba(245, 239, 255, .84);
+    clip-path: polygon(45% 0, 66% 0, 54% 42%, 83% 42%, 25% 100%, 42% 57%, 18% 57%);
+  }
+  .mock-lightning::before { top: 32%; left: calc(-4 * var(--u)); transform: rotate(36deg) scale(.55); }
+  .mock-lightning::after { top: 47%; left: calc(3 * var(--u)); transform: rotate(-31deg) scale(.42); }
+  .mock-photo-name {
+    position: absolute;
+    z-index: 4;
+    right: calc(6 * var(--u));
+    bottom: calc(5 * var(--u));
+    padding: calc(2 * var(--u)) calc(5 * var(--u));
+    border: 1px solid rgba(255, 255, 255, .1);
+    border-radius: 999px;
+    background: rgba(10, 9, 15, .58);
+    color: rgba(240, 239, 246, .72);
+    font-size: calc(6 * var(--u));
+    backdrop-filter: blur(calc(3 * var(--u)));
+  }
+  @keyframes mock-cloud-pulse {
+    0%, 100% { opacity: .72; transform: translate3d(-2%, 0, 0) scale(1); }
+    50% { opacity: 1; transform: translate3d(3%, 1%, 0) scale(1.08); }
+  }
+  @keyframes mock-lightning-pulse {
+    0%, 45%, 55%, 100% { opacity: .78; }
+    49% { opacity: 1; filter: drop-shadow(0 0 calc(5 * var(--u)) #fff) drop-shadow(0 0 calc(13 * var(--u)) rgba(203, 183, 255, .86)); }
+  }
+  .mock-label-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: calc(6 * var(--u));
+    margin-bottom: calc(4 * var(--u));
+  }
+  .mock-label {
+    display: block;
+    color: var(--dim);
+    font-size: calc(7 * var(--u));
+  }
+  .mock-label.edited { color: var(--accent-2); }
+  .mock-field-state {
+    color: #73727f;
+    font-size: calc(6.2 * var(--u));
+  }
+  .mock-field-state.edited {
+    padding: calc(1.5 * var(--u)) calc(4 * var(--u));
+    border-radius: 999px;
+    background: rgba(139, 136, 248, .1);
+    color: #a9a6ff;
+  }
+  .mock-field {
+    padding: calc(7 * var(--u)) calc(8 * var(--u));
+    margin-bottom: calc(8 * var(--u));
+    border: 1px solid rgba(255, 255, 255, .085);
+    border-radius: calc(6 * var(--u));
+    background: linear-gradient(145deg, rgba(18, 18, 24, .95), rgba(22, 22, 29, .95));
+    color: #b8b7c1;
+    font-size: calc(8 * var(--u));
+    box-shadow: inset 0 1px rgba(255, 255, 255, .02);
+  }
+  /* Поля высотой строго по тексту: пустые строки внутри рамки выглядят как
+     недозаполненная форма, а не как заполненная AI карточка. */
+  .mock-field.description,
+  .mock-field.keywords {
+    color: #a9a8b3;
+    line-height: 1.28;
+  }
+  .mock-preview .mock-label-line,
+  .mock-preview .mock-field { flex: 0 0 auto; }
+  /* Высота панели задана пропорциями окна, а внутрь идут кадр и четыре поля
+     фиксированной высоты — запас панель отдаёт вертикальными интервалами.
+     Ужимаем только по вертикали и только в preview: боковые отступы держат
+     ширину колонки (от неё считается 2/3 кадра), а левая панель Results
+     остаётся с прежним воздухом. */
+  .mock-preview { padding-block: calc(9 * var(--u)); }
+  .mock-preview .mock-panel-top { margin-bottom: calc(7 * var(--u)); }
+  .mock-preview .mock-label-line { margin-bottom: calc(3 * var(--u)); }
+  .mock-preview .mock-field {
+    padding-block: calc(5 * var(--u));
+    margin-bottom: calc(6 * var(--u));
+  }
+  .mock-preview .mock-field u { margin-top: calc(2 * var(--u)); }
+  .mock-preview .mock-field.mock-category { margin-bottom: 0; }
+  .mock-field u {
+    display: block;
+    margin-top: calc(4 * var(--u));
+    text-align: right;
+    color: var(--dim);
+    font-size: calc(7 * var(--u));
+    text-decoration: none;
+  }
+  .mock-category {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0;
+  }
+  .mock-category::after {
+    content: "";
+    width: calc(4.5 * var(--u));
+    height: calc(4.5 * var(--u));
+    margin-top: calc(-2 * var(--u));
+    border-right: 1px solid #898894;
+    border-bottom: 1px solid #898894;
+    transform: rotate(45deg);
+  }
+
+  .mock-steps {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: calc(6 * var(--u));
+    margin-top: calc(10 * var(--u));
+    padding: calc(9.5 * var(--u)) calc(12 * var(--u));
+    border: 1px solid var(--line);
+    border-radius: calc(10 * var(--u));
+    background: linear-gradient(145deg, rgba(29, 29, 37, .98), rgba(22, 22, 29, .98));
+    color: var(--dim);
+    font-size: calc(7 * var(--u));
+  }
+  .mock-steps span { display: inline-flex; align-items: center; gap: calc(4 * var(--u)); }
+  .mock-steps i {
+    display: grid;
+    place-items: center;
+    width: calc(11 * var(--u));
+    height: calc(11 * var(--u));
+    border: 1px solid var(--line-strong);
+    border-radius: 50%;
+    color: var(--dim);
+    font-size: calc(7 * var(--u));
+    font-style: normal;
+  }
+  /* Цвета как в приложении: пройденные шаги и связки между ними акцентные,
+     текущий — нейтральный кружок с белой подписью, будущие приглушены. */
+  .mock-steps .done { color: var(--accent-2); }
+  .mock-steps .done i {
+    border-color: var(--accent-2);
+    color: var(--accent-2);
+  }
+  .mock-steps .now { color: var(--text); }
+  .mock-steps .now i {
+    background: #6966da;
+    border-color: rgba(179, 176, 255, .42);
+    color: #fff;
+    box-shadow: 0 0 calc(8 * var(--u)) rgba(111, 108, 228, .34);
+    animation: mock-step-pulse 2.8s ease-in-out infinite;
+  }
+  @keyframes mock-step-pulse {
+    0%, 100% { box-shadow: 0 0 calc(5 * var(--u)) rgba(111, 108, 228, .22); }
+    50% { box-shadow: 0 0 calc(11 * var(--u)) rgba(139, 136, 248, .48); }
+  }
+  /* Связки одинаковой длины: полоса остаётся во всю ширину окна, а шаги
+     собираются компактной группой по центру, а не размазываются по краям.
+     При нехватке места (узкий hero) связки сжимаются до минимума. */
+  .mock-steps hr {
+    flex: 0 1 auto;
+    width: calc(14 * var(--u));
+    min-width: calc(6 * var(--u));
+    height: 1px;
+    margin: 0;
+    border: 0;
+    background: var(--line);
+  }
+  .mock-steps hr.done { background: var(--accent-2); }
+  /* Как в приложении: шкала шагов слева, действие прижато вправо. На шаге
+     Review обработка уже позади, поэтому кнопка показана заглушённой —
+     цвета совпадают с disabled-состоянием кнопки в приложении. */
+  .mock-steps .mock-action {
+    margin-left: auto;
+    flex: 0 0 auto;
+    gap: calc(3.5 * var(--u));
+    padding: calc(4.5 * var(--u)) calc(9 * var(--u));
+    border: 1px solid #3d3d4b;
+    border-radius: calc(6 * var(--u));
+    /* Плоская заливка выдавала бы кнопку за наклейку поверх окна: остальные
+       поверхности мокапа ловят свет сверху и отбрасывают тень, кнопка — тоже. */
+    background: linear-gradient(160deg, #2a2a35, #202029);
+    box-shadow:
+      inset 0 1px rgba(255, 255, 255, .05),
+      0 calc(2 * var(--u)) calc(6 * var(--u)) calc(-4 * var(--u)) rgba(0, 0, 0, .6);
+    color: #5a5a72;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  /* Контур play — тот же, что у start-icon в приложении, и такого же
+     размера относительно подписи кнопки. */
+  .mock-steps .mock-action svg {
+    width: calc(9 * var(--u));
+    height: calc(10 * var(--u));
+    fill: currentColor;
+    stroke: none;
+  }
 
   /* ---------- sections ---------- */
 
   /* Отступ одинаковый у всех разделов — иначе шаг между ними «плавает». */
-  section { padding: 72px 0; }
+  section { padding: 88px 0; }
+
+  /* Заголовки не оставляют висячих слов, абзацы — коротких строк в конце.
+     Браузеры без поддержки просто переносят по-старому. */
+  h1, h2, h3 { text-wrap: balance; }
+  .lede, .section-lede, p { text-wrap: pretty; }
+
+  /* ---------- полоса площадок ---------- */
+
+  /* Три знакомых имени сразу под первым экраном: посетителю не нужно
+     читать абзац, чтобы понять, для чего приложение. */
+  .platforms {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 18px 46px;
+    padding: 26px 0;
+    border-block: 1px solid var(--line);
+  }
+  .platforms .label {
+    color: var(--dim);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .platforms b {
+    color: var(--muted);
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
 
   .eyebrow {
     color: var(--accent);
@@ -243,116 +1222,250 @@
     font-size: 17px;
   }
 
-  /* ---------- cards ---------- */
+  /* ---------- ключевые возможности ---------- */
 
-  .grid {
+  /* Компактный список вместо сетки одинаковых карточек:
+     этот раздел оставляет только отличия, а маппинг, экспорт и
+     онбординг объясняются в своих блоках ниже. */
+  .feature-layout {
     display: grid;
-    gap: 18px;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: minmax(250px, .72fr) minmax(0, 1.28fr);
+    gap: clamp(48px, 8vw, 104px);
+    align-items: start;
   }
 
-  .card {
-    padding: 26px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  .feature-list {
+    display: grid;
+    border-top: 1px solid var(--line);
   }
-
-  .card h3 {
-    margin: 0 0 9px;
+  .feature-item {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+    padding: 24px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .feature-item h3 {
+    margin: 1px 0 6px;
     font-size: 17.5px;
     font-weight: 600;
     letter-spacing: -0.01em;
   }
+  .feature-item p {
+    margin: 0;
+    max-width: 56ch;
+    color: var(--muted);
+    font-size: 15px;
+  }
 
-  .card p { margin: 0; color: var(--muted); font-size: 15px; }
-
-  .icon {
+  .feature-icon {
     display: grid;
     place-items: center;
     width: 42px;
     height: 42px;
-    margin-bottom: 18px;
     border-radius: 11px;
     background: var(--accent-dim);
     border: 1px solid rgba(139, 136, 248, 0.24);
+    transition: transform .25s cubic-bezier(.22, .8, .3, 1), background .2s ease;
   }
-  .icon svg { width: 21px; height: 21px; stroke: var(--accent-2); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .feature-icon svg { width: 21px; height: 21px; stroke: var(--accent-2); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .feature-item:hover .feature-icon { transform: translateX(3px); background: rgba(139, 136, 248, 0.2); }
 
-  /* ---------- steps ---------- */
+  /* ---------- steps (process route) ---------- */
 
+  /* На широком экране мастер читается как один маршрут, а не как пять карточек. */
   .steps {
+    position: relative;
     display: grid;
-    gap: 14px;
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    min-height: 300px;
+    margin: 12px 0 0;
+    padding: 0;
+    list-style: none;
+    isolation: isolate;
   }
-
+  .steps::before,
+  .steps::after {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    top: calc(50% - .5px);
+    left: 10%;
+    right: 10%;
+    height: 1px;
+  }
+  .steps::before {
+    background: linear-gradient(
+      90deg,
+      rgba(139, 136, 248, .42),
+      rgba(139, 136, 248, .2) 70%,
+      rgba(255, 255, 255, .07)
+    );
+  }
+  /* Световой импульс показывает направление движения по мастеру. */
+  .steps::after {
+    right: auto;
+    width: 16%;
+    background: linear-gradient(90deg, transparent, var(--accent-2), transparent);
+    filter: drop-shadow(0 0 5px rgba(139, 136, 248, .65));
+    opacity: 0;
+  }
   .step {
-    padding: 22px;
-    border: 1px solid var(--line);
-    border-radius: 13px;
-    background: var(--panel);
+    position: relative;
+    display: grid;
+    grid-template-rows: 1fr 40px 1fr;
+    min-width: 0;
+    padding: 0 12px;
   }
   .step .n {
+    position: relative;
+    z-index: 2;
+    grid-row: 2;
+    align-self: center;
+    justify-self: center;
     display: grid;
     place-items: center;
-    width: 26px;
-    height: 26px;
-    margin-bottom: 14px;
+    width: 32px;
+    height: 32px;
+    border: 1px solid rgba(139, 136, 248, .48);
     border-radius: 50%;
-    border: 1px solid rgba(139, 136, 248, 0.5);
+    background: var(--bg);
     color: var(--accent-2);
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 650;
+    box-shadow: 0 0 0 7px var(--bg);
+    transition:
+      transform .25s cubic-bezier(.22, .8, .3, 1),
+      border-color .2s ease,
+      background .2s ease,
+      box-shadow .2s ease;
   }
-  .step h4 { margin: 0 0 6px; font-size: 15.5px; font-weight: 600; }
-  .step p { margin: 0; color: var(--dim); font-size: 14px; line-height: 1.5; }
+  .step-copy {
+    grid-row: 1;
+    align-self: end;
+    min-width: 0;
+    padding: 0 4px 23px;
+    transition: transform .25s cubic-bezier(.22, .8, .3, 1);
+  }
+  .step:nth-child(even) .step-copy {
+    grid-row: 3;
+    align-self: start;
+    padding-top: 23px;
+    padding-bottom: 0;
+  }
+  .step h3 {
+    margin: 0 0 7px;
+    color: var(--text);
+    font-size: 16px;
+    font-weight: 610;
+    letter-spacing: -.01em;
+    transition: color .2s ease;
+  }
+  .step p {
+    margin: 0;
+    color: var(--dim);
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  @media (hover: hover) {
+    .steps:hover .step .n { animation: none; }
+    .step:hover .n {
+      transform: scale(1.12);
+      border-color: var(--accent-2);
+      background: rgba(139, 136, 248, .16);
+      box-shadow: 0 0 0 7px var(--bg), 0 0 22px rgba(139, 136, 248, .25);
+    }
+    .step:hover .step-copy { transform: translateY(-3px); }
+    .step:nth-child(even):hover .step-copy { transform: translateY(3px); }
+    .step:hover h3 { color: var(--accent-2); }
+  }
+
+  .reveal.steps::before {
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 1s cubic-bezier(.22, .8, .3, 1) .12s;
+  }
+  .reveal.steps.in::before { transform: none; }
+  .reveal.steps.in::after {
+    animation: steps-flow 4.8s cubic-bezier(.4, 0, .2, 1) 1.2s infinite;
+  }
+  .reveal.steps.in .step .n {
+    animation: step-node-pulse 4.8s ease-in-out calc(1.2s + var(--step-delay)) infinite;
+  }
+  .step:nth-child(1) { --step-delay: 0s; }
+  .step:nth-child(2) { --step-delay: .72s; }
+  .step:nth-child(3) { --step-delay: 1.44s; }
+  .step:nth-child(4) { --step-delay: 2.16s; }
+  .step:nth-child(5) { --step-delay: 2.88s; }
+  @keyframes steps-flow {
+    0% { opacity: 0; transform: translateX(-75%); }
+    10%, 82% { opacity: .9; }
+    100% { opacity: 0; transform: translateX(500%); }
+  }
+  @keyframes step-node-pulse {
+    0%, 12%, 100% {
+      border-color: rgba(139, 136, 248, .48);
+      background: var(--bg);
+      box-shadow: 0 0 0 7px var(--bg);
+    }
+    5% {
+      border-color: var(--accent-2);
+      background: rgba(139, 136, 248, .18);
+      box-shadow: 0 0 0 7px var(--bg), 0 0 22px rgba(139, 136, 248, .32);
+    }
+  }
 
   /* ---------- showcase ---------- */
 
-  .showcase { display: grid; gap: 56px; }
-  .showcase figure { margin: 0; }
-  .showcase figcaption { margin-top: 14px; color: var(--dim); font-size: 14.5px; }
-
-  /* ---------- gallery ---------- */
-
-  .gallery {
+  /* Один крупный снимок с подписью сбоку вместо трёх в колонку: так раздел
+     короче, а ключевой экран виден целиком, а не в ленте одинаковых картинок. */
+  .showcase {
     display: grid;
-    gap: 18px;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    margin-top: 26px;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: 44px;
+    align-items: center;
   }
+  .showcase figure { margin: 0; }
+  /* Снимок ведёт на свой кадр в галерее — ссылка не должна менять вид блока. */
+  .showcase .shot-link { display: block; color: inherit; text-decoration: none; }
+  .showcase-copy h3 { margin: 0 0 12px; font-size: 21px; font-weight: 620; letter-spacing: -0.015em; }
+  .showcase-copy p { margin: 0 0 22px; color: var(--muted); font-size: 15.5px; }
 
-  .gallery a {
+  /* Ряд превью ведёт на страницу всех экранов — приглашение, а не галерея. */
+  .thumbs {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-top: 34px;
+  }
+  .thumbs a {
     display: block;
+    padding: 5px;
     border: 1px solid var(--line);
-    border-radius: 13px;
+    border-radius: 12px;
     background: var(--panel);
-    overflow: hidden;
-    color: inherit;
     transition: border-color .18s ease, transform .18s ease;
   }
-  .gallery a:hover {
-    text-decoration: none;
-    border-color: var(--line-strong);
-    transform: translateY(-2px);
-  }
-  .gallery img {
+  .thumbs a:hover { border-color: rgba(139, 136, 248, 0.45); transform: translateY(-3px); text-decoration: none; }
+  .thumbs img {
     width: 100%;
     aspect-ratio: 4 / 3;
     object-fit: cover;
-    object-position: top center;
-    background: #0a0a0e;
-    border-bottom: 1px solid var(--line);
+    /* По центру, а не по верху: на трёх из четырёх кадров смысл в середине
+       окна (диалог обработки, итог экспорта, панель метаданных). */
+    object-position: center;
+    border-radius: 8px;
+    filter: saturate(.9);
+    transition: filter .18s ease;
   }
-  .gallery .meta { padding: 14px 16px 16px; }
-  .gallery .meta b {
+  .thumbs a:hover img { filter: none; }
+  .thumbs span {
     display: block;
-    font-size: 14.5px;
-    font-weight: 600;
-    margin-bottom: 4px;
+    padding: 9px 6px 5px;
+    color: var(--dim);
+    font-size: 12.5px;
   }
-  .gallery .meta span { color: var(--dim); font-size: 13.5px; line-height: 1.45; }
 
   /* ---------- split / privacy ---------- */
 
@@ -363,42 +1476,898 @@
     align-items: center;
   }
 
-  .list { margin: 0; padding: 0; list-style: none; display: grid; gap: 14px; }
-  .list li { display: flex; gap: 12px; color: var(--muted); font-size: 15.5px; }
-  .list .tick {
-    flex: none;
-    width: 20px;
-    height: 20px;
-    margin-top: 2px;
-    border-radius: 50%;
-    background: rgba(74, 196, 138, 0.14);
+  /* ---------- визуализация приватности ---------- */
+
+  .privacy-section .split {
+    grid-template-columns: minmax(300px, .78fr) minmax(540px, 1.22fr);
+    gap: clamp(54px, 7vw, 110px);
+  }
+
+  /* Слева не карточки, а одна вертикальная линия с двумя гарантиями. */
+  .privacy-proofs {
+    position: relative;
+    display: grid;
+    gap: 0;
+    margin: 34px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .privacy-proofs::before {
+    content: "";
+    position: absolute;
+    top: 24px;
+    bottom: 24px;
+    left: 22px;
+    width: 1px;
+    background: linear-gradient(var(--accent), rgba(139, 136, 248, .08));
+    transform-origin: top;
+  }
+  .privacy-proof {
+    position: relative;
+    display: grid;
+    grid-template-columns: 46px 1fr;
+    gap: 18px;
+    padding: 18px 0 24px;
+  }
+  .privacy-proof + .privacy-proof { padding-top: 24px; }
+  .proof-mark {
+    position: relative;
+    z-index: 1;
     display: grid;
     place-items: center;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    border: 1px solid rgba(139, 136, 248, .48);
+    background: var(--bg);
+    box-shadow: 0 0 0 7px var(--bg), 0 0 30px rgba(129, 125, 240, .13);
+    transition: border-color .25s ease, box-shadow .25s ease, background-color .25s ease;
   }
-  .list .tick svg { width: 11px; height: 11px; stroke: var(--green); fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
-  .list b { color: var(--text); font-weight: 600; }
+  .proof-mark svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: var(--accent-2);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .proof-copy { padding-top: 2px; transition: transform .25s cubic-bezier(.22, .8, .3, 1); }
+  .proof-copy small {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--accent);
+    font: 600 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+  .proof-copy b { display: block; font-size: 16px; font-weight: 600; }
+  .proof-copy span { display: block; max-width: 34ch; margin-top: 7px; color: var(--dim); font-size: 13.5px; line-height: 1.55; }
+  .privacy-proof:hover .proof-mark {
+    border-color: rgba(170, 168, 255, .85);
+    background: var(--bg-soft);
+    box-shadow: 0 0 0 7px var(--bg), 0 0 34px rgba(129, 125, 240, .34);
+  }
+  .privacy-proof:hover .proof-copy { transform: translateX(5px); }
 
-  /* ---------- chips ---------- */
-
-  .chips { display: flex; flex-wrap: wrap; gap: 10px; }
-  .chip {
-    padding: 9px 16px;
+  /* Справа — не панель, а карта движения данных в локальном контуре. */
+  .privacy-map {
+    position: relative;
+    min-height: 410px;
+    display: grid;
+    align-items: center;
+    isolation: isolate;
+  }
+  .privacy-map::before {
+    content: "";
+    position: absolute;
+    inset: 4% 0 0;
+    z-index: -1;
+    background: radial-gradient(closest-side, rgba(129, 125, 240, .13), transparent 75%);
+    filter: blur(12px);
+  }
+  .local-boundary {
+    position: relative;
+    min-height: 270px;
+    border: 1px dashed rgba(139, 136, 248, .28);
+    border-radius: 140px;
+  }
+  .boundary-label {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    padding: 3px 14px;
+    border-radius: 999px;
+    background: var(--bg);
+    color: #c0beff;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.45;
+    letter-spacing: .025em;
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
+  .data-rail {
+    position: absolute;
+    top: 50%;
+    left: 15%;
+    right: 15%;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(139, 136, 248, .08), var(--accent), rgba(139, 136, 248, .08));
+  }
+  .data-rail i {
+    position: absolute;
+    top: -3px;
+    left: 0;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #c8c6ff;
+    box-shadow: 0 0 14px rgba(170, 168, 255, .9);
+    animation: data-run 3.8s linear infinite;
+  }
+  .data-rail i:nth-child(2) { animation-delay: -1.9s; }
+  @keyframes data-run {
+    0% { left: 0; opacity: 0; }
+    10%, 90% { opacity: 1; }
+    100% { left: calc(100% - 7px); opacity: 0; }
+  }
+  .route-node {
+    position: absolute;
+    top: 50%;
+    display: grid;
+    justify-items: center;
+    gap: 10px;
+    width: 132px;
+    text-align: center;
+    transform: translate(-50%, -50%);
+  }
+  .route-node.source { left: 15%; }
+  .route-node.core { left: 50%; }
+  .route-node.output { left: 85%; }
+  .node-orbit {
+    display: grid;
+    place-items: center;
+    width: 62px;
+    height: 62px;
+    border-radius: 50%;
     border: 1px solid var(--line-strong);
+    background: var(--bg-soft);
+    box-shadow: 0 14px 35px -22px rgba(0, 0, 0, 1);
+  }
+  .route-node.core .node-orbit {
+    width: 88px;
+    height: 88px;
+    border-color: rgba(139, 136, 248, .65);
+    background: radial-gradient(circle, rgba(139, 136, 248, .22), rgba(23, 23, 29, .94) 68%);
+    box-shadow: 0 0 0 10px rgba(139, 136, 248, .035), 0 0 55px rgba(129, 125, 240, .26);
+  }
+  .node-orbit svg { width: 23px; height: 23px; fill: none; stroke: var(--accent-2); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .route-node.core .node-orbit svg { width: 29px; height: 29px; }
+  .route-node b { font-size: 14px; font-weight: 600; }
+  .route-node small { max-width: 16ch; color: var(--dim); font-size: 11.5px; line-height: 1.4; }
+  .offline-badge {
+    position: absolute;
+    left: 50%;
+    bottom: 23px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: #83cba6;
+    font-size: 11px;
+    transform: translateX(-50%);
+  }
+  .offline-badge::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 0 5px rgba(74, 196, 138, .09);
+  }
+  .provider-route {
+    position: absolute;
+    left: 50%;
+    bottom: -70px;
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+    width: 220px;
+    color: var(--dim);
+    font-size: 11px;
+    text-align: center;
+    transform: translateX(-50%);
+  }
+  .provider-route::before {
+    content: "";
+    width: 1px;
+    height: 42px;
+    background: repeating-linear-gradient(to bottom, rgba(139, 136, 248, .55) 0 4px, transparent 4px 9px);
+  }
+  .provider-route b { color: var(--muted); font-size: 12px; font-weight: 550; }
+
+  .reveal .privacy-proof { opacity: 0; transform: translateY(12px); }
+  .reveal .privacy-proofs::before { transform: scaleY(0); }
+  .reveal .proof-mark svg > * { stroke-dasharray: 42; stroke-dashoffset: 42; }
+  .reveal.in .privacy-proof { animation: proof-in .55s cubic-bezier(.22, .8, .3, 1) forwards; }
+  .reveal.in .privacy-proof:nth-child(2) { animation-delay: .12s; }
+  .reveal.in .privacy-proofs::before { animation: proof-line-in .7s ease-out .18s forwards; }
+  .reveal.in .proof-mark svg > * { animation: proof-icon-in .7s ease-out .35s forwards; }
+  .reveal.in .privacy-proof:nth-child(2) .proof-mark svg > * { animation-delay: .62s; }
+  .reveal .local-boundary { opacity: 0; transform: scale(.97); }
+  .reveal.in .local-boundary { animation: map-in .65s cubic-bezier(.22, .8, .3, 1) .12s forwards; }
+  @keyframes proof-in { to { opacity: 1; transform: none; } }
+  @keyframes proof-line-in { to { transform: scaleY(1); } }
+  @keyframes proof-icon-in { to { stroke-dashoffset: 0; } }
+  @keyframes map-in { to { opacity: 1; transform: none; } }
+
+  @media (max-width: 900px) {
+    .privacy-section .split { grid-template-columns: 1fr; gap: 38px; }
+    .privacy-map { min-height: 390px; }
+  }
+  @media (max-width: 560px) {
+    .privacy-map { min-height: 350px; }
+    .local-boundary { min-height: 230px; border-radius: 110px; }
+    .route-node { width: 92px; }
+    .node-orbit { width: 50px; height: 50px; }
+    .route-node.core .node-orbit { width: 68px; height: 68px; }
+    .route-node b { font-size: 12px; }
+    .route-node small { display: none; }
+    .offline-badge { bottom: 19px; }
+    .provider-route { bottom: -68px; }
+  }
+
+  /* ---------- поля метаданных ---------- */
+
+  /* Радиальная карта заменяет стену технического текста: сразу видны
+     четыре группы и их объём. */
+  .metadata-orbit {
+    --metadata-cycle: 10.5s;
+    position: relative;
+    width: min(100%, 960px);
+    height: 410px;
+    margin: 46px auto 0;
+  }
+  .metadata-core {
+    --metadata-core-final-transform: translate(-50%, -50%);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    width: 148px;
+    height: 148px;
+    border: 1px solid rgba(139, 136, 248, .58);
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(139, 136, 248, .22), var(--panel) 66%, var(--bg-soft));
+    box-shadow: 0 0 0 10px rgba(139, 136, 248, .035), 0 0 60px rgba(129, 125, 240, .2);
+    text-align: center;
+    transform: var(--metadata-core-final-transform);
+  }
+  .metadata-core::after {
+    content: "";
+    position: absolute;
+    inset: -13px;
+    z-index: -1;
+    border: 1px solid rgba(139, 136, 248, .12);
+    border-radius: 50%;
+    box-shadow: 0 0 48px rgba(129, 125, 240, .16);
+    animation: metadata-breathe var(--metadata-cycle) cubic-bezier(.45, 0, .55, 1) infinite;
+  }
+  .metadata-core strong { font-size: 50px; font-weight: 600; line-height: .9; letter-spacing: -.05em; }
+  .metadata-core span { margin-top: 8px; color: var(--accent-2); font-family: inherit; font-size: 12.5px; font-weight: 600; letter-spacing: 0; }
+  .metadata-core small { margin-top: 5px; color: var(--dim); font-family: inherit; font-size: 11.5px; }
+
+  .metadata-ray {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 31%;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(139, 136, 248, .2), rgba(139, 136, 248, .07));
+    transform-origin: left center;
+  }
+  .metadata-ray:nth-child(1) { transform: rotate(-148deg); }
+  .metadata-ray:nth-child(2) { transform: rotate(-32deg); }
+  .metadata-ray:nth-child(3) { transform: rotate(148deg); }
+  .metadata-ray:nth-child(4) { transform: rotate(32deg); }
+  .metadata-node {
+    position: absolute;
+    isolation: isolate;
+    width: 260px;
+    transition: opacity .22s ease;
+  }
+  .metadata-node:nth-of-type(2) { top: 28px; left: 18px; text-align: right; }
+  .metadata-node:nth-of-type(3) { top: 28px; right: 18px; }
+  .metadata-node:nth-of-type(4) { bottom: 28px; left: 18px; text-align: right; }
+  .metadata-node:nth-of-type(5) { right: 18px; bottom: 28px; }
+  .metadata-node::before {
+    content: "";
+    position: absolute;
+    inset: -18px -26px;
+    z-index: -1;
+    border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(129, 125, 240, .14), transparent);
+    opacity: 0;
+    transform: scale(.94);
+    animation: metadata-focus var(--metadata-cycle) ease-in-out infinite;
+    transition: opacity .22s ease, transform .22s ease;
+  }
+  .metadata-node small {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 3px 8px;
+    border: 1px solid rgba(139, 136, 248, .25);
     border-radius: 999px;
     background: var(--panel);
+    color: #c0beff;
+    font-family: inherit;
+    font-size: 11.5px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: .01em;
+    transition: border-color .22s ease, background .22s ease, color .22s ease;
+  }
+  .metadata-node h3 {
+    margin: 9px 0 5px;
+    font-size: 17.5px;
+    font-weight: 600;
+    letter-spacing: -.01em;
+    animation: metadata-label-glow var(--metadata-cycle) ease-in-out infinite;
+  }
+  .metadata-node p { margin: 0; color: #8c8c9a; font-family: inherit; font-size: 13.5px; line-height: 1.5; }
+  .metadata-node h3, .metadata-node p { transition: color .22s ease, transform .22s cubic-bezier(.22, .8, .3, 1), text-shadow .22s ease; }
+  .metadata-node:hover h3 { color: var(--accent-2); transform: translateY(-2px); }
+  .metadata-node:hover p { color: var(--muted); }
+
+  /* Hover по pill-полю: стоп автоподсветки, акцент на связанной группе. */
+  #fields:has(.field-cloud [data-group]:hover) .metadata-node {
+    opacity: .42;
+  }
+  #fields:has(.field-cloud [data-group]:hover) .metadata-node::before,
+  #fields:has(.field-cloud [data-group]:hover) .metadata-node h3 {
+    animation: none;
+  }
+  #fields:has(.field-cloud [data-group]:hover) .metadata-node::before {
+    opacity: 0;
+    transform: scale(.96);
+  }
+  #fields:has(.field-cloud [data-group]:hover) .metadata-node h3 {
+    color: var(--text);
+    text-shadow: none;
+    transform: none;
+  }
+  #fields:has(.field-cloud [data-group="text"]:hover) .metadata-node[data-group="text"],
+  #fields:has(.field-cloud [data-group="classification"]:hover) .metadata-node[data-group="classification"],
+  #fields:has(.field-cloud [data-group="location"]:hover) .metadata-node[data-group="location"],
+  #fields:has(.field-cloud [data-group="editorial"]:hover) .metadata-node[data-group="editorial"] {
+    opacity: 1;
+  }
+  #fields:has(.field-cloud [data-group="text"]:hover) .metadata-node[data-group="text"]::before,
+  #fields:has(.field-cloud [data-group="classification"]:hover) .metadata-node[data-group="classification"]::before,
+  #fields:has(.field-cloud [data-group="location"]:hover) .metadata-node[data-group="location"]::before,
+  #fields:has(.field-cloud [data-group="editorial"]:hover) .metadata-node[data-group="editorial"]::before {
+    opacity: .95;
+    transform: scale(1.04);
+  }
+  #fields:has(.field-cloud [data-group="text"]:hover) .metadata-node[data-group="text"] h3,
+  #fields:has(.field-cloud [data-group="classification"]:hover) .metadata-node[data-group="classification"] h3,
+  #fields:has(.field-cloud [data-group="location"]:hover) .metadata-node[data-group="location"] h3,
+  #fields:has(.field-cloud [data-group="editorial"]:hover) .metadata-node[data-group="editorial"] h3 {
+    color: var(--accent-2);
+    text-shadow: 0 0 18px rgba(139, 136, 248, .28);
+    transform: translateY(-2px);
+  }
+  #fields:has(.field-cloud [data-group="text"]:hover) .metadata-node[data-group="text"] p,
+  #fields:has(.field-cloud [data-group="classification"]:hover) .metadata-node[data-group="classification"] p,
+  #fields:has(.field-cloud [data-group="location"]:hover) .metadata-node[data-group="location"] p,
+  #fields:has(.field-cloud [data-group="editorial"]:hover) .metadata-node[data-group="editorial"] p {
+    color: var(--muted);
+  }
+  #fields:has(.field-cloud [data-group="text"]:hover) .metadata-node[data-group="text"] small,
+  #fields:has(.field-cloud [data-group="classification"]:hover) .metadata-node[data-group="classification"] small,
+  #fields:has(.field-cloud [data-group="location"]:hover) .metadata-node[data-group="location"] small,
+  #fields:has(.field-cloud [data-group="editorial"]:hover) .metadata-node[data-group="editorial"] small {
+    border-color: rgba(139, 136, 248, .55);
+    background: rgba(139, 136, 248, .1);
+    color: #d4d2ff;
+  }
+  .metadata-delivery {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    width: fit-content;
+    margin: 26px auto 0;
+    color: var(--muted);
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  .metadata-delivery::before {
+    content: "";
+    flex: 0 0 auto;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #40c993;
+    box-shadow: 0 0 0 6px rgba(64, 201, 147, .08);
+  }
+  .metadata-delivery b { color: var(--text); font-weight: 600; }
+  .field-details {
+    width: min(100%, 960px);
+    margin: 26px auto 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .field-details summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 18px 0;
+    color: var(--text);
+    cursor: pointer;
+    list-style: none;
+  }
+  .field-details summary::-webkit-details-marker { display: none; }
+  .field-details summary b { font-size: 15.5px; font-weight: 600; }
+  .field-details summary::after {
+    content: "+";
+    color: var(--accent-2);
+    font-size: 25px;
+    font-weight: 400;
+    line-height: 1;
+    transition: transform .2s ease;
+  }
+  .field-details[open] summary::after { transform: rotate(45deg); }
+  .field-cloud {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 2px 0 24px;
+  }
+  .field-cloud span {
+    padding: 9px 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: 9px;
+    background: var(--panel);
+    color: #aaaab8;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.2;
+    box-shadow: inset 0 1px rgba(255, 255, 255, .025);
+    cursor: default;
+    transition:
+      border-color .2s ease,
+      background .2s ease,
+      box-shadow .2s ease,
+      transform .2s cubic-bezier(.22, .8, .3, 1);
+  }
+  .field-cloud span:hover {
+    border-color: rgba(255, 255, 255, .18);
+    background: #1f1f27;
+    box-shadow:
+      inset 0 1px rgba(255, 255, 255, .05),
+      0 6px 14px -10px rgba(0, 0, 0, .55);
+    transform: translateY(-1px);
+  }
+  .field-cloud .maybe {
+    border-color: rgba(161, 161, 174, .28);
+    border-style: dashed;
+    background: transparent;
+    color: #858596;
+    box-shadow: none;
+  }
+  .field-cloud .maybe:hover {
+    border-style: solid;
+    border-color: rgba(255, 255, 255, .14);
+    background: rgba(255, 255, 255, .04);
+    box-shadow: 0 6px 14px -10px rgba(0, 0, 0, .45);
+  }
+
+  .reveal .metadata-core { opacity: 0; transform: translate(-50%, -50%) scale(.82); }
+  .reveal .metadata-ray { opacity: 0; scale: 0 1; }
+  .reveal .metadata-node { opacity: 0; transform: translateY(10px); }
+  .reveal.in .metadata-core { animation: metadata-core-in .55s cubic-bezier(.22, .8, .3, 1) .1s forwards; }
+  .reveal.in .metadata-ray { animation: metadata-ray-in .45s ease-out .42s forwards; }
+  .reveal.in .metadata-node { animation: metadata-node-in .5s ease-out .58s forwards; }
+  .reveal.in .metadata-node:nth-of-type(3),
+  .reveal.in .metadata-node:nth-of-type(5) { animation-delay: .72s; }
+  @keyframes metadata-core-in { to { opacity: 1; transform: var(--metadata-core-final-transform); } }
+  @keyframes metadata-ray-in { to { opacity: 1; scale: 1 1; } }
+  @keyframes metadata-node-in { to { opacity: 1; transform: none; } }
+  @keyframes metadata-breathe {
+    0% { opacity: .18; transform: scale(.9); }
+    24%, 78% { opacity: 1; transform: scale(1.08); }
+    100% { opacity: .18; transform: scale(.9); }
+  }
+  @keyframes metadata-focus {
+    0%, 28%, 100% { opacity: 0; transform: scale(.96); }
+    46%, 62% { opacity: .9; transform: scale(1.02); }
+    78% { opacity: 0; transform: scale(1.05); }
+  }
+  @keyframes metadata-label-glow {
+    0%, 30%, 100% { color: var(--text); text-shadow: none; }
+    46%, 62% { color: var(--accent-2); text-shadow: 0 0 18px rgba(139, 136, 248, .28); }
+    78% { color: var(--text); text-shadow: none; }
+  }
+
+  @media (max-width: 720px) {
+    .metadata-orbit {
+      height: auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px 18px;
+      margin-top: 38px;
+    }
+    .metadata-core {
+      --metadata-core-final-transform: none;
+      position: relative;
+      top: auto;
+      left: auto;
+      grid-column: 1 / -1;
+      width: 132px;
+      height: 132px;
+      margin: 0 auto 12px;
+      transform: none;
+    }
+    .metadata-core strong { font-size: 46px; }
+    .metadata-ray { display: none; }
+    .metadata-node,
+    .metadata-node:nth-of-type(2), .metadata-node:nth-of-type(3),
+    .metadata-node:nth-of-type(4), .metadata-node:nth-of-type(5) {
+      position: relative;
+      inset: auto;
+      width: auto;
+      text-align: left;
+    }
+    .metadata-node h3 { font-size: 16px; }
+    .reveal .metadata-core { transform: scale(.82); }
+  }
+
+  /* ---------- faq ---------- */
+
+  /* Без карточек: колонки, разделённые линиями. Ещё один блок «плиток»
+     подряд читался бы как продолжение предыдущего раздела. */
+  .faq {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 0 34px;
+    border-top: 1px solid var(--line);
+  }
+  .faq > div {
+    padding: 28px 0 4px;
+    border-bottom: 1px solid var(--line);
+  }
+  .faq .n { color: var(--dim); font-size: 12.5px; font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace; }
+  .faq h3 { margin: 14px 0 8px; font-size: 16.5px; font-weight: 600; }
+  .faq p { margin: 0 0 20px; color: var(--muted); font-size: 14.5px; line-height: 1.6; }
+
+  /* ---------- маппинг площадок ---------- */
+
+  /* Вместо тяжёлой таблицы — три короткие колонки. Разделители сохраняют
+     структуру, но не превращают блок в ещё одну крупную карточку. */
+  .mapping-grid {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .mapping-platform {
+    --mapping-inset: 0px;
+    --mapping-phase: 0s;
+    position: relative;
+    min-width: 0;
+    padding: 24px 28px 22px 0;
+    transition: background .25s ease, box-shadow .25s ease;
+  }
+  .mapping-platform:nth-child(2) { --mapping-phase: 3s; }
+  .mapping-platform:nth-child(3) { --mapping-phase: 6s; }
+  .mapping-platform + .mapping-platform {
+    --mapping-inset: 28px;
+    padding-left: 28px;
+    border-left: 1px solid var(--line);
+  }
+  .mapping-platform::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    left: var(--mapping-inset);
+    width: calc(100% - var(--mapping-inset) - 28px);
+    height: 2px;
+    border-radius: 999px;
+    background: var(--accent);
+    opacity: 0;
+    transform: scaleX(.08);
+    transform-origin: left;
+    transition: opacity .2s ease, transform .3s cubic-bezier(.22, .8, .3, 1);
+  }
+  .mapping-platform h3 {
+    margin: 0 0 10px;
+    color: var(--text);
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    transition: color .2s ease, transform .25s cubic-bezier(.22, .8, .3, 1);
+  }
+  .mapping-platform p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14.5px;
+    line-height: 1.65;
+  }
+  .mapping-platform p + p {
+    margin-top: 8px;
+    color: var(--dim);
+    font-size: 13.5px;
+  }
+  .mapping-platform strong {
+    color: var(--text);
+    font-weight: 560;
+    transition: color .2s ease;
+  }
+  /* Вместо бегущего импульса площадки по очереди получают тихий акцент:
+     меняется вся колонка, поэтому motion не похож на передачу данных. */
+  .mapping-platform.reveal.in {
+    animation: mapping-focus 9s ease-in-out var(--mapping-phase) infinite;
+  }
+  .mapping-platform.reveal.in h3 {
+    animation: mapping-title-focus 9s ease-in-out var(--mapping-phase) infinite;
+  }
+  @keyframes mapping-focus {
+    0%, 4%, 34%, 100% {
+      background-color: transparent;
+      box-shadow: inset 0 0 rgba(139, 136, 248, 0);
+    }
+    11%, 27% {
+      background-color: rgba(139, 136, 248, .065);
+      box-shadow: inset 0 1px rgba(170, 168, 255, .22), inset 0 -1px rgba(139, 136, 248, .06);
+    }
+  }
+  @keyframes mapping-title-focus {
+    0%, 4%, 34%, 100% { color: var(--text); }
+    11%, 27% { color: var(--accent-2); }
+  }
+  @media (hover: hover) {
+    .mapping-grid:hover .mapping-platform.reveal.in,
+    .mapping-grid:hover .mapping-platform.reveal.in h3 { animation: none; }
+    .mapping-platform:hover {
+      background: linear-gradient(180deg, rgba(139, 136, 248, 0.13), rgba(139, 136, 248, 0.025) 72%, transparent);
+      box-shadow: inset 0 18px 34px -28px rgba(170, 168, 255, 0.8);
+    }
+    .mapping-platform:hover::before { opacity: 1; transform: scaleX(1); }
+    .mapping-platform:hover h3 { color: var(--accent-2); transform: translateX(6px); }
+    .mapping-platform:hover strong { color: var(--accent-2); }
+  }
+  .mapping-note {
+    margin: 20px 0 0;
+    max-width: 76ch;
+    color: var(--dim);
+    font-size: 14.5px;
+  }
+  .mapping-note b { color: var(--muted); font-weight: 560; }
+
+  /* ---------- установка ---------- */
+
+  /* Без внешней панели: шаги и детали держатся на ритме, а не на вложенных рамках. */
+  .install-shell { margin-top: 38px; }
+  .install-steps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 32px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .install-step {
+    position: relative;
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+    min-width: 0;
+  }
+  .install-step:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    top: 13px;
+    left: 38px;
+    right: -22px;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(139, 136, 248, .42), rgba(139, 136, 248, .08));
+  }
+  .install-step .n {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    color: var(--accent-2);
+    font-size: 13px;
+    font-weight: 650;
+    box-shadow: 0 0 0 5px var(--bg);
+    transition: transform .25s cubic-bezier(.22, .8, .3, 1), background .2s ease;
+  }
+  .install-step-copy {
+    transition: transform .25s cubic-bezier(.22, .8, .3, 1);
+  }
+  .install-step h3 {
+    margin: 1px 0 6px;
+    font-size: 15.5px;
+    font-weight: 600;
+  }
+  .install-step p {
+    margin: 0;
+    color: var(--dim);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  @media (hover: hover) {
+    .install-step:hover .n { transform: translateY(-2px) scale(1.06); background: rgba(139, 136, 248, .22); }
+    .install-step:hover .install-step-copy { transform: translateY(-2px); }
+  }
+
+  .install-compat {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 32px 0 0;
+    padding: 17px 0 0;
+    border-top: 1px solid var(--line);
     color: var(--muted);
     font-size: 14.5px;
   }
-  .chip b { color: var(--text); font-weight: 600; }
-
-  /* ---------- panels / code ---------- */
-
-  .panel {
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: linear-gradient(180deg, var(--panel-2), var(--bg-soft));
-    padding: 40px;
+  .install-compat svg {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    padding: 3px;
+    border-radius: 50%;
+    background: rgba(74, 196, 138, .13);
+    fill: none;
+    stroke: var(--green);
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
+
+  .install-tech {
+    margin-top: 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .install-tech summary {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 18px 0;
+    color: var(--muted);
+    cursor: pointer;
+    list-style: none;
+    transition: color .2s ease;
+  }
+  .install-tech summary::-webkit-details-marker { display: none; }
+  .install-tech summary:hover, .install-tech[open] summary { color: var(--text); }
+  .install-tech summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 5px;
+    border-radius: 3px;
+  }
+  .install-tech-summary-copy { min-width: 0; }
+  .install-tech-summary-copy strong {
+    display: block;
+    color: inherit;
+    font-size: 15.5px;
+    font-weight: 600;
+  }
+  .install-tech-summary-copy span {
+    display: block;
+    margin-top: 1px;
+    color: var(--dim);
+    font-size: 13.5px;
+  }
+  .install-tech summary svg {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin-left: auto;
+    padding: 4px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    fill: none;
+    stroke: var(--accent-2);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform .25s cubic-bezier(.22, .8, .3, 1), background .2s ease;
+  }
+  .install-tech[open] summary svg {
+    transform: rotate(180deg);
+    background: rgba(139, 136, 248, .22);
+  }
+  .install-tech[open] .install-tech-content {
+    animation: install-tech-open .35s cubic-bezier(.22, .8, .3, 1);
+  }
+  @keyframes install-tech-open {
+    from { opacity: 0; transform: translateY(-5px); }
+  }
+  .install-details {
+    display: grid;
+    grid-template-columns: minmax(250px, .72fr) minmax(0, 1.28fr);
+  }
+  .install-detail { min-width: 0; padding: 28px 0 30px; }
+  .install-detail + .install-detail {
+    margin-left: 34px;
+    padding-left: 34px;
+    border-left: 1px solid var(--line);
+  }
+  .install-detail h3 { margin: 0 0 14px; font-size: 17px; }
+  #install pre {
+    margin-top: 0;
+    border: 0;
+    background: rgba(5, 5, 8, .62);
+    box-shadow: inset 0 1px rgba(255, 255, 255, .035);
+  }
+  #install .stack { margin-top: 0; font-size: 14px; }
+  #install .stack th, #install .stack td { padding: 10px 12px; }
+  #install .stack th { padding-left: 0; }
+  #install .stack td { padding-right: 0; }
+  .install-note {
+    max-width: 76ch;
+    margin: 0;
+    padding: 0 0 20px;
+    color: var(--dim);
+    font-size: 14px;
+  }
+
+  /* Каскад запускается вместе с общим reveal-наблюдателем. */
+  .reveal .install-step .n { opacity: 0; transform: scale(.72); }
+  .reveal .install-step-copy { opacity: 0; transform: translateY(10px); }
+  .reveal .install-step:not(:last-child)::after { transform: scaleX(0); transform-origin: left; }
+  .reveal .install-compat, .reveal .install-tech {
+    opacity: 0;
+    transform: translateY(9px);
+  }
+  .reveal.in .install-step .n {
+    opacity: 1;
+    transform: none;
+    animation: install-dot-in .42s cubic-bezier(.22, .8, .3, 1) backwards;
+  }
+  .reveal.in .install-step-copy {
+    opacity: 1;
+    transform: none;
+    animation: install-copy-in .5s cubic-bezier(.22, .8, .3, 1) .08s backwards;
+  }
+  .reveal.in .install-step:not(:last-child)::after {
+    transform: scaleX(1);
+    animation: install-line-in .52s ease-out .18s backwards;
+  }
+  .reveal.in .install-step:nth-child(2) .n { animation-delay: .18s; }
+  .reveal.in .install-step:nth-child(2) .install-step-copy { animation-delay: .26s; }
+  .reveal.in .install-step:nth-child(2)::after { animation-delay: .36s; }
+  .reveal.in .install-step:nth-child(3) .n { animation-delay: .36s; }
+  .reveal.in .install-step:nth-child(3) .install-step-copy { animation-delay: .44s; }
+  .reveal.in .install-compat {
+    opacity: 1;
+    transform: none;
+    animation: install-detail-in .48s ease-out .5s backwards;
+  }
+  .reveal.in .install-tech {
+    opacity: 1;
+    transform: none;
+    animation: install-detail-in .5s ease-out .58s backwards;
+  }
+  @keyframes install-dot-in {
+    from { opacity: 0; transform: scale(.72); }
+  }
+  @keyframes install-copy-in { from { opacity: 0; transform: translateY(10px); } }
+  @keyframes install-detail-in { from { opacity: 0; transform: translateY(9px); } }
+  @keyframes install-line-in { from { transform: scaleX(0); } }
 
   code, pre {
     font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
@@ -433,6 +2402,20 @@
   .stack th { color: var(--dim); font-weight: 600; white-space: nowrap; }
   .stack td { color: var(--muted); }
   .stack tr:last-child th, .stack tr:last-child td { border-bottom: 0; }
+  /* Строки таблицы проявляются сверху вниз вслед за появлением панели. */
+  .reveal .stack tr { opacity: 0; }
+  .reveal.in .stack tr { animation: row-in .45s ease-out forwards; }
+  .reveal.in .stack tr:nth-child(2) { animation-delay: .07s; }
+  .reveal.in .stack tr:nth-child(3) { animation-delay: .14s; }
+  .reveal.in .stack tr:nth-child(4) { animation-delay: .21s; }
+  .reveal.in .stack tr:nth-child(5) { animation-delay: .28s; }
+  @keyframes row-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+  /* Подсветка строки под курсором — длинную таблицу удобнее читать. */
+  .stack tr { transition: background .18s ease; }
+  .stack tbody tr:hover { background: rgba(255, 255, 255, 0.025); }
 
   .table-scroll { overflow-x: auto; }
 
@@ -447,6 +2430,9 @@
       radial-gradient(closest-side at 50% 0%, rgba(129, 125, 240, 0.2), transparent),
       linear-gradient(180deg, var(--panel-2), var(--bg-soft));
   }
+  /* Единственный блок, где кнопки по центру: раздел сам центрирован.
+     В первом экране .cta прижата влево, к тексту. */
+  .final .cta { justify-content: center; }
   .final h2 { max-width: 20ch; margin-inline: auto; }
   .final p { color: var(--muted); max-width: 55ch; margin: 0 auto 28px; }
 
@@ -454,7 +2440,7 @@
 
   footer {
     border-top: 1px solid var(--line);
-    padding: 34px 0;
+    padding: 24px 0;
     color: var(--dim);
     font-size: 14px;
   }
@@ -465,29 +2451,356 @@
     align-items: center;
     justify-content: space-between;
   }
-  .foot-links { display: flex; flex-wrap: wrap; gap: 20px; }
-  .foot-links a { color: var(--muted); }
+  /* Обычная надпись, а не кнопка: подсветка текста при наведении
+     вместо подчёркивания. */
+  .foot-link { color: var(--muted); transition: color .18s ease; }
+  .foot-link:hover { color: var(--text); text-decoration: none; }
 
+  /* ---------- кнопка «наверх» ---------- */
+
+  .to-top {
+    position: fixed;
+    right: 22px;
+    bottom: 22px;
+    z-index: 20;
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 1px solid var(--line-strong);
+    background: rgba(23, 23, 29, 0.86);
+    backdrop-filter: blur(10px);
+    color: var(--text);
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(12px) scale(.9);
+    pointer-events: none;
+    transition: opacity .25s ease, transform .25s cubic-bezier(.22, .8, .3, 1), border-color .18s ease;
+  }
+  .to-top.show { opacity: 1; transform: none; pointer-events: auto; }
+  .to-top:hover { border-color: rgba(139, 136, 248, 0.5); }
+  .to-top:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .to-top svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .to-top:hover svg { animation: nudge .5s ease; }
+  @keyframes nudge {
+    50% { transform: translateY(-3px); }
+  }
+
+  /* ---------- появление при скролле ---------- */
+
+  /* Класс ставит JS: без него (или без поддержки IntersectionObserver)
+     контент виден сразу, ничего не прячем «на всякий случай». */
+  .reveal {
+    opacity: 0;
+    transform: translateY(22px);
+    transition: opacity .7s cubic-bezier(.22, .8, .3, 1), transform .7s cubic-bezier(.22, .8, .3, 1);
+    transition-delay: var(--d, 0s);
+  }
+  .reveal.in { opacity: 1; transform: none; }
+
+  /* Снимки экрана — чуть заметнее, с лёгким приближением. */
+  .showcase figure.reveal { transform: translateY(28px) scale(.985); }
+  .showcase figure.reveal.in { transform: none; }
+
+  .showcase .shot { transition: transform .35s cubic-bezier(.22, .8, .3, 1), box-shadow .35s ease; }
+  .showcase figure:hover .shot {
+    transform: translateY(-4px);
+    box-shadow: 0 50px 90px -40px rgba(0, 0, 0, 1);
+  }
+
+  @media (max-width: 1000px) {
+    /* Мокап под текстом: в узкой колонке его подписи становятся нечитаемы. */
+    .hero-grid { grid-template-columns: 1fr; gap: 46px; }
+    .hero-copy { max-width: 62ch; }
+    .hero-visual {
+      width: min(100%, 920px);
+      margin-inline: auto;
+      perspective-origin: 28% 48%;
+    }
+    h1 { max-width: 18ch; }
+    .lede { max-width: none; }
+    .showcase { grid-template-columns: 1fr; gap: 30px; }
+  }
+  /* Пять колонок мастера держатся примерно до 900 px: ниже на колонку остаётся
+     ~130 px и подписи ломаются на четыре-пять строк. Здесь же зигзаг сменяется
+     вертикальным таймлайном, а три площадки — двумя колонками. */
+  @media (max-width: 900px) {
+    .steps {
+      grid-template-columns: 1fr;
+      min-height: 0;
+      margin-top: 4px;
+    }
+    .steps::before,
+    .steps::after {
+      top: 16px;
+      right: auto;
+      bottom: 16px;
+      left: 15px;
+      width: 1px;
+      height: auto;
+    }
+    .steps::before {
+      background: linear-gradient(
+        rgba(139, 136, 248, .42),
+        rgba(139, 136, 248, .2) 70%,
+        rgba(255, 255, 255, .07)
+      );
+    }
+    .steps::after {
+      bottom: auto;
+      height: 72px;
+      background: linear-gradient(transparent, var(--accent-2), transparent);
+    }
+    .step {
+      grid-template: auto / 32px minmax(0, 1fr);
+      gap: 17px;
+      padding: 0 0 30px;
+    }
+    .step:last-child { padding-bottom: 0; }
+    .step .n {
+      grid-row: 1;
+      grid-column: 1;
+      align-self: start;
+    }
+    .step-copy,
+    .step:nth-child(even) .step-copy {
+      grid-row: 1;
+      grid-column: 2;
+      align-self: start;
+      padding: 3px 0 0;
+    }
+    .step p { max-width: 52ch; font-size: 14px; }
+    .reveal.steps::before {
+      transform: scaleY(0);
+      transform-origin: top;
+    }
+    .reveal.steps.in::after {
+      animation-name: steps-flow-mobile;
+    }
+    .mapping-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    /* Третья площадка уходит на всю ширину второй строки: вертикальный
+       разделитель ей уже не нужен, границу рисуем сверху. */
+    .mapping-platform:nth-child(3) {
+      --mapping-inset: 0px;
+      grid-column: 1 / -1;
+      padding-left: 0;
+      border-left: 0;
+      border-top: 1px solid var(--line);
+    }
+  }
+  @media (max-width: 900px) and (hover: hover) {
+    .step:nth-child(even):hover .step-copy { transform: translateY(-3px); }
+  }
+
+  /* Ссылки на разделы не прячем, а переносим на вторую строку шапки
+     горизонтальной лентой: страница длинная, и без них по разделам не пройти. */
   @media (max-width: 860px) {
-    .nav-links { display: none; }
+    :root { --header-h: 84px; }
+    .nav {
+      height: auto;
+      flex-wrap: wrap;
+      gap: 0 16px;
+      padding-top: 9px;
+    }
+    .brand { height: 42px; }
+    .nav-links {
+      order: 3;
+      width: 100%;
+      margin: 0 -24px;
+      padding: 0 24px 10px;
+      gap: 20px;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scroll-snap-type: x proximity;
+      scrollbar-width: none;
+    }
+    .nav-links::-webkit-scrollbar { display: none; }
+    .nav-links a {
+      flex: 0 0 auto;
+      scroll-snap-align: start;
+    }
   }
   @media (max-width: 720px) {
-    .hero { padding-top: 56px; }
-    section { padding: 56px 0; }
-    .panel { padding: 26px; }
+    .hero { padding: 56px 0 66px; }
+    section { padding: 62px 0; }
+    .install-shell { margin-top: 32px; }
+    .install-steps { grid-template-columns: 1fr; gap: 22px; }
+    .install-step:not(:last-child)::after {
+      top: 35px;
+      bottom: -16px;
+      left: 13px;
+      right: auto;
+      width: 1px;
+      height: auto;
+      background: linear-gradient(rgba(139, 136, 248, .42), rgba(139, 136, 248, .08));
+    }
+    .reveal .install-step:not(:last-child)::after { transform: scaleY(0); transform-origin: top; }
+    .reveal.in .install-step:not(:last-child)::after {
+      transform: scaleY(1);
+      animation-name: install-line-in-mobile;
+    }
+    .install-compat { margin-top: 28px; }
+    .install-tech summary { gap: 14px; }
+    .install-details { grid-template-columns: 1fr; }
+    .install-detail { padding: 25px 0 27px; }
+    .install-detail + .install-detail {
+      margin-left: 0;
+      padding-left: 0;
+      border-top: 1px solid var(--line);
+      border-left: 0;
+    }
+    .mapping-grid { grid-template-columns: 1fr; }
+    .mapping-platform,
+    .mapping-platform + .mapping-platform { padding: 20px 0; }
+    .mapping-platform + .mapping-platform {
+      --mapping-inset: 0px;
+      border-top: 1px solid var(--line);
+      border-left: 0;
+    }
+    .feature-layout { grid-template-columns: 1fr; gap: 32px; }
+    .hero-visual {
+      perspective: 1100px;
+      padding: 10px 3px 34px 7px;
+    }
+    .mock-depth {
+      --mock-rx: 1deg;
+      --mock-ry: -5.5deg;
+      --mock-rz: -.1deg;
+      transform-origin: 18% 52%;
+    }
+    .mock { --u: clamp(.74px, calc(100cqi / 440), .92px); }
+    /* Узкий hero: только Results; Metadata Preview прячем. */
+    .mock-cols { grid-template-columns: 1fr; }
+    .mock-preview { display: none; }
+    .thumbs { grid-template-columns: repeat(2, 1fr); }
+    .platforms { gap: 14px 26px; }
+    .platforms b { font-size: 15px; }
+  }
+  @keyframes install-line-in-mobile { from { transform: scaleY(0); } }
+  @keyframes steps-flow-mobile {
+    0% { opacity: 0; transform: translateY(-75%); }
+    10%, 82% { opacity: .9; }
+    100% { opacity: 0; transform: translateY(500%); }
+  }
+  @media (max-width: 420px) {
+    .install-step { gap: 12px; }
+    #install pre { padding: 16px; font-size: 13px; }
+    .mock-row {
+      grid-template-columns:
+        calc(11 * var(--u)) calc(23 * var(--u))
+        minmax(0, 1fr) auto;
+    }
+    .mock-title { display: none; }
+    .mock-chips span { padding-inline: calc(5 * var(--u)); }
+    .mock-steps { gap: calc(4 * var(--u)); padding-inline: calc(8 * var(--u)); }
   }
   @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
-    .gallery a, .nav-links a, .nav-links a::after { transition: none; }
+    .nav-links a, .nav-links a::after { transition: none; }
+    /* Ничего не движется: показываем всё сразу и глушим анимации. */
+    .reveal, .reveal.in { opacity: 1; transform: none; transition: none; }
+    .ambient-particle { display: none; }
+    .hero .badge, .hero h1, .hero .lede, .hero .cta, .hero .cta-note,
+    .hero-visual, .hero::before,
+    .btn-primary::after, .btn-primary:hover::after { animation: none; }
+    .feature-item:hover .feature-icon, .step:hover .n, .step:hover .step-copy, .showcase figure:hover .shot,
+    .thumbs a:hover, .btn-primary:hover, .btn-ghost:hover, .btn-ghost:hover svg { transform: none; }
+    .feature-icon, .step .n, .step-copy, .showcase .shot, .thumbs a, .btn-primary, .btn-ghost { transition: none; }
+    .reveal.steps::before, .reveal.steps.in::before { transform: none; transition: none; }
+    .reveal.steps.in::after, .reveal.steps.in .step .n { animation: none; }
+    /* Перспективу оставляем статичной; отключаем вход, плавание и микроэффекты. */
+    .mock-stage { transform: none; transition: none; }
+    .mock-depth {
+      animation: none;
+      transform:
+        rotateX(var(--mock-rx))
+        rotateY(var(--mock-ry))
+        rotateZ(var(--mock-rz));
+    }
+    .mock-float,
+    .mock-row.on::after,
+    .mock-photo::before,
+    .mock-lightning,
+    .mock-steps .now i { animation: none; }
+    .nav-cta { transition: opacity .2s ease; }
+    header.hero-cta-visible .nav-cta { transform: none; }
+    h1 .grad { animation: none; }
+    .brand:hover img { transform: none; }
+    .to-top { transition: opacity .2s ease; transform: none; }
+    .to-top:hover svg { animation: none; }
+    .reveal.in .stack tr, .reveal .stack tr { animation: none; opacity: 1; }
+    /* Блок приватности остаётся в конечном состоянии. */
+    .reveal .privacy-proof, .reveal.in .privacy-proof,
+    .reveal .local-boundary, .reveal.in .local-boundary {
+      animation: none;
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+    .reveal .privacy-proofs::before,
+    .reveal.in .privacy-proofs::before { animation: none; transform: none; }
+    .reveal .proof-mark svg > *,
+    .reveal.in .proof-mark svg > * { animation: none; stroke-dashoffset: 0; }
+    .privacy-proof:hover .proof-copy { transform: none; }
+    .data-rail i { animation: none; opacity: .65; }
+    .data-rail i:first-child { left: 28%; }
+    .data-rail i:nth-child(2) { left: 72%; }
+    .reveal .metadata-core, .reveal.in .metadata-core {
+      animation: none;
+      opacity: 1;
+      transform: var(--metadata-core-final-transform);
+    }
+    .reveal .metadata-ray, .reveal.in .metadata-ray,
+    .reveal .metadata-node, .reveal.in .metadata-node {
+      animation: none;
+      opacity: 1;
+      scale: 1 1;
+      transform: none;
+    }
+    .metadata-core::after { animation: none; opacity: .55; transform: none; }
+    .metadata-node::before { animation: none; opacity: 0; transform: none; }
+    .metadata-node h3 { animation: none; }
+    .metadata-node { transition: none; }
+    .metadata-node::before, .metadata-node small { transition: none; }
+    .field-details summary::after { transition: none; }
+    .metadata-node h3, .metadata-node p { transition: none; }
+    .metadata-node:hover h3 { transform: none; }
+    .field-cloud span { transition: none; }
+    .field-cloud span:hover { transform: none; }
+    .mapping-platform, .mapping-platform::before,
+    .mapping-platform h3, .mapping-platform strong { transition: none; }
+    .mapping-platform:hover h3 { transform: none; }
+    .mapping-platform.reveal.in,
+    .mapping-platform.reveal.in h3 { animation: none; }
+    .install-step .n, .install-step-copy { transition: none; }
+    .install-step:hover .n, .install-step:hover .install-step-copy { transform: none; }
+    .install-tech summary, .install-tech summary svg { transition: none; }
+    .install-tech[open] .install-tech-content { animation: none; }
+    .reveal .install-step .n, .reveal.in .install-step .n,
+    .reveal .install-step-copy, .reveal.in .install-step-copy,
+    .reveal .install-compat, .reveal.in .install-compat,
+    .reveal .install-tech, .reveal.in .install-tech {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
+    .reveal .install-step:not(:last-child)::after,
+    .reveal.in .install-step:not(:last-child)::after {
+      animation: none;
+      transform: none;
+    }
   }
 </style>
 </head>
 <body>
 
+<span class="ambient-particle" aria-hidden="true"></span>
+
 <header>
   <div class="wrap nav">
     <a class="brand" href="#top">
-      <img src="../../desktop/build/icon.svg" alt="">
+      <img src="icon.svg" width="30" height="30" alt="">
       Photo Metadata AI
     </a>
     <nav class="nav-links" id="nav-links">
@@ -497,7 +2810,7 @@
       <a href="#screens">Скриншоты</a>
       <a href="#install">Установка</a>
     </nav>
-    <a class="btn btn-ghost btn-sm" href="https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.1.0/Photo-Metadata-AI-1.1.0-universal.dmg">Скачать</a>
+    <a class="btn btn-ghost btn-sm nav-cta" href="https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.1.0/Photo-Metadata-AI-1.1.0-universal.dmg"><svg class="apple" viewBox="0 0 384 512" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>Скачать</a>
   </div>
 </header>
 
@@ -505,68 +2818,244 @@
 
   <!-- HERO -->
   <div class="hero">
-    <div class="wrap">
-      <span class="badge">macOS · Apple Silicon и Intel</span>
-      <h1>Метаданные для фотостоков <span class="grad">за минуты</span></h1>
-      <p class="lede">
-        Десктопное приложение анализирует каждый кадр с помощью AI и генерирует полный
-        набор полей, которых требуют стоки — от заголовка и ключевых слов до лицензии,
-        локации, editorial-блока и релизов. Под Adobe Stock, Shutterstock или Getty Images
-        они пересобираются автоматически, вшиваются в файлы и выгружаются в CSV.
-      </p>
-    </div>
-    <div class="wrap hero-shot">
-      <div class="shot">
-        <img src="../screenshots/04_start_screen.png" alt="Главный экран приложения: зона drag &amp; drop, панель Context &amp; Settings и карточки возможностей">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <span class="badge">macOS 11+ · Apple Silicon и Intel</span>
+        <h1>Метаданные для фотостоков <span class="grad">за минуты</span></h1>
+        <p class="lede">
+          Десктопное приложение анализирует каждый кадр с помощью AI и генерирует полный
+          набор полей, которых требуют стоки — от заголовка и ключевых слов до лицензии,
+          локации, editorial-блока и релизов. Под требования каждой площадки они
+          пересобираются автоматически, вшиваются в файлы и выгружаются в CSV.
+        </p>
+        <div class="cta" id="hero-cta">
+          <a class="btn btn-primary" href="https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.1.0/Photo-Metadata-AI-1.1.0-universal.dmg">
+            <svg class="apple" viewBox="0 0 384 512" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>
+            Скачать для macOS
+          </a>
+          <a class="btn btn-ghost" href="#how">
+            Как это работает
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13"/><path d="M12.5 6.5L18 12l-5.5 5.5"/></svg>
+          </a>
+        </div>
+        <p class="cta-note">DMG ~230 МБ · без регистрации и подписки — нужен ключ AI-провайдера или локальная модель.</p>
       </div>
+
+      <!-- Мокап окна, а не снимок экрана: см. комментарий у .mock в стилях. -->
+      <div class="hero-visual">
+        <div class="mock-stage">
+          <div class="mock-depth">
+            <div class="mock-float">
+              <div class="mock" role="img" aria-label="Окно приложения на шаге Review: список из 113 фотографий и Metadata Preview выбранного кадра с полями Title, Keywords и Category">
+                <div class="mock-bar" aria-hidden="true">
+                  <i></i><i></i><i></i>
+                  <b>Photo Metadata AI</b>
+                </div>
+                <div class="mock-body" aria-hidden="true">
+                  <div class="mock-head">
+                    <img src="icon.svg" width="20" height="20" alt="">
+                    <div>
+                      <b>Photo Metadata AI</b>
+                      <small>Prepare your photos for stock platforms in minutes</small>
+                    </div>
+                    <span class="mock-setup">AI Setup</span>
+                  </div>
+
+                  <div class="mock-cols">
+                    <section class="mock-panel">
+                      <div class="mock-panel-top">
+                        <div class="mock-panel-heading">
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M8 6h12M8 12h12M8 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/>
+                          </svg>
+                          <div>
+                            <h4>Results</h4>
+                            <span>113 photos</span>
+                          </div>
+                        </div>
+                        <span class="mock-panel-meta">Review</span>
+                      </div>
+                      <div class="mock-chips">
+                        <span class="on">All 113</span>
+                        <span><i class="dot-ok"></i>Ready 69</span>
+                        <span><i class="dot-warn"></i>Recommendations 38</span>
+                        <span><i class="dot-err"></i>Missing 6</span>
+                      </div>
+                      <div class="mock-rows">
+                        <div class="mock-row">
+                          <span class="mock-check"></span>
+                          <span class="mock-thumb t1"></span>
+                          <span class="mock-name">026_001117_15-44-2…</span>
+                          <span class="mock-title"><i class="dot-ok"></i><span>Persian Ceramic Tile…</span></span>
+                          <span class="mock-prov">QWEN 2.5 VL</span>
+                        </div>
+                        <div class="mock-row">
+                          <span class="mock-check"></span>
+                          <span class="mock-thumb t2"></span>
+                          <span class="mock-name">027_002_Asian_gree…</span>
+                          <span class="mock-title"><i class="dot-ok"></i><span>Two Green Bee-eaters…</span></span>
+                          <span class="mock-prov">OpenRouter</span>
+                        </div>
+                        <div class="mock-row">
+                          <span class="mock-check"></span>
+                          <span class="mock-thumb t3"></span>
+                          <span class="mock-name">038_003_Ringed_kin…</span>
+                          <span class="mock-title"><i class="dot-ok"></i><span>Kingfisher with Catch…</span></span>
+                          <span class="mock-prov">Gemini</span>
+                        </div>
+                        <div class="mock-row on">
+                          <span class="mock-check"></span>
+                          <span class="mock-thumb t4"></span>
+                          <span class="mock-name">040_004_2018_05_1…</span>
+                          <span class="mock-title"><i class="dot-warn"></i><span>Lightning Storm at…</span></span>
+                          <span class="mock-prov">QWEN 2.5 VL</span>
+                        </div>
+                        <div class="mock-row">
+                          <span class="mock-check"></span>
+                          <span class="mock-thumb t5"></span>
+                          <span class="mock-name">052_006_Dune_45_i…</span>
+                          <span class="mock-title"><i class="dot-ok"></i><span>Giant Orange Sand…</span></span>
+                          <span class="mock-prov">OpenRouter</span>
+                        </div>
+                        <div class="mock-row">
+                          <span class="mock-check"></span>
+                          <span class="mock-thumb t6"></span>
+                          <span class="mock-name">043_004_Great_horn…</span>
+                          <span class="mock-title"><i class="dot-ok"></i><span>Majestic Owl Perched…</span></span>
+                          <span class="mock-prov">Gemini</span>
+                        </div>
+                        <div class="mock-row">
+                          <span class="mock-check"></span>
+                          <span class="mock-thumb t7"></span>
+                          <span class="mock-name">047_005_Lilac-breast…</span>
+                          <span class="mock-title"><i class="dot-err"></i><span>Lilac-breasted Roller…</span></span>
+                          <span class="mock-prov">QWEN 2.5 VL</span>
+                        </div>
+                        <div class="mock-row">
+                          <span class="mock-check"></span>
+                          <span class="mock-thumb t8"></span>
+                          <span class="mock-name">055_006_Wild_Baby_…</span>
+                          <span class="mock-title"><i class="dot-ok"></i><span>Winter Wildlife Scene…</span></span>
+                          <span class="mock-prov">QWEN 2.5 VL</span>
+                        </div>
+                      </div>
+                      <div class="mock-foot">
+                        <span>111 selected for export</span>
+                        <em>Select all 113</em>
+                      </div>
+                    </section>
+
+                    <section class="mock-panel mock-preview">
+                      <div class="mock-panel-top">
+                        <div class="mock-panel-heading">
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/>
+                          </svg>
+                          <div>
+                            <h4>Metadata Preview</h4>
+                            <span>Selected photo</span>
+                          </div>
+                        </div>
+                        <span class="mock-panel-meta">16 / 111</span>
+                      </div>
+                      <div class="mock-photo">
+                        <span class="mock-lightning"></span>
+                        <span class="mock-photo-name">040_004_2018_05_1.jpg</span>
+                      </div>
+                      <div class="mock-label-line">
+                        <span class="mock-label">Title</span>
+                        <span class="mock-field-state">AI generated</span>
+                      </div>
+                      <div class="mock-field">
+                        Lightning Storm at Twilight
+                        <u>27/200 characters</u>
+                      </div>
+                      <div class="mock-label-line">
+                        <span class="mock-label">Description</span>
+                        <span class="mock-field-state">AI generated</span>
+                      </div>
+                      <div class="mock-field description">
+                        A dramatic scene of lightning illuminating the night sky during
+                        a thunderstorm.
+                        <u>79/2000 characters</u>
+                      </div>
+                      <div class="mock-label-line">
+                        <span class="mock-label edited">Keywords</span>
+                        <span class="mock-field-state edited">Edited</span>
+                      </div>
+                      <div class="mock-field keywords">
+                        lightning, thunderstorm, twilight, electricity, nature, power, weather,
+                        dramatic, sky, purple, tree, landscape
+                        <u>12/50 words</u>
+                      </div>
+                      <div class="mock-label-line">
+                        <span class="mock-label">Category 1</span>
+                      </div>
+                      <div class="mock-field mock-category">Nature</div>
+                    </section>
+                  </div>
+
+                  <div class="mock-steps">
+                    <span class="done"><i>1</i>Upload</span><hr class="done">
+                    <span class="done"><i>2</i>Context</span><hr class="done">
+                    <span class="done"><i>3</i>Process</span><hr class="done">
+                    <span class="now"><i>4</i>Review</span><hr>
+                    <span><i>5</i>Export</span>
+                    <span class="mock-action">
+                      <svg viewBox="0 0 10 11" aria-hidden="true"><path d="M0 9.7373V0.926758C0 0.609375 0.0782878 0.376628 0.234863 0.228516C0.391439 0.0761719 0.577637 0 0.793457 0C0.983887 0 1.17855 0.055013 1.37744 0.165039L8.77246 4.48779C9.03483 4.64014 9.2168 4.77767 9.31836 4.90039C9.42415 5.01888 9.47705 5.16276 9.47705 5.33203C9.47705 5.49707 9.42415 5.64095 9.31836 5.76367C9.2168 5.88639 9.03483 6.02393 8.77246 6.17627L1.37744 10.499C1.17855 10.609 0.983887 10.6641 0.793457 10.6641C0.577637 10.6641 0.391439 10.5879 0.234863 10.4355C0.0782878 10.2832 0 10.0505 0 9.7373ZM1.02197 9.28662C1.02197 9.34163 1.04313 9.38184 1.08545 9.40723C1.12777 9.42839 1.1722 9.42415 1.21875 9.39453L8.00439 5.43359C8.05094 5.4082 8.07422 5.37435 8.07422 5.33203C8.07422 5.28125 8.05094 5.2474 8.00439 5.23047L1.21875 1.26953C1.1722 1.23991 1.12777 1.23779 1.08545 1.26318C1.04313 1.28434 1.02197 1.32243 1.02197 1.37744V9.28662Z"/></svg>
+                      Start processing
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ПЛОЩАДКИ -->
+  <div class="wrap">
+    <div class="platforms">
+      <span class="label">Готово для</span>
+      <b>Adobe Stock</b>
+      <b>Shutterstock</b>
+      <b>Getty Images</b>
     </div>
   </div>
 
   <!-- FEATURES -->
   <section id="features">
-    <div class="wrap">
-      <p class="eyebrow">Возможности</p>
-      <h2>Весь путь от папки с кадрами до готовой загрузки</h2>
-      <p class="section-lede">
-        Приложение закрывает рутину, которая обычно съедает вечер после съёмки: описания,
-        ключевые слова, категории, проверку под требования площадки и подготовку файлов.
-      </p>
+    <div class="wrap feature-layout">
+      <div class="feature-copy">
+        <p class="eyebrow">Возможности</p>
+        <h2>Обрабатывайте всю съёмку сразу</h2>
+      </div>
 
-      <div class="grid">
-        <div class="card">
-          <div class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
-          <h3>Пакетная обработка</h3>
-          <p>Загрузка сотен фотографий за раз, прогресс с возможностью отмены и повтор только упавших файлов.</p>
+      <div class="feature-list">
+        <div class="feature-item">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+          <div>
+            <h3>Серия очередью</h3>
+            <p>Добавляйте сотни JPEG одной пачкой, следите за прогрессом и при необходимости останавливайте.</p>
+          </div>
         </div>
 
-        <div class="card">
-          <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></div>
-          <h3>Несколько AI-провайдеров</h3>
-          <p>Локальная модель и облачные сервисы образуют кольцо fallback: при таймауте, 429 или ошибке файл уходит к следующему — с cooldown и адаптивным ограничением параллельных запросов.</p>
+        <div class="feature-item">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18"/><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></div>
+          <div>
+            <h3>AI переключается сам</h3>
+            <p>При таймауте, лимите или ошибке запрос уйдёт к следующей доступной модели — локальной или облачной.</p>
+          </div>
         </div>
 
-        <div class="card">
-          <div class="icon"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/><path d="M15.5 17.5l2 2 4-4.5"/></svg></div>
-          <h3>Правила стоков — после генерации</h3>
-          <p>Модель не знает про площадку. Лимиты title, число и состав ключевых слов, словари категорий, типы лицензий и editorial-поля накладываются при маппинге, а автофикс правит формальные ошибки. Смена площадки не требует перегенерации.</p>
-        </div>
-
-        <div class="card">
-          <div class="icon"><svg viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></svg></div>
-          <h3>Проверка перед экспортом</h3>
-          <p>Таблица результатов, панель Metadata Preview, быстрые фильтры и сводка валидации, ручная правка любого поля и перегенерация отдельных файлов. Отредактированные поля отмечены подсветкой подписи — видно, что правил человек, а что сгенерировал AI.</p>
-        </div>
-
-        <div class="card">
-          <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 3v11"/><path d="M8 10.5l4 4 4-4"/><path d="M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17"/></svg></div>
-          <h3>Экспорт</h3>
-          <p>CSV под формат выбранного стока плюс копии фотографий со вшитыми IPTC-метаданными. Можно выгрузить только файлы со статусом Ready или без ошибок.</p>
-        </div>
-
-        <div class="card">
-          <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 3l7.5 3.5v5c0 4.5-3 8-7.5 9.5-4.5-1.5-7.5-5-7.5-9.5v-5L12 3Z"/><path d="M9 12l2 2 4-4"/></svg></div>
-          <h3>Онбординг и ключи</h3>
-          <p>Приложение само находит доступные провайдеры, проверяет ключи и хранит их в пользовательском каталоге данных — вне бандла приложения.</p>
+        <div class="feature-item">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/><path d="M15.5 17.5l2 2 4-4.5"/></svg></div>
+          <div>
+            <h3>Повторяйте только проблемное</h3>
+            <p>Перезапускайте файлы с ошибками, перегенерируйте один кадр или правьте отдельное поле вручную.</p>
+          </div>
         </div>
       </div>
     </div>
@@ -576,95 +3065,108 @@
   <section id="fields">
     <div class="wrap">
       <p class="eyebrow">Метаданные</p>
-      <h2>Не только заголовок и ключевые слова</h2>
+      <h2>Необходимое стокам</h2>
       <p class="section-lede">
-        За один проход по кадру AI возвращает набор полей намеренно с запасом — чтобы под
-        конкретный сток их можно было урезать, а не догенерировать. Все текстовые поля
-        только на английском, как требуют площадки.
+        Один кадр превращается в полный набор для стока — от описания до editorial и IPTC.
       </p>
 
-      <div class="grid">
-        <div class="card">
-          <div class="icon"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/></svg></div>
-          <h3>Основное</h3>
-          <p><code>title</code> минимум из 5 значимых слов, <code>description</code> с законченным фактическим предложением, <code>keywords</code> — не менее 15 уникальных тегов, упорядоченных по убыванию важности.</p>
+      <div class="metadata-orbit" role="img" aria-label="Photo Metadata AI создаёт 17 полей в четырёх группах: текст, классификация, локация, editorial и права. Результат экспортируется в CSV и IPTC внутри копии фотографии.">
+        <span class="metadata-ray" aria-hidden="true"></span>
+        <span class="metadata-ray" aria-hidden="true"></span>
+        <span class="metadata-ray" aria-hidden="true"></span>
+        <span class="metadata-ray" aria-hidden="true"></span>
+
+        <div class="metadata-core">
+          <strong>17</strong>
+          <span>полей</span>
+          <small>за один проход</small>
         </div>
 
-        <div class="card">
-          <div class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/></svg></div>
+        <div class="metadata-node" data-group="text">
+          <small>3 поля</small>
+          <h3>Текст</h3>
+          <p>title · description · keywords</p>
+        </div>
+
+        <div class="metadata-node" data-group="classification">
+          <small>5 полей</small>
           <h3>Классификация</h3>
-          <p><code>categories</code> — 1–2 широких кандидата, <code>license_type</code> (commercial или editorial), а также флаги <code>is_illustration</code>, <code>mature_content</code> и раскрытие AI-контента.</p>
+          <p>категории · лицензия · AI-флаги</p>
         </div>
 
-        <div class="card">
-          <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg></div>
+        <div class="metadata-node" data-group="location">
+          <small>4 поля</small>
           <h3>Локация</h3>
-          <p>Структурные <code>sublocation</code>, <code>city</code>, <code>province_state</code>, <code>country</code> и читаемая строка. Заполняются только когда место действительно известно — модель не догадывается.</p>
+          <p>место · город · регион · страна</p>
         </div>
 
-        <div class="card">
-          <div class="icon"><svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z"/><path d="M8 12h8M8 16h5"/></svg></div>
-          <h3>Editorial</h3>
-          <p>Признак editorial-съёмки, полная фактическая подпись и дата события — заполняются, когда контекст съёмки действительно указывает на editorial.</p>
-        </div>
-
-        <div class="card">
-          <div class="icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M16 6.5a3 3 0 0 1 0 5.6M18 19a5.4 5.4 0 0 0-2.2-4.4"/></svg></div>
-          <h3>Люди и права</h3>
-          <p>Есть ли люди в кадре и сколько их, известен ли model release, список имеющихся релизов — площадки требуют этого для съёмок с людьми и узнаваемой собственностью.</p>
-        </div>
-
-        <div class="card">
-          <div class="icon"><svg viewBox="0 0 24 24"><path d="M4 7h16v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7Z"/><path d="M9 7V4h6v3"/><path d="M8 12h8M8 16h5"/></svg></div>
-          <h3>IPTC прямо в файле</h3>
-          <p>Метаданные вшиваются в копии фотографий, а не живут отдельной таблицей: описание, название, ключевые слова, категория и локация едут вместе с кадром.</p>
+        <div class="metadata-node" data-group="editorial">
+          <small>5 полей · по ситуации</small>
+          <h3>Editorial и права</h3>
+          <p>подпись · дата · люди · релизы</p>
         </div>
       </div>
+
+      <p class="metadata-delivery"><b>Два результата:</b> CSV для площадки + IPTC внутри копии JPEG</p>
+
+      <details class="field-details">
+        <summary><b>Посмотреть все 17 полей</b></summary>
+        <div class="field-cloud">
+          <span data-group="text">title</span>
+          <span data-group="text">description</span>
+          <span data-group="text">keywords</span>
+          <span data-group="classification">categories</span>
+          <span data-group="classification">license_type</span>
+          <span data-group="classification">is_illustration</span>
+          <span data-group="classification">mature_content</span>
+          <span data-group="classification">ai_disclosure</span>
+          <span data-group="location">sublocation</span>
+          <span data-group="location">city</span>
+          <span data-group="location">province_state</span>
+          <span data-group="location">country</span>
+          <span class="maybe" data-group="editorial">is_editorial</span>
+          <span class="maybe" data-group="editorial">editorial_caption</span>
+          <span class="maybe" data-group="editorial">event_date</span>
+          <span class="maybe" data-group="editorial">people_count</span>
+          <span class="maybe" data-group="editorial">model_release</span>
+        </div>
+      </details>
+
     </div>
   </section>
 
   <!-- MAPPING -->
-  <section>
+  <section id="mapping">
     <div class="wrap">
       <p class="eyebrow">Маппинг</p>
-      <h2>Один набор — три формата площадок</h2>
+      <h2>Один набор — три площадки</h2>
       <p class="section-lede">
-        Правила стока применяются к уже сгенерированным полям, поэтому переключение
-        площадки — это пересборка, а не новый прогон через AI.
+        Выберите площадку — приложение пересоберёт метаданные без повторного запуска AI.
       </p>
 
-      <div class="panel" style="padding:8px 28px">
-        <div class="table-scroll">
-          <table class="stack">
-            <tr>
-              <th style="width:200px">Лимит title</th>
-              <td>Adobe Stock — 70 символов, Getty Images — 200, Shutterstock — 2048 с предупреждением после 150</td>
-            </tr>
-            <tr>
-              <th>Ключевые слова</th>
-              <td>Adobe Stock — до 49, Getty и Shutterstock — до 50. Дубликаты удаляются, порядок по важности сохраняется</td>
-            </tr>
-            <tr>
-              <th>Категории</th>
-              <td>«wildlife» → <code>Nature</code> у Getty, <code>Animals/Wildlife</code> у Shutterstock, <code>Animals</code> у Adobe Stock. Adobe принимает одну категорию, остальные — две</td>
-            </tr>
-            <tr>
-              <th>Тип лицензии</th>
-              <td>Getty — creative / editorial, Adobe Stock — standard / extended / editorial, Shutterstock — commercial / editorial</td>
-            </tr>
-            <tr>
-              <th>Колонки CSV</th>
-              <td>У Getty есть <code>Category 2</code>, <code>License Type</code> и <code>Editorial Date</code>; у Adobe Stock — <code>AI Disclosure</code>; у Shutterstock — <code>Illustration</code> и <code>Mature Content</code></td>
-            </tr>
-          </table>
-        </div>
+      <div class="mapping-grid">
+        <article class="mapping-platform">
+          <h3>Adobe Stock</h3>
+          <p><strong>70</strong> знаков в title · до <strong>49</strong> ключевых слов · одна категория</p>
+          <p>В CSV — AI Disclosure</p>
+        </article>
+
+        <article class="mapping-platform">
+          <h3>Getty Images</h3>
+          <p><strong>200</strong> знаков в title · до <strong>50</strong> ключевых слов · две категории</p>
+          <p>В CSV — лицензия и editorial-дата</p>
+        </article>
+
+        <article class="mapping-platform">
+          <h3>Shutterstock</h3>
+          <p><strong>2048</strong> знаков в title · до <strong>50</strong> ключевых слов · две категории</p>
+          <p>Предупреждение после 150 знаков; флаги Illustration и Mature Content</p>
+        </article>
       </div>
 
-      <p style="margin-top:22px;color:var(--dim);font-size:14.5px;max-width:70ch">
-        Валидация делит замечания на ошибки и рекомендации, а автофикс чинит формальные:
-        добивает короткий title, обрезает длинный, приводит число ключевых слов к границам,
-        убирает дубликаты, подставляет категорию по умолчанию. Поля, которые вы правили
-        руками, автофикс не трогает.
+      <p class="mapping-note">
+        <b>Автоматически:</b> лимиты, словари категорий, лицензии и колонки CSV.
+        Автофикс исправляет формальные ошибки и сохраняет ручные правки.
       </p>
     </div>
   </section>
@@ -676,33 +3178,43 @@
       <h2>Мастер из пяти шагов</h2>
       <p class="section-lede">Линейный сценарий без скрытых настроек: на каждом шаге видно, что уже сделано и что осталось.</p>
 
-      <div class="steps">
-        <div class="step">
-          <div class="n">1</div>
-          <h4>Upload</h4>
-          <p>Перетащите JPEG-файлы в окно или выберите их в диалоге.</p>
-        </div>
-        <div class="step">
-          <div class="n">2</div>
-          <h4>Context</h4>
-          <p>Заметки о съёмке, AI-провайдер, сток и формат экспорта.</p>
-        </div>
-        <div class="step">
-          <div class="n">3</div>
-          <h4>Process</h4>
-          <p>Генерация полей без привязки к площадке, прогресс, отмена и повтор упавших.</p>
-        </div>
-        <div class="step">
-          <div class="n">4</div>
-          <h4>Review</h4>
-          <p>Поля пересобраны под сток: проверка, правка, фильтры, перегенерация.</p>
-        </div>
-        <div class="step">
-          <div class="n">5</div>
-          <h4>Export</h4>
-          <p>CSV и копии фотографий с метаданными — в папку результатов.</p>
-        </div>
-      </div>
+      <ol class="steps">
+        <li class="step">
+          <span class="n" aria-hidden="true">1</span>
+          <div class="step-copy">
+            <h3>Upload</h3>
+            <p>Перетащите JPEG-файлы в окно или выберите их в диалоге.</p>
+          </div>
+        </li>
+        <li class="step">
+          <span class="n" aria-hidden="true">2</span>
+          <div class="step-copy">
+            <h3>Context</h3>
+            <p>Заметки о съёмке, AI-провайдер, сток и формат экспорта.</p>
+          </div>
+        </li>
+        <li class="step">
+          <span class="n" aria-hidden="true">3</span>
+          <div class="step-copy">
+            <h3>Process</h3>
+            <p>Генерация полей без привязки к площадке.</p>
+          </div>
+        </li>
+        <li class="step">
+          <span class="n" aria-hidden="true">4</span>
+          <div class="step-copy">
+            <h3>Review</h3>
+            <p>Поля пересобраны под выбранный сток — остаётся проверить.</p>
+          </div>
+        </li>
+        <li class="step">
+          <span class="n" aria-hidden="true">5</span>
+          <div class="step-copy">
+            <h3>Export</h3>
+            <p>CSV и копии фотографий с метаданными — в папку результатов.</p>
+          </div>
+        </li>
+      </ol>
     </div>
   </section>
 
@@ -711,85 +3223,107 @@
     <div class="wrap">
       <p class="eyebrow">Скриншоты</p>
       <h2>Как это выглядит в работе</h2>
-      <p class="section-lede">Снято 3 августа 2026 года на macOS, сборка Photo Metadata AI 1.1.0-universal.</p>
+      <p class="section-lede">Снято на macOS, сборка Photo Metadata AI 1.1.0-universal.</p>
 
       <div class="showcase">
         <figure>
-          <div class="shot">
-            <img src="../screenshots/07_review_metadata_preview.png" alt="Шаг Review: таблица результатов и панель Metadata Preview с заголовком, описанием, ключевыми словами и категорией">
-          </div>
-          <figcaption>
-            Шаг 4 «Review»: таблица результатов и панель Metadata Preview с заголовком, описанием,
-            ключевыми словами и категорией. Поле Keywords отредактировано вручную — его подпись
-            подсвечена. Рядом — быстрые фильтры и ссылка «Retry failed» для упавших файлов.
-          </figcaption>
+          <a class="shot-link" href="screens.html#shot-07_review_metadata_preview" target="_blank" rel="noopener">
+            <div class="shot">
+              <!-- Уменьшенная копия под ширину колонки (~560 px): оригинал 3424 px
+                   весит 1,6 МБ, полный размер открывается на странице скриншотов. -->
+              <img src="../screenshots/07_review_metadata_showcase.png" width="1200" height="920" alt="Шаг Review: таблица результатов и панель Metadata Preview с заголовком, описанием, ключевыми словами и категорией">
+            </div>
+          </a>
         </figure>
 
-        <figure>
-          <div class="shot">
-            <img src="../screenshots/13_export_completed.png" alt="Экспорт завершён: фотографии готовы к загрузке на сток, кнопки «Open CSV file» и «Open folder»" loading="lazy">
-          </div>
-          <figcaption>
-            Шаг 5 «Export»: экспорт завершён — фотографии готовы к загрузке на сток,
-            CSV и папку результатов можно открыть прямо из приложения.
-          </figcaption>
-        </figure>
-
-        <figure>
-          <div class="shot">
-            <img src="../screenshots/15_exported_file_iptc_metadata.png" alt="Экспортированный JPEG в «Просмотре» macOS с вшитыми IPTC-полями" loading="lazy">
-          </div>
-          <figcaption>
-            Метаданные действительно внутри файла: экспортированный JPEG в «Просмотре» macOS —
-            описание, город, страна, ключевые слова, название и категория.
-          </figcaption>
-        </figure>
+        <div class="showcase-copy">
+          <h3>Шаг 4 «Review» — всё видно до экспорта</h3>
+          <p>
+            Поле Keywords здесь отредактировано вручную — его подпись подсвечена, так что
+            всегда видно, что правил человек, а что сгенерировал AI.
+          </p>
+          <a class="btn btn-ghost" href="screens.html" target="_blank" rel="noopener">
+            Посмотреть все 15 экранов
+            <svg viewBox="0 0 24 24"><path d="M5 12h13"/><path d="M12.5 6.5L18 12l-5.5 5.5"/></svg>
+          </a>
+        </div>
       </div>
 
-      <p style="margin-top:40px">
-        <a class="btn btn-ghost" href="screens.html" target="_blank" rel="noopener">
-          Посмотреть все экраны
-          <svg viewBox="0 0 24 24"><path d="M5 12h13"/><path d="M12.5 6.5L18 12l-5.5 5.5"/></svg>
+      <div class="thumbs">
+        <a href="screens.html#shot-05_upload_and_context" target="_blank" rel="noopener">
+          <!-- Отдельное превью под размер плитки (~250 px): при сжатии крупного
+               файла браузером пропадала тонкая рамка панели «Context & Settings». -->
+          <img src="../screenshots/05_upload_and_context_thumb.png" width="640" height="490" alt="Шаг Upload: загруженные фотографии и панель Context &amp; Settings" loading="lazy">
+          <span>Загрузка и контекст съёмки</span>
         </a>
-      </p>
+        <a href="screens.html#shot-06_processing" target="_blank" rel="noopener">
+          <img src="../screenshots/06_processing_thumb.png" width="640" height="490" alt="Шаг Process: индикатор обработки с возможностью отмены" loading="lazy">
+          <span>Обработка пакета с отменой</span>
+        </a>
+        <a href="screens.html#shot-13_export_completed" target="_blank" rel="noopener">
+          <img src="../screenshots/13_export_completed_thumb.png" width="640" height="491" alt="Экспорт завершён: кнопки «Open CSV file» и «Open folder»" loading="lazy">
+          <span>Экспорт завершён</span>
+        </a>
+        <a href="screens.html#shot-15_exported_file_iptc_metadata" target="_blank" rel="noopener">
+          <!-- Плиточное превью: оригинал весит 11 МБ, полный размер
+               открывается на странице скриншотов. -->
+          <img src="../screenshots/15_exported_file_iptc_metadata_thumb.png" width="640" height="506" alt="Экспортированный JPEG в «Просмотре» macOS с вшитыми IPTC-полями" loading="lazy">
+          <span>IPTC внутри готового файла</span>
+        </a>
+      </div>
     </div>
   </section>
 
   <!-- PRIVACY -->
-  <section>
+  <section class="privacy-section" id="privacy">
     <div class="wrap split">
       <div>
         <p class="eyebrow">Приватность</p>
         <h2>Работает локально</h2>
-        <p class="section-lede" style="margin-bottom:28px">
-          Фотографии не покидают компьютер — кроме кадров, которые вы сами отправляете
-          выбранному AI-провайдеру. С локальной моделью обработка полностью офлайн.
-        </p>
-        <ul class="list">
-          <li><span class="tick"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></svg></span><span><b>Ключи хранятся у вас</b> — в пользовательском каталоге данных, вне бандла приложения.</span></li>
-          <li><span class="tick"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></svg></span><span><b>Никакого сервера посередине</b> — бэкенд запускается на вашей машине на <code>127.0.0.1</code>.</span></li>
-          <li><span class="tick"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></svg></span><span><b>Данные переживают обновление</b> — результаты и настройки лежат вне <code>.app</code>.</span></li>
+        <ul class="privacy-proofs">
+          <li class="privacy-proof">
+            <span class="proof-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="12" r="4"/><path d="M13 12h8"/><path d="M18 12v3.5"/><path d="M21 12v2.5"/></svg></span>
+            <span class="proof-copy"><small>Хранение</small><b>Ключи остаются у вас</b><span>Пользовательский каталог данных, отдельно от бандла приложения.</span></span>
+          </li>
+          <li class="privacy-proof">
+            <span class="proof-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5C4 5.6 7.6 4 12 4s8 1.6 8 3.5-3.6 3.5-8 3.5S4 9.4 4 7.5z"/><path d="M4 7.5v9c0 1.9 3.6 3.5 8 3.5s8-1.6 8-3.5v-9"/><path d="M4 12c0 1.9 3.6 3.5 8 3.5s8-1.6 8-3.5"/></svg></span>
+            <span class="proof-copy"><small>Обновления</small><b>Данные не исчезают</b><span>Результаты и настройки лежат вне <code>.app</code> и переживают переустановку.</span></span>
+          </li>
         </ul>
       </div>
 
-      <div>
-        <div class="card" style="padding:28px">
-          <h3 style="margin-bottom:16px">AI-провайдеры</h3>
-          <div class="chips" style="margin-bottom:26px">
-            <span class="chip"><b>Локальная модель</b> — Qwen2.5-VL через Ollama</span>
-            <span class="chip"><b>Google Gemini</b></span>
-            <span class="chip"><b>OpenRouter</b></span>
+      <div class="privacy-map" role="img" aria-label="Исходные фотографии обрабатываются внутри локального контура macOS и сохраняются в папку экспорта. В облако данные отправляются только выбранному AI-провайдеру; через Ollama обработка полностью офлайн.">
+        <div class="local-boundary">
+          <span class="boundary-label">Контур macOS</span>
+
+          <span class="data-rail" aria-hidden="true"><i></i><i></i></span>
+
+          <div class="route-node source">
+            <span class="node-orbit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v13H4z"/><circle cx="9" cy="10" r="1.7"/><path d="M5.5 17l4.5-4 3 2.5 2.5-2 3 3"/></svg></span>
+            <b>Исходники</b>
+            <small>JPEG и контекст съёмки</small>
           </div>
-          <h3 style="margin-bottom:16px">Форматы стоков</h3>
-          <div class="chips">
-            <span class="chip"><b>Adobe Stock</b></span>
-            <span class="chip"><b>Shutterstock</b></span>
-            <span class="chip"><b>Getty Images</b></span>
+
+          <div class="route-node core">
+            <span class="node-orbit">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg>
+            </span>
+            <b>Photo Metadata AI</b>
+            <small>Работает на вашем Mac</small>
           </div>
-          <p style="margin-top:26px;color:var(--dim);font-size:14.5px">
-            Провайдеры образуют кольцо fallback, поэтому один упавший ключ или таймаут
-            не останавливает пакет: файл уходит к следующему провайдеру.
-          </p>
+
+          <div class="route-node output">
+            <span class="node-orbit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11"/><path d="M8 10.5l4 4 4-4"/><path d="M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17"/></svg></span>
+            <b>Экспорт</b>
+            <small>CSV и JPEG с IPTC</small>
+          </div>
+
+          <span class="offline-badge">Ollama · полностью офлайн</span>
+
+          <span class="provider-route">
+            <b>Облачный AI на ваш выбор</b>
+            <span>Только этот канал наружу</span>
+          </span>
         </div>
       </div>
     </div>
@@ -800,47 +3334,117 @@
     <div class="wrap">
       <p class="eyebrow">Установка</p>
       <h2>Две минуты до первой обработки</h2>
-      <div class="panel">
-        <div class="steps" style="margin-bottom:32px">
-          <div class="step">
-            <div class="n">1</div>
-            <h4>Откройте образ</h4>
-            <p>Скачанный <code>.dmg</code> монтируется двойным щелчком.</p>
-          </div>
-          <div class="step">
-            <div class="n">2</div>
-            <h4>Перетащите в Applications</h4>
-            <p>Перенесите «Photo Metadata AI.app» в папку программ.</p>
-          </div>
-          <div class="step">
-            <div class="n">3</div>
-            <h4>Пройдите AI Setup</h4>
-            <p>Подключите локальную модель и/или введите ключи облачных провайдеров.</p>
-          </div>
-        </div>
+      <div class="install-shell">
+        <ol class="install-steps">
+          <li class="install-step">
+            <span class="n" aria-hidden="true">1</span>
+            <div class="install-step-copy">
+              <h3>Откройте образ</h3>
+              <p>Скачанный <code>.dmg</code> монтируется двойным щелчком.</p>
+            </div>
+          </li>
+          <li class="install-step">
+            <span class="n" aria-hidden="true">2</span>
+            <div class="install-step-copy">
+              <h3>Перетащите в Applications</h3>
+              <p>Перенесите «Photo Metadata AI.app» в папку программ.</p>
+            </div>
+          </li>
+          <li class="install-step">
+            <span class="n" aria-hidden="true">3</span>
+            <div class="install-step-copy">
+              <h3>Пройдите AI Setup</h3>
+              <p>Подключите локальную модель и/или введите ключи облачных провайдеров.</p>
+            </div>
+          </li>
+        </ol>
 
-        <p style="color:var(--muted);margin:0">
-          Сборка universal2 — работает и на Apple Silicon, и на Intel. Приложение само
-          сообщает баннером о новой версии; загрузка и установка ручные.
+        <p class="install-compat">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.2l2.7 2.7 6.3-6.1"/></svg>
+          Требуется macOS 11 или новее. Работает и на Apple Silicon, и на Intel.
         </p>
 
-        <h3 style="margin:34px 0 0;font-size:17px">Локальная модель (опционально)</h3>
-        <pre><code>brew install ollama
+        <details class="install-tech">
+          <summary>
+            <span class="install-tech-summary-copy">
+              <strong>Технические детали</strong>
+              <span>Локальная модель и стек приложения</span>
+            </span>
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 6l4.5 4 4.5-4"/></svg>
+          </summary>
+          <div class="install-tech-content">
+            <div class="install-details">
+              <section class="install-detail">
+                <h3>Локальная модель (опционально)</h3>
+                <pre><code>brew install ollama
 ollama serve
 ollama pull qwen2.5vl</code></pre>
+              </section>
 
-        <h3 style="margin:34px 0 8px;font-size:17px">Под капотом</h3>
-        <div class="table-scroll">
-          <table class="stack">
-            <tr><th>Backend</th><td>Python 3.11+, FastAPI, Uvicorn, Pydantic, aiohttp, httpx, Pillow, structlog, iptcinfo3, uv, Ruff, pytest</td></tr>
-            <tr><th>Frontend</th><td>React 18, TypeScript, Zustand, Sass, axios, react-scripts, Jest и Testing Library</td></tr>
-            <tr><th>Desktop</th><td>Electron 33, electron-builder, PyInstaller (universal2), Jest</td></tr>
-          </table>
+              <section class="install-detail">
+                <h3>Под капотом</h3>
+                <div class="table-scroll">
+                  <table class="stack">
+                    <tbody>
+                      <tr><th>Backend</th><td>Python 3.11+, FastAPI, Uvicorn, Pydantic, aiohttp, httpx, Pillow, structlog, iptcinfo3, uv, Ruff, pytest</td></tr>
+                      <tr><th>Frontend</th><td>React 18, TypeScript, Zustand, Sass, axios, react-scripts, Jest и Testing Library</td></tr>
+                      <tr><th>Desktop</th><td>Electron 33, electron-builder, PyInstaller (universal2), Jest</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </div>
+
+            <p class="install-note">
+              Electron запускает бинарник бэкенда, FastAPI раздаёт собранный React-фронтенд —
+              один origin, без CORS.
+            </p>
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq">
+    <div class="wrap">
+      <p class="eyebrow">Перед установкой</p>
+      <h2>Вопросы, которые возникают первыми</h2>
+
+      <div class="faq">
+        <div>
+          <span class="n">01</span>
+          <h3>Почему macOS ругается при первом запуске?</h3>
+          <p>
+            Приложение подписано ad-hoc и не нотарифицировано, поэтому Gatekeeper показывает
+            предупреждение. Откройте «Photo Metadata AI.app» правым щелчком → «Открыть» и
+            подтвердите — дальше приложение запускается обычным двойным щелчком.
+          </p>
         </div>
-        <p style="color:var(--dim);font-size:14.5px;margin:16px 0 0">
-          Electron запускает бинарник бэкенда, FastAPI раздаёт собранный React-фронтенд —
-          один origin, без CORS.
-        </p>
+        <div>
+          <span class="n">02</span>
+          <h3>Что нужно, чтобы заработал AI?</h3>
+          <p>
+            Локальная Ollama с моделью Qwen2.5-VL или ключ Google Gemini либо OpenRouter —
+            достаточно одного варианта.
+          </p>
+        </div>
+        <div>
+          <span class="n">03</span>
+          <h3>Какие файлы можно загружать?</h3>
+          <p>
+            JPEG — их же приложение отдаёт на выходе, с метаданными внутри копий. Съёмочный
+            EXIF при этом сохраняется, оригиналы остаются нетронутыми.
+          </p>
+        </div>
+        <div>
+          <span class="n">04</span>
+          <h3>Как выходят обновления?</h3>
+          <p>
+            Приложение показывает баннер, когда вышла новая версия; загрузка и установка
+            ручные — скачайте новый <code>.dmg</code> и замените приложение.
+          </p>
+        </div>
       </div>
     </div>
   </section>
@@ -850,8 +3454,8 @@ ollama pull qwen2.5vl</code></pre>
     <div class="wrap">
       <div class="final">
         <h2>Освободите вечер после съёмки</h2>
-        <p>Загрузите папку с кадрами, проверьте сгенерированные поля и выгрузите готовый пакет для стока.</p>
-        <div class="cta" style="margin-bottom:0">
+        <p>Загрузите файлы, проверьте сгенерированные поля и выгрузите готовый пакет для стока.</p>
+        <div class="cta" id="final-cta" style="margin-bottom:0">
           <a class="btn btn-primary" href="https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.1.0/Photo-Metadata-AI-1.1.0-universal.dmg">
             <svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7.5 11l4.5 4.5 4.5-4.5"/><path d="M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17"/></svg>
             Скачать для macOS
@@ -866,15 +3470,12 @@ ollama pull qwen2.5vl</code></pre>
 
 <footer>
   <div class="wrap foot">
-    <span>Photo Metadata AI</span>
-    <nav class="foot-links">
-      <a href="https://github.com/SlavaKlkv/photo_metadata_ai" target="_blank" rel="noopener">GitHub</a>
-      <a href="https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.1.0/Photo-Metadata-AI-1.1.0-universal.dmg">Скачать</a>
-      <a href="screens.html" target="_blank" rel="noopener">Все экраны</a>
-    </nav>
+    <span>© 2026 Photo Metadata AI</span>
+    <a class="foot-link" href="screens.html" target="_blank" rel="noopener">Все экраны</a>
   </div>
 </footer>
 
+<script src="ambient-particle-flags.js"></script>
 <script>
   // Подсветка активного пункта меню: берём самую верхнюю секцию,
   // которая уже пересекла нижнюю границу шапки.
@@ -934,6 +3535,529 @@ ollama pull qwen2.5vl</code></pre>
     window.addEventListener('resize', onScroll);
     update();
   })();
+
+  // Появление блоков при скролле. Классы вешаем из JS: если скрипт не
+  // выполнился или браузер не умеет IntersectionObserver, страница
+  // остаётся обычной статичной вёрсткой, а не пустой.
+  (function () {
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced || !('IntersectionObserver' in window)) return;
+
+    // Группы: внутри каждой элементы появляются каскадом.
+    var groups = document.querySelectorAll(
+      'section .eyebrow, section h2, section .section-lede, ' +
+      '.feature-list, .steps, .showcase, .thumbs, .faq, .metadata-orbit, .metadata-delivery, .field-details, .mapping-grid, .mapping-note, ' +
+      '.split > div, .install-shell, .final'
+    );
+    var items = [];
+
+    Array.prototype.forEach.call(groups, function (group) {
+      // У таймлайна линия рисуется на самом списке, а шаги — каскадом.
+      if (group.matches('.steps')) {
+        group.classList.add('reveal');
+        items.push(group);
+      }
+      var children = group.matches('.feature-list, .steps, .showcase, .thumbs, .faq, .mapping-grid')
+        ? Array.prototype.slice.call(group.children)
+        : [group];
+      children.forEach(function (el, i) {
+        el.classList.add('reveal');
+        el.style.setProperty('--d', Math.min(i, 5) * 0.07 + 's');
+        items.push(el);
+      });
+    });
+
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('in');
+        io.unobserve(entry.target);
+      });
+    }, { rootMargin: '0px 0px -12% 0px', threshold: 0.05 });
+
+    items.forEach(function (el) { io.observe(el); });
+  })();
+
+  // Тень у шапки и кнопка «наверх» зависят от одной величины,
+  // поэтому считаем их в одном обработчике.
+  (function () {
+    var header = document.querySelector('header');
+
+    var toTop = document.createElement('button');
+    toTop.type = 'button';
+    toTop.className = 'to-top';
+    toTop.setAttribute('aria-label', 'Наверх');
+    toTop.innerHTML =
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V6"/><path d="M6 11.5L12 5.5l6 6"/></svg>';
+    toTop.addEventListener('click', function () {
+      var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' });
+    });
+    document.body.appendChild(toTop);
+
+    var ticking = false;
+
+    function update() {
+      var y = window.scrollY;
+
+      if (header) header.classList.toggle('stuck', y > 8);
+      // Кнопка появляется, когда первый экран уже пролистан.
+      toTop.classList.toggle('show', y > window.innerHeight * 0.9);
+    }
+
+    window.addEventListener('scroll', function () {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(function () {
+        update();
+        ticking = false;
+      });
+    }, { passive: true });
+    window.addEventListener('resize', update);
+    update();
+  })();
+
+  // Кнопка «Скачать» в шапке нужна только когда такой же кнопки нет на экране:
+  // на первом экране и в финальном блоке они бы дублировались.
+  (function () {
+    var header = document.querySelector('header');
+    var ctas = [document.getElementById('hero-cta'), document.getElementById('final-cta')]
+      .filter(Boolean);
+    if (!header || !ctas.length || !('IntersectionObserver' in window)) return;
+
+    // Состояние держим по каждому блоку отдельно: со счётчиком легко
+    // разъехаться на стартовых колбэках наблюдателя.
+    var shown = [];
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        shown[ctas.indexOf(entry.target)] = entry.isIntersecting;
+      });
+      header.classList.toggle('hero-cta-visible', shown.some(Boolean));
+    }, { rootMargin: '-72px 0px 0px 0px' });
+
+    ctas.forEach(function (cta) { io.observe(cta); });
+  })();
+
+  // Скролл двигает всю 3D-сцену, а курсор едва меняет её ракурс.
+  // Базовый боковой поворот остаётся на отдельном слое .mock-depth.
+  (function () {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    var scene = document.querySelector('.hero-visual');
+    var stage = document.querySelector('.hero-visual .mock-stage');
+    if (!scene || !stage) return;
+
+    var ticking = false;
+
+    function update() {
+      // Считаем только пока hero на экране: ниже сдвиг всё равно не виден,
+      // а фиксация значения не даёт картинке «прыгнуть» при возврате.
+      var progress = Math.min(Math.max(window.scrollY / window.innerHeight, 0), 1);
+      stage.style.setProperty('--py', (progress * -38).toFixed(1) + 'px');
+    }
+
+    window.addEventListener('scroll', function () {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(function () {
+        update();
+        ticking = false;
+      });
+    }, { passive: true });
+    window.addEventListener('resize', update);
+
+    if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+      scene.addEventListener('pointermove', function (event) {
+        var rect = scene.getBoundingClientRect();
+        var x = Math.max(-1, Math.min(1, ((event.clientX - rect.left) / rect.width - .5) * 2));
+        var y = Math.max(-1, Math.min(1, ((event.clientY - rect.top) / rect.height - .5) * 2));
+
+        stage.style.setProperty('--tilt-x', (y * -1.15).toFixed(2) + 'deg');
+        stage.style.setProperty('--tilt-y', (x * 1.8).toFixed(2) + 'deg');
+      }, { passive: true });
+
+      scene.addEventListener('pointerleave', function () {
+        stage.style.setProperty('--tilt-x', '0deg');
+        stage.style.setProperty('--tilt-y', '0deg');
+      });
+    }
+
+    update();
+  })();
+
+  // Частица движется по плавной неповторяющейся кривой поверх всей страницы.
+  // Координаты — в пространстве документа: при скролле пятно уезжает вместе со страницей,
+  // а не «висит» в viewport. Становится прозрачной над контентом и реагирует на мышь.
+  // Флаги ENABLE_* — в ambient-particle-flags.js, ключ 'index' (отдельно от screens).
+  (function () {
+    var particleFlags = getLandingParticleFlags('index');
+    var ENABLE_AMBIENT_PARTICLE = particleFlags.ENABLE_AMBIENT_PARTICLE;
+    var ENABLE_HOVER_ATTRACTION = particleFlags.ENABLE_HOVER_ATTRACTION;
+    var particle = document.querySelector('.ambient-particle');
+    if (!ENABLE_AMBIENT_PARTICLE) {
+      if (particle) particle.remove();
+      return;
+    }
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (!particle) return;
+
+    // pageX/pageY — позиция в документе; viewX/viewY — в viewport для fixed-transform.
+    var pageX;
+    var pageY;
+    var viewX;
+    var viewY;
+    var heading = Math.PI * -.15; // от левого низа — вправо-вверх по странице
+    var speed = 70;
+    var last = 0;
+    var margin = 40;
+    var phaseA = Math.random() * Math.PI * 2;
+    var phaseB = Math.random() * Math.PI * 2;
+    var phaseC = Math.random() * Math.PI * 2;
+
+    // Интерактивность: отслеживание курсора мыши и кликов
+    var mouseX = -1000;
+    var mouseY = -1000;
+    var clickImpulseTime = -Infinity;
+    var clickDirection = heading;
+    var clickPhase = null;
+    var hoverSuppressedUntil = 0;
+    var isHoverCaptured = false;
+    // После клика курсор не перехватывает, пока частица не улетит достаточно далеко.
+    var flightLockedAfterClick = false;
+    var clickStartTime = -Infinity;
+    // Чередуем вверх/вниз между кликами — строго 50/50, без «всегда вверх» по ощущению.
+    var nextVerticalUp = Math.random() < .5;
+    // Результат последней проверки «пятно над контентом» и время этой проверки.
+    var isOverContent = false;
+    var lastContentProbe = -Infinity;
+    var hasAppeared = false;
+    var contentZoneSelector =
+      '.hero-grid, .feature-list, .metadata-orbit, .field-details, .mapping-grid, ' +
+      '.steps, .showcase, .thumbs, .privacy-section .split, .install-shell, .faq, footer .foot';
+    // Точное попадание под курсором частицы: проверяется каждый кадр, поэтому
+    // перечисляем только то, что на странице действительно есть.
+    var CONTENT_HIT_SELECTOR =
+      '.hero-grid, .hero-visual, .showcase, .steps, .step, .faq, .field-details, ' +
+      '.mapping-grid, .metadata-orbit, .metadata-delivery, .thumbs, .nav, .btn, .cta, ' +
+      'h1, h2, h3, h4, p, code, pre, table, input, button, a';
+
+    // Разметка статична, поэтому список зон ищем один раз, а их прямоугольники
+    // пересчитываем только когда они могли поехать: скролл, resize, раскрытие
+    // <details>. Иначе getBoundingClientRect по десятку зон гонял бы layout
+    // каждый кадр — во время клик-фазы это происходит подряд секунду-две.
+    var zoneNodes = null;
+    var zoneRects = null;
+    var zoneRectsStale = true;
+
+    function markZoneRectsStale() { zoneRectsStale = true; }
+
+    window.addEventListener('scroll', markZoneRectsStale, { passive: true });
+    window.addEventListener('resize', markZoneRectsStale);
+    // toggle не всплывает — слушаем на фазе перехвата.
+    document.addEventListener('toggle', markZoneRectsStale, true);
+
+    function getVisibleContentRects() {
+      if (!zoneRectsStale && zoneRects) return zoneRects;
+      if (!zoneNodes) zoneNodes = document.querySelectorAll(contentZoneSelector);
+
+      var rects = [];
+      for (var i = 0; i < zoneNodes.length; i += 1) {
+        var rect = zoneNodes[i].getBoundingClientRect();
+        if (!rect.width || !rect.height ||
+            rect.right <= 0 || rect.left >= window.innerWidth ||
+            rect.bottom <= 0 || rect.top >= window.innerHeight) continue;
+        rects.push(rect);
+      }
+
+      zoneRects = rects;
+      zoneRectsStale = false;
+      return rects;
+    }
+
+    function pointIsOverContent(px, py) {
+      var rects = getVisibleContentRects();
+      for (var i = 0; i < rects.length; i += 1) {
+        var r = rects[i];
+        if (px >= r.left && px <= r.right && py >= r.top && py <= r.bottom) return true;
+      }
+      return false;
+    }
+
+    // Примерно влево или вправо — к ближайшему выходу из контента по горизонтали.
+    // Не строго: добавляем небольшой случайный наклон.
+    function getHorizontalEscapeDirection(px, py) {
+      var rects = getVisibleContentRects();
+      var leftEdge = Infinity;
+      var rightEdge = -Infinity;
+      var covered = false;
+      var i;
+
+      for (i = 0; i < rects.length; i += 1) {
+        var rect = rects[i];
+        if (py < rect.top || py > rect.bottom) continue;
+        covered = true;
+        leftEdge = Math.min(leftEdge, rect.left);
+        rightEdge = Math.max(rightEdge, rect.right);
+      }
+
+      var goRight;
+      if (covered && px >= leftEdge && px <= rightEdge) {
+        goRight = (rightEdge - px) <= (px - leftEdge);
+      } else if (covered) {
+        goRight = px < (leftEdge + rightEdge) / 2;
+      } else {
+        goRight = px < window.innerWidth / 2;
+      }
+
+      // ~±7° wobble so the path is not a straight line.
+      var wobble = (Math.random() - .5) * .24;
+      return (goRight ? 0 : Math.PI) + wobble;
+    }
+
+    function getVerticalWanderDirection() {
+      // Строго 50/50 за счёт чередования направлений между кликами.
+      var up = nextVerticalUp;
+      nextVerticalUp = !nextVerticalUp;
+      var base = up ? -Math.PI / 2 : Math.PI / 2;
+      // Небольшой боковой уклон, без перевеса вверх.
+      var wobble = (Math.random() - .5) * .28;
+      return base + wobble;
+    }
+
+    function applyClickImpulse(delta, progress) {
+      // Мягкий ease-in-out: разгон растёт без рывка, но держит крейсерскую скорость.
+      var t = Math.min(1, Math.max(0, progress));
+      var clickEase = t * t * (3 - 2 * t);
+      // Минимум ~92: сразу есть уход от курсора; пик ~150.
+      var clickTargetSpeed = 92 + clickEase * 58;
+      var currentClickX = Math.cos(heading) * speed;
+      var currentClickY = Math.sin(heading) * speed;
+      var targetClickX = Math.cos(clickDirection) * clickTargetSpeed;
+      var targetClickY = Math.sin(clickDirection) * clickTargetSpeed;
+      var clickBlend = Math.min(1, delta * 1.5 * (.18 + clickEase * .7));
+      var clickVelocityX = currentClickX + (targetClickX - currentClickX) * clickBlend;
+      var clickVelocityY = currentClickY + (targetClickY - currentClickY) * clickBlend;
+
+      heading = Math.atan2(clickVelocityY, clickVelocityX);
+      speed = Math.sqrt(clickVelocityX * clickVelocityX + clickVelocityY * clickVelocityY);
+    }
+
+    function syncViewFromPage() {
+      viewX = pageX - window.scrollX;
+      viewY = pageY - window.scrollY;
+    }
+
+    function wrapInViewport() {
+      var viewW = window.innerWidth;
+      var viewH = window.innerHeight;
+      if (viewX < -margin) {
+        viewX = viewW + margin;
+        pageX = window.scrollX + viewX;
+      } else if (viewX > viewW + margin) {
+        viewX = -margin;
+        pageX = window.scrollX + viewX;
+      }
+      if (viewY < -margin) {
+        viewY = viewH + margin;
+        pageY = window.scrollY + viewY;
+      } else if (viewY > viewH + margin) {
+        viewY = -margin;
+        pageY = window.scrollY + viewY;
+      }
+    }
+
+    window.addEventListener('pointermove', function (e) {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+    }, { passive: true });
+
+    window.addEventListener('pointerleave', function () {
+      mouseX = -1000;
+      mouseY = -1000;
+      isHoverCaptured = false;
+    });
+
+    window.addEventListener('click', function (event) {
+      if (pageX === undefined || pageY === undefined) return;
+      syncViewFromPage();
+      var clickX = event.clientX - viewX;
+      var clickY = event.clientY - viewY;
+      var clickDist = Math.sqrt(clickX * clickX + clickY * clickY);
+      // Клик по частице — по близости; при вкл. притяжении ещё нужен «захват».
+      if (clickDist > 76) return;
+      if (ENABLE_HOVER_ATTRACTION && !isHoverCaptured) return;
+
+      // Сначала примерно влево/вправо из контента, затем случайно вверх/вниз.
+      clickPhase = 'out';
+      clickDirection = getHorizontalEscapeDirection(viewX, viewY);
+      clickImpulseTime = performance.now();
+      clickStartTime = clickImpulseTime;
+      // Курсор не ловит, пока не прошло время И частица не отошла далеко.
+      hoverSuppressedUntil = clickImpulseTime + 5200;
+      flightLockedAfterClick = true;
+      isHoverCaptured = false;
+    }, { passive: true });
+
+    function move(time) {
+      if (pageX === undefined) {
+        // Главная: появление слева снизу.
+        pageX = window.scrollX + window.innerWidth * .12;
+        pageY = window.scrollY + window.innerHeight * .88;
+      }
+
+      if (!last) last = time;
+      var delta = Math.min((time - last) / 1000, .05);
+      last = time;
+
+      // pageX/pageY — document-space; view* = page* − scroll* (fixed-layer).
+      // При скролле page* не двигаем — пятно уезжает вместе со страницей.
+      syncViewFromPage();
+
+      var seconds = time / 1000;
+      var clickProgress = (time - clickImpulseTime) / 1800;
+      var isClickActive = clickPhase !== null;
+      var dx = mouseX - viewX;
+      var dy = mouseY - viewY;
+      var mouseDist = Math.sqrt(dx * dx + dy * dy);
+
+      // Снимаем блок только после ухода от курсора (≥300px) и не раньше suppress-таймера.
+      // ENABLE_HOVER_ATTRACTION = false — захват и follow заглушены, код остаётся.
+      if (!ENABLE_HOVER_ATTRACTION) {
+        isHoverCaptured = false;
+      } else if (flightLockedAfterClick) {
+        isHoverCaptured = false;
+        if (
+          time >= hoverSuppressedUntil &&
+          mouseDist >= 300 &&
+          clickPhase === null
+        ) {
+          flightLockedAfterClick = false;
+        }
+        // Жёсткий потолок, если курсор «едет» за частицей.
+        if (time - clickStartTime > 7000) {
+          flightLockedAfterClick = false;
+        }
+      } else if (isClickActive || time < hoverSuppressedUntil) {
+        isHoverCaptured = false;
+      } else if (mouseDist < 170) {
+        isHoverCaptured = true;
+      } else if (mouseDist > 240) {
+        isHoverCaptured = false;
+      }
+      var isNear = ENABLE_HOVER_ATTRACTION && isHoverCaptured && !flightLockedAfterClick;
+
+      if (clickPhase === 'out') {
+        applyClickImpulse(delta, Math.min(clickProgress, .95));
+
+        // После выхода на свободную зону — плавно поворачиваем вверх или вниз (50/50).
+        // Дольше держим горизонтальный разгон, чтобы уйти от курсора.
+        if (time - clickImpulseTime > 520 && !pointIsOverContent(viewX, viewY)) {
+          clickPhase = 'turn';
+          clickDirection = getVerticalWanderDirection();
+          clickImpulseTime = time;
+        } else if (time - clickImpulseTime > 2400) {
+          // Подстраховка: если долго не вышли — всё равно начинаем вертикальный дрейф.
+          clickPhase = 'turn';
+          clickDirection = getVerticalWanderDirection();
+          clickImpulseTime = time;
+        }
+      } else if (clickPhase === 'turn') {
+        applyClickImpulse(delta, Math.min((time - clickImpulseTime) / 1400, 1));
+        if (time - clickImpulseTime > 1400) {
+          clickPhase = null;
+        }
+      } else if (isNear) {
+        // Под курсором частица следует за медленно меняющейся хаотичной целью.
+        // Демпфирование гасит инерцию и не даёт ей вращаться вокруг указателя.
+        var hoverX =
+          mouseX +
+          Math.sin(seconds * 1.17 + phaseA) * 10 +
+          Math.sin(seconds * .53 + phaseC) * 5;
+        var hoverY =
+          mouseY +
+          Math.sin(seconds * .91 + phaseB) * 8 +
+          Math.cos(seconds * .47 + phaseA) * 5;
+        // Скорость в screen-space → применяем к page-space (одинаковый шаг).
+        var desiredX = (hoverX - viewX) * 3.2;
+        var desiredY = (hoverY - viewY) * 3.2;
+        var desiredSpeed = Math.sqrt(desiredX * desiredX + desiredY * desiredY);
+        if (desiredSpeed > 105) {
+          desiredX = desiredX / desiredSpeed * 105;
+          desiredY = desiredY / desiredSpeed * 105;
+        }
+
+        var currentX = Math.cos(heading) * speed;
+        var currentY = Math.sin(heading) * speed;
+        var follow = Math.min(1, delta * 4.2);
+        currentX += (desiredX - currentX) * follow;
+        currentY += (desiredY - currentY) * follow;
+        heading = Math.atan2(currentY, currentX);
+        speed = Math.sqrt(currentX * currentX + currentY * currentY);
+      } else {
+        var turnRate =
+          Math.sin(seconds * .37 + phaseA) * .22 +
+          Math.sin(seconds * .73 + phaseB) * .11 +
+          Math.sin(seconds * .11 + phaseC) * .06;
+        var targetSpeed = 70 + Math.sin(seconds * .29 + phaseB) * 9;
+
+        heading += turnRate * delta;
+        speed += (targetSpeed - speed) * Math.min(1, delta * 1.4);
+      }
+
+      // Полёт в document-space: страница уезжает, pageX/Y держат точку на документе.
+      pageX += Math.cos(heading) * speed * delta;
+      pageY += Math.sin(heading) * speed * delta;
+      syncViewFromPage();
+      wrapInViewport();
+
+      // Определение нахождения частицы над зонами с контентом (чтобы сделать её прозрачнее)
+      // elementFromPoint форсирует layout, поэтому опрашиваем его ~10 раз в
+      // секунду, а не каждый кадр: прозрачность всё равно меняется через
+      // transition .4s, и задержка в сотню миллисекунд не видна.
+      if (time - lastContentProbe > 100) {
+        lastContentProbe = time;
+        var elem = document.elementFromPoint(viewX, viewY);
+        isOverContent = !!(elem && elem.closest(CONTENT_HIT_SELECTOR));
+      }
+
+      if (isOverContent) {
+        particle.classList.add('is-dimmed');
+      } else {
+        particle.classList.remove('is-dimmed');
+      }
+
+      if (isNear) {
+        particle.classList.add('is-near-cursor');
+      } else {
+        particle.classList.remove('is-near-cursor');
+      }
+
+      // Вычисление динамического масштаба частицы
+      var scale = 1;
+      if (clickPhase) {
+        scale = 1 + Math.sin(Math.min(1, Math.max(0, clickProgress)) * Math.PI) * .12;
+        particle.classList.add('is-impulsed');
+      } else if (isNear) {
+        scale = 1.12;
+        particle.classList.remove('is-impulsed');
+      } else {
+        particle.classList.remove('is-impulsed');
+      }
+
+      particle.style.transform =
+        'translate3d(' + viewX.toFixed(1) + 'px,' + viewY.toFixed(1) + 'px,0) scale(' + scale.toFixed(2) + ')';
+      // Класс проявляет пятно и нужен ровно один раз — на первом кадре.
+      if (!hasAppeared) {
+        hasAppeared = true;
+        particle.classList.add('is-moving');
+      }
+
+      requestAnimationFrame(move);
+    }
+
+    requestAnimationFrame(move);
+  })();
+
 </script>
 
 </body>

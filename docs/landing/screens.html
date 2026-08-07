@@ -2,10 +2,36 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
+<meta name="color-scheme" content="dark">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Photo Metadata AI — все экраны приложения</title>
 <meta name="description" content="Все экраны Photo Metadata AI: онбординг, загрузка, обработка, проверка метаданных и экспорт. Сборка 1.1.0-universal.">
-<link rel="icon" href="../../desktop/build/icon.svg">
+<link rel="icon" href="icon.svg">
+<link rel="canonical" href="https://slavaklkv.github.io/photo_metadata_ai/landing/screens.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Photo Metadata AI">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:url" content="https://slavaklkv.github.io/photo_metadata_ai/landing/screens.html">
+<meta property="og:title" content="Photo Metadata AI — все экраны приложения">
+<meta property="og:description" content="Все экраны Photo Metadata AI: онбординг, загрузка, обработка, проверка метаданных и экспорт. Сборка 1.1.0-universal.">
+<meta property="og:image" content="https://slavaklkv.github.io/photo_metadata_ai/landing/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Photo Metadata AI — приложение для macOS, генерирующее метаданные для фотостоков">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Photo Metadata AI — все экраны приложения">
+<meta name="twitter:description" content="Все экраны Photo Metadata AI: онбординг, загрузка, обработка, проверка метаданных и экспорт.">
+<meta name="twitter:image" content="https://slavaklkv.github.io/photo_metadata_ai/landing/og.png">
+<!-- Каскад галереи: класс до первой отрисовки body, чтобы плитки
+     не мигали opacity 1→0. Без JS / при reduce класс не ставится. -->
+<script>
+(function () {
+  try {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  } catch (e) { return; }
+  document.documentElement.classList.add('js-cascade');
+})();
+</script>
 <style>
   :root {
     --bg: #0b0b0f;
@@ -27,6 +53,10 @@
 
   * { box-sizing: border-box; }
 
+  /* Тёмный canvas задан до первой отрисовки; межстраничный View Transition не используется,
+     чтобы возврат на главную не создавал промежуточный светлый кадр. */
+  html { background: var(--bg); color-scheme: dark; }
+
   body {
     margin: 0;
     background: var(--bg);
@@ -38,7 +68,10 @@
 
   a { color: var(--accent-2); text-decoration: none; }
   a:hover { text-decoration: underline; }
-  img { max-width: 100%; display: block; }
+  /* height: auto обязателен: у снимков проставлены атрибуты width/height (чтобы
+     место под них резервировалось до загрузки), а они действуют как presentational
+     hint и без этого фиксируют высоту, отменяя aspect-ratio в галерее. */
+  img { max-width: 100%; height: auto; display: block; }
 
   .wrap { width: 100%; max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
 
@@ -49,7 +82,45 @@
     background: rgba(11, 11, 15, 0.82);
     backdrop-filter: saturate(160%) blur(14px);
     border-bottom: 1px solid var(--line);
+    transition: box-shadow .25s ease, background .25s ease;
   }
+  /* Класс ставит JS, когда страница прокручена: шапка отделяется тенью. */
+  header.stuck {
+    background: rgba(11, 11, 15, 0.92);
+    box-shadow: 0 10px 30px -22px rgba(0, 0, 0, 1);
+  }
+
+  /* ---------- кнопка «наверх» ---------- */
+
+  .to-top {
+    position: fixed;
+    right: 22px;
+    bottom: 22px;
+    z-index: 20;
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 1px solid var(--line-strong);
+    background: rgba(23, 23, 29, 0.86);
+    backdrop-filter: blur(10px);
+    color: var(--text);
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(12px) scale(.9);
+    pointer-events: none;
+    transition: opacity .25s ease, transform .25s cubic-bezier(.22, .8, .3, 1), border-color .18s ease;
+  }
+  .to-top.show { opacity: 1; transform: none; pointer-events: auto; }
+  .to-top:hover { border-color: rgba(139, 136, 248, 0.5); }
+  .to-top:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .to-top svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .to-top:hover svg { animation: nudge .5s ease; }
+  @keyframes nudge {
+    50% { transform: translateY(-3px); }
+  }
+
   .nav { display: flex; align-items: center; gap: 20px; height: var(--header-h); }
   .brand {
     display: flex;
@@ -60,7 +131,13 @@
     margin-right: auto;
   }
   .brand:hover { text-decoration: none; }
-  .brand img { width: 30px; height: 30px; border-radius: 8px; }
+  .brand img {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    transition: transform .3s cubic-bezier(.22, .8, .3, 1);
+  }
+  .brand:hover img { transform: rotate(-8deg) scale(1.08); }
 
   .btn {
     display: inline-flex;
@@ -74,16 +151,171 @@
     color: var(--text);
     background: rgba(255, 255, 255, 0.03);
     white-space: nowrap;
+    transition: background .18s ease, border-color .18s ease, transform .18s ease;
   }
-  .btn:hover { background: rgba(255, 255, 255, 0.07); text-decoration: none; }
+  .btn:hover {
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+    text-decoration: none;
+  }
   .btn-primary {
+    position: relative;
+    overflow: hidden;
     background: linear-gradient(180deg, #8f8cfa, #6f6ce4);
     border-color: transparent;
     color: #0d0d14;
+    box-shadow: 0 8px 24px -10px rgba(126, 122, 240, 0.9);
+    transition: filter .18s ease, transform .18s ease, box-shadow .18s ease;
   }
-  .btn-primary:hover { filter: brightness(1.07); background: linear-gradient(180deg, #8f8cfa, #6f6ce4); }
+  .btn-primary:hover {
+    filter: brightness(1.07);
+    background: linear-gradient(180deg, #8f8cfa, #6f6ce4);
+    border-color: transparent;
+    transform: translateY(-1px);
+    box-shadow: 0 14px 30px -12px rgba(126, 122, 240, 1);
+  }
+  .btn-primary:active { transform: translateY(0); }
+  /* Блик пробегает по кнопке при наведении — как на главной. */
+  .btn-primary::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -60%;
+    width: 45%;
+    background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+    transform: skewX(-18deg);
+    opacity: 0;
+  }
+  .btn-primary:hover::after { animation: sheen .75s ease-out; }
+  @keyframes sheen {
+    0% { left: -60%; opacity: 0; }
+    15% { opacity: 1; }
+    100% { left: 120%; opacity: 0; }
+  }
+  /* Логотип Apple — сплошная заливка, а не обводка. */
+  .btn svg.apple { width: 13px; height: 16px; fill: currentColor; stroke: none; margin-top: -2px; }
 
-  .intro { padding: 56px 0 28px; }
+  /* Сверху свечение обрезается, а справа может естественно уйти за край. */
+  .intro {
+    position: relative;
+    padding: 56px 0 28px;
+    overflow: visible;
+    clip-path: inset(0 -100vw);
+  }
+  /* Правый край остаётся на прежнем месте, а увеличенная ширина растягивает
+     подсветку влево примерно на две трети блока. */
+  .intro::before {
+    content: "";
+    position: absolute;
+    top: -280px;
+    right: -160px;
+    width: min(100%, 1040px);
+    height: 560px;
+    background: radial-gradient(closest-side, rgba(129, 125, 240, 0.22), transparent);
+    pointer-events: none;
+    z-index: 0;
+    will-change: transform, opacity;
+    animation: aurora 9s cubic-bezier(.45, 0, .55, 1) infinite;
+  }
+  /* Текст поднимаем над свечением: абсолютный ::before иначе рисуется поверх. */
+  .intro > * { position: relative; z-index: 1; }
+
+  /* Та же частица, что на главной: мягкий световой туман без хвоста и без
+     чёткой круглой границы. */
+  .ambient-particle {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 9;
+    width: 56px;
+    height: 56px;
+    margin-left: -28px;
+    margin-top: -28px;
+    border-radius: 58% 42% 63% 37% / 46% 54% 46% 54%;
+    background:
+      radial-gradient(45% 42% at 38% 40%, rgba(236, 232, 255, .55) 0%, rgba(186, 176, 255, .22) 42%, transparent 72%),
+      radial-gradient(38% 40% at 62% 58%, rgba(148, 136, 248, .28) 0%, transparent 70%),
+      radial-gradient(55% 50% at 52% 48%, rgba(120, 108, 235, .12) 0%, transparent 78%);
+    filter: blur(5px) saturate(1.08);
+    mix-blend-mode: screen;
+    opacity: 0;
+    pointer-events: none;
+    will-change: transform, opacity, filter;
+    transition: opacity .4s cubic-bezier(.2,0,.3,1), filter .4s ease;
+    animation: particle-morph 7.2s ease-in-out infinite alternate;
+  }
+  .ambient-particle::before {
+    content: "";
+    position: absolute;
+    left: 8px;
+    top: 10px;
+    width: 28px;
+    height: 26px;
+    border-radius: 48% 52% 41% 59% / 55% 42% 58% 45%;
+    background: radial-gradient(ellipse at 50% 45%, rgba(255, 252, 255, .42), rgba(198, 190, 255, .16) 48%, transparent 78%);
+    filter: blur(3px);
+    animation: particle-breathe 4.2s ease-in-out infinite alternate;
+  }
+  .ambient-particle::after {
+    content: "";
+    position: absolute;
+    right: 4px;
+    bottom: 6px;
+    width: 24px;
+    height: 22px;
+    border-radius: 61% 39% 52% 48% / 43% 57% 43% 57%;
+    background: radial-gradient(ellipse at 45% 50%, rgba(157, 145, 250, .26), transparent 74%);
+    filter: blur(5.5px);
+    animation: particle-drift 5.4s ease-in-out infinite alternate;
+  }
+  .ambient-particle.is-moving { opacity: .72; }
+
+  @keyframes particle-morph {
+    from { border-radius: 58% 42% 63% 37% / 46% 54% 46% 54%; }
+    to { border-radius: 41% 59% 38% 62% / 57% 40% 60% 43%; }
+  }
+  @keyframes particle-breathe {
+    from { opacity: .55; transform: translate(-2px, 3px) scale(.88); }
+    to { opacity: 1; transform: translate(3px, -2px) scale(1.12); }
+  }
+  @keyframes particle-drift {
+    from { opacity: .4; transform: translate(2px, -3px) scale(.9); }
+    to { opacity: .85; transform: translate(-3px, 2px) scale(1.18); }
+  }
+
+  /* Прозрачность при пролёте над блоками с контентом: частица становится едва заметной, чтобы не мешать чтению */
+  .ambient-particle.is-dimmed {
+    opacity: .08 !important;
+    filter: blur(7px) saturate(.8);
+  }
+
+  /* Рядом с курсором пятно чуть ярче, но остаётся мягким. */
+  .ambient-particle.is-near-cursor {
+    opacity: .86;
+    filter: blur(4px) saturate(1.22) drop-shadow(0 0 8px rgba(159, 146, 255, .32));
+  }
+  .ambient-particle.is-impulsed {
+    filter: blur(3.5px) saturate(1.35) drop-shadow(0 0 12px rgba(181, 170, 255, .4));
+  }
+
+  @keyframes aurora {
+    0%, 100% { opacity: .62; transform: scale(.94); }
+    50% { opacity: 1; transform: scale(1.16); }
+  }
+
+  /* Появление шапки страницы: элементы въезжают по очереди. */
+  .intro .eyebrow, .intro h1, .intro .lede {
+    animation: rise .8s cubic-bezier(.22, .8, .3, 1) both;
+  }
+  .intro h1 { animation-delay: .08s; }
+  .intro .lede { animation-delay: .16s; }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(18px); }
+    to { opacity: 1; transform: none; }
+  }
+
   .eyebrow {
     color: var(--accent);
     font-size: 13px;
@@ -110,6 +342,7 @@
 
   .gallery button {
     display: block;
+    position: relative;
     width: 100%;
     padding: 0;
     text-align: left;
@@ -120,28 +353,91 @@
     border-radius: 13px;
     background: var(--panel);
     overflow: hidden;
-    transition: border-color .18s ease, transform .18s ease;
+    transition: border-color .28s cubic-bezier(.22, .61, .36, 1), transform .28s cubic-bezier(.22, .61, .36, 1);
   }
-  .gallery button:hover { border-color: var(--line-strong); transform: translateY(-2px); }
+  .gallery button:hover {
+    border-color: rgba(139, 136, 248, 0.4);
+    transform: translateY(-4px);
+    box-shadow: 0 22px 46px -30px rgba(0, 0, 0, 1);
+  }
   .gallery button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
   .gallery img {
     width: 100%;
-    aspect-ratio: 16 / 11;
+    aspect-ratio: 4 / 3;
     object-fit: cover;
     object-position: top center;
     background: #0a0a0e;
     border-bottom: 1px solid var(--line);
   }
+  /* Вертикальные диалоги (онбординг, AI Setup): cover обрезал бы нижние
+     провайдеры и поле ключа. contain показывает окно целиком. */
+  .gallery img.shot-tall {
+    object-fit: contain;
+    object-position: center;
+  }
+
+  /* Подсказка «открыть» выезжает поверх снимка при наведении. */
+  .gallery .zoom {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--line-strong);
+    background: rgba(11, 11, 15, 0.72);
+    backdrop-filter: blur(8px);
+    color: var(--text);
+    font-size: 12.5px;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity .22s ease, transform .22s ease;
+    pointer-events: none;
+  }
+  .gallery button:hover .zoom,
+  .gallery button:focus-visible .zoom { opacity: 1; transform: none; }
+
   .gallery .meta { padding: 15px 17px 17px; }
-  .gallery .meta b { display: block; font-size: 15px; font-weight: 600; margin-bottom: 5px; }
+  .gallery .meta b {
+    display: block;
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 5px;
+    transition: color .2s ease;
+  }
+  .gallery button:hover .meta b { color: var(--accent-2); }
   .gallery .meta span { color: var(--dim); font-size: 14px; line-height: 1.5; }
+
+  /* ---------- каскад появления галереи ---------- */
+
+  /* Без html.js-cascade (нет JS / reduce) плитки сразу в финальном виде.
+     С классом — прячем только «ещё не вошедшие»; is-shown / каскад снят
+     → обычные стили кнопки и hover снова работают без борьбы селекторов.
+     Анимация keyframes, не transition: hover у кнопки тогда не конфликтует. */
+  html.js-cascade #gallery button:not(.cascade-in):not(.is-shown) {
+    opacity: 0;
+    transform: translateY(22px) scale(.99);
+  }
+  html.js-cascade #gallery button.cascade-in {
+    animation: reveal-in .65s cubic-bezier(.22, .8, .3, 1) var(--d, 0s) both;
+  }
+  @keyframes reveal-in {
+    from { opacity: 0; transform: translateY(22px) scale(.99); }
+    to { opacity: 1; transform: none; }
+  }
 
   /* ---------- lightbox ---------- */
 
   dialog.lightbox {
     width: min(96vw, 1500px);
     max-width: 96vw;
+    /* Высота фиксированная, а не max-height: иначе высота .lb-body
+       неопределённая и max-height:100% у картинки игнорируется —
+       высокий скриншот вылезает под подпись. */
+    height: 94vh;
     max-height: 94vh;
     padding: 0;
     border: 1px solid var(--line-strong);
@@ -150,10 +446,51 @@
     color: var(--text);
     overflow: hidden;
   }
+  /* Колонка: картинка отдаёт высоту подписи, а не выдавливает её
+     за границу диалога — иначе при подписи в две строки низ обрезается. */
+  dialog.lightbox[open] { display: flex; flex-direction: column; }
   dialog.lightbox::backdrop { background: rgba(6, 6, 9, 0.86); }
+
+  /* Появление и закрытие: диалог всплывает, подложка проявляется.
+     allow-discrete + @starting-style нужны, чтобы анимировался и display.
+     Открытие длиннее и мягче закрытия — так движение не выглядит рывком. */
+  dialog.lightbox {
+    opacity: 0;
+    transform: scale(.985) translateY(6px);
+    transition:
+      opacity .18s cubic-bezier(.4, 0, 1, 1),
+      transform .18s cubic-bezier(.4, 0, 1, 1),
+      overlay .18s allow-discrete,
+      display .18s allow-discrete;
+    will-change: opacity, transform;
+  }
+  dialog.lightbox[open] {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity .34s cubic-bezier(.22, .61, .36, 1),
+      transform .34s cubic-bezier(.22, .61, .36, 1),
+      overlay .34s allow-discrete,
+      display .34s allow-discrete;
+  }
+  @starting-style {
+    dialog.lightbox[open] { opacity: 0; transform: scale(.985) translateY(6px); }
+  }
+  dialog.lightbox::backdrop {
+    opacity: 0;
+    transition: opacity .18s ease, overlay .18s allow-discrete, display .18s allow-discrete;
+  }
+  dialog.lightbox[open]::backdrop {
+    opacity: 1;
+    transition: opacity .34s ease, overlay .34s allow-discrete, display .34s allow-discrete;
+  }
+  @starting-style {
+    dialog.lightbox[open]::backdrop { opacity: 0; }
+  }
 
   .lb-bar {
     display: flex;
+    flex: 0 0 auto;
     align-items: center;
     gap: 14px;
     padding: 12px 14px 12px 20px;
@@ -176,19 +513,69 @@
   }
   .lb-btn:hover { background: rgba(255, 255, 255, 0.09); }
   .lb-btn:disabled { opacity: .35; cursor: default; }
+  /* Кликом фокус липнет на «первой нажатой» стрелке — обводку только с Tab. */
+  .lb-btn:focus { outline: none; }
+  .lb-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .lb-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
-  .lb-body { padding: 16px; background: #0a0a0e; }
+  /* shellFocus() — без UA-рамки вокруг всего окна */
+  dialog.lightbox:focus { outline: none; }
+
+  .lb-body {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    /* Слои абсолютны: иначе intrinsic-высота вертикального PNG
+       (онбординг/AI Setup) раздувала body и подпись «залазила» на кадр. */
+    background: #0a0a0e;
+    overflow: hidden;
+  }
   .lb-body img {
-    width: 100%;
-    max-height: calc(94vh - 150px);
+    position: absolute;
+    inset: 16px;
+    width: calc(100% - 32px);
+    height: calc(100% - 32px);
+    margin: auto;
     object-fit: contain;
     border-radius: 8px;
+    /* Кадр в покое стоит за краем области и скрыт overflow'ом родителя. */
+    opacity: 0;
+    transform: translateX(var(--lb-shift, 100vw));
+    transition:
+      transform .46s cubic-bezier(.32, .72, 0, 1),
+      opacity .46s cubic-bezier(.32, .72, 0, 1);
+    will-change: transform;
   }
+  /* Оба кадра едут одновременно и с одинаковой скоростью: уходящий за край,
+     входящий с противоположной стороны — это и есть сдвиг ленты. */
+  .lb-body img.is-active,
+  .lb-body img.is-entering,
+  .lb-body img.is-leaving { opacity: 1; }
+  .lb-body img.is-active { transform: translateX(0); }
+  .lb-body img.is-entering.from-right { transform: translateX(var(--lb-shift, 100vw)); }
+  .lb-body img.is-entering.from-left { transform: translateX(calc(-1 * var(--lb-shift, 100vw))); }
+  .lb-body img.is-leaving.to-left { transform: translateX(calc(-1 * var(--lb-shift, 100vw))); }
+  .lb-body img.is-leaving.to-right { transform: translateX(var(--lb-shift, 100vw)); }
+  /* Стартовое положение входящего кадра выставляется без анимации. */
+  .lb-body img.no-anim { transition: none; }
+
+  .lb-title,
   .lb-caption {
-    padding: 0 20px 18px;
+    transition: opacity .18s ease;
+  }
+  .lb-bar.is-swapping .lb-title,
+  .lb-caption.is-swapping { opacity: 0; }
+
+  .lb-caption {
+    /* Отдельная полоса под flex-колонкой: не сжимается и не перекрывается кадром. */
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 14px 20px 18px;
+    border-top: 1px solid var(--line);
+    background: var(--panel);
     color: var(--dim);
     font-size: 14.5px;
+    line-height: 1.45;
   }
 
   @media (max-width: 720px) {
@@ -196,20 +583,47 @@
     .lb-title { font-size: 14px; }
   }
   @media (prefers-reduced-motion: reduce) {
+    .ambient-particle { display: none; }
     .gallery button { transition: none; }
+    .gallery button:hover { transform: none; }
+    .gallery .zoom, .gallery .meta b { transition: none; }
+    .intro::before, .intro .eyebrow, .intro h1, .intro .lede { animation: none; }
+    html.js-cascade #gallery button,
+    html.js-cascade #gallery button.cascade-in,
+    html.js-cascade #gallery button.is-shown {
+      opacity: 1;
+      transform: none;
+      animation: none;
+    }
+    .brand:hover img { transform: none; }
+    .to-top { transition: opacity .2s ease; transform: none; }
+    .to-top:hover svg { animation: none; }
+    .btn, .btn-primary { transition: none; }
+    .btn:hover, .btn-primary:hover { transform: none; }
+    .btn-primary::after, .btn-primary:hover::after { animation: none; }
+    dialog.lightbox,
+    dialog.lightbox[open],
+    dialog.lightbox::backdrop,
+    dialog.lightbox[open]::backdrop { transition: none; }
+    dialog.lightbox { opacity: 1; transform: none; }
+    .lb-body img { transition: none; }
+    .lb-body img.is-active { transform: none; }
+    .lb-title, .lb-caption { transition: none; }
   }
 </style>
 </head>
 <body>
 
+<span class="ambient-particle" aria-hidden="true"></span>
+
 <header>
   <div class="wrap nav">
-    <a class="brand" href="index.html" target="_blank" rel="noopener">
-      <img src="../../desktop/build/icon.svg" alt="">
+    <a class="brand" href="index.html">
+      <img src="icon.svg" width="30" height="30" alt="">
       Photo Metadata AI
     </a>
-    <a class="btn" href="index.html" target="_blank" rel="noopener">← На главную</a>
-    <a class="btn btn-primary" href="https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.1.0/Photo-Metadata-AI-1.1.0-universal.dmg">Скачать</a>
+    <a class="btn" href="index.html">← На главную</a>
+    <a class="btn btn-primary" href="https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.1.0/Photo-Metadata-AI-1.1.0-universal.dmg"><svg class="apple" viewBox="0 0 384 512" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>Скачать</a>
   </div>
 </header>
 
@@ -225,71 +639,78 @@
   </div>
 
   <div class="gallery" id="gallery">
-    <button type="button" data-src="../screenshots/01_dmg_installer.png" data-title="Установка" data-caption="Смонтированный DMG: перетаскивание «Photo Metadata AI.app» в папку Applications.">
-      <img src="../screenshots/01_dmg_installer.png" alt="Смонтированный DMG" loading="lazy">
+    <button type="button" id="shot-01_dmg_installer" data-src="../screenshots/01_dmg_installer.png" data-title="Установка" data-caption="Смонтированный DMG: перетаскивание «Photo Metadata AI.app» в папку Applications.">
+      <img src="../screenshots/01_dmg_installer.png" width="1336" height="936" alt="Смонтированный DMG" loading="lazy">
       <span class="meta"><b>Установка</b><span>Перетаскивание «Photo Metadata AI.app» в папку Applications.</span></span>
     </button>
-    <button type="button" data-src="../screenshots/02_onboarding.png" data-title="Онбординг" data-caption="«Checking your AI setup»: найдена локальная модель QWEN 2.5 VL и ключ Gemini, поле для ключа OpenRouter.">
-      <img src="../screenshots/02_onboarding.png" alt="Онбординг Checking your AI setup" loading="lazy">
+    <button type="button" id="shot-02_onboarding" data-src="../screenshots/02_onboarding.png" data-title="Онбординг" data-caption="«Checking your AI setup»: найдена локальная модель QWEN 2.5 VL и ключ Gemini, поле для ключа OpenRouter.">
+      <img class="shot-tall" src="../screenshots/02_onboarding.png" width="954" height="1224" alt="Онбординг Checking your AI setup" loading="lazy">
       <span class="meta"><b>Онбординг</b><span>Приложение само находит доступные провайдеры и проверяет ключи.</span></span>
     </button>
-    <button type="button" data-src="../screenshots/03_ai_setup.png" data-title="AI Setup" data-caption="Окно «AI Setup»: локальная модель отключена, ввод ключа OpenRouter с ошибкой «invalid key».">
-      <img src="../screenshots/03_ai_setup.png" alt="Окно AI Setup" loading="lazy">
+    <button type="button" id="shot-03_ai_setup" data-src="../screenshots/03_ai_setup.png" data-title="AI Setup" data-caption="Окно «AI Setup»: локальная модель отключена, ввод ключа OpenRouter с ошибкой «invalid key».">
+      <img class="shot-tall" src="../screenshots/03_ai_setup.png" width="923" height="1016" alt="Окно AI Setup" loading="lazy">
       <span class="meta"><b>AI Setup</b><span>Подключение провайдеров и проверка ключа с понятной ошибкой.</span></span>
     </button>
-    <button type="button" data-src="../screenshots/04_start_screen.png" data-title="Шаг 1 — Upload" data-caption="Пустая зона drag &amp; drop, панель «Context &amp; Settings» и карточки возможностей.">
-      <img src="../screenshots/04_start_screen.png" alt="Шаг Upload" loading="lazy">
-      <span class="meta"><b>Шаг 1 — Upload</b><span>Пустая зона drag &amp; drop и панель «Context &amp; Settings».</span></span>
+    <button type="button" id="shot-04_start_screen" data-src="../screenshots/04_start_screen.png" data-title="Шаг 1 — Upload" data-caption="Пустая зона drag &amp; drop, панель «Context &amp; Settings» с выбором провайдера (Gemini), стоковой площадки (Getty Images) и формата экспорта, а также карточки возможностей.">
+      <img src="../screenshots/04_start_screen.png" width="3424" height="2626" alt="Шаг Upload" loading="lazy">
+      <span class="meta"><b>Шаг 1 — Upload</b><span>Пустая зона drag &amp; drop, провайдер, площадка и формат экспорта.</span></span>
     </button>
-    <button type="button" data-src="../screenshots/05_upload_and_context.png" data-title="Шаг 2 — Context" data-caption="Загружено 113 фотографий, заполнены заметки съёмки, активна кнопка «Start processing».">
-      <img src="../screenshots/05_upload_and_context.png" alt="Шаг Context" loading="lazy">
+    <button type="button" id="shot-05_upload_and_context" data-src="../screenshots/05_upload_and_context.png" data-title="Шаг 2 — Context" data-caption="Загружено 113 фотографий, заполнены заметки съёмки, активна кнопка «Start processing».">
+      <!-- Уменьшенное превью: при сжатии оригинала браузером пропадала
+           тонкая рамка панели «Context & Settings». В лайтбокс открывается оригинал. -->
+      <img src="../screenshots/05_upload_and_context_preview.png" width="1200" height="920" alt="Шаг Context" loading="lazy">
       <span class="meta"><b>Шаг 2 — Context</b><span>113 фотографий загружены, заметки съёмки заполнены.</span></span>
     </button>
-    <button type="button" data-src="../screenshots/06_processing.png" data-title="Шаг 3 — Process" data-caption="Модальное окно прогресса «Processing: 73/113», обработка через локальную модель QWEN 2.5 VL.">
-      <img src="../screenshots/06_processing.png" alt="Шаг Process" loading="lazy">
+    <button type="button" id="shot-06_processing" data-src="../screenshots/06_processing.png" data-title="Шаг 3 — Process" data-caption="Модальное окно прогресса «Processing: 73/113», обработка через локальную модель QWEN 2.5 VL.">
+      <img src="../screenshots/06_processing.png" width="3424" height="2624" alt="Шаг Process" loading="lazy">
       <span class="meta"><b>Шаг 3 — Process</b><span>Прогресс «Processing: 73/113» с возможностью отмены.</span></span>
     </button>
-    <button type="button" data-src="../screenshots/07_review_metadata_preview.png" data-title="Шаг 4 — Review" data-caption="Таблица результатов и панель «Metadata Preview» с заголовком, описанием, ключевыми словами и категорией. Поле Keywords отредактировано вручную — его подпись подсвечена. 2 файла с ошибками и ссылка «Retry failed (2)».">
-      <img src="../screenshots/07_review_metadata_preview.png" alt="Шаг Review" loading="lazy">
+    <button type="button" id="shot-07_review_metadata_preview" data-src="../screenshots/07_review_metadata_preview.png" data-title="Шаг 4 — Review" data-caption="Таблица результатов и панель «Metadata Preview» с заголовком, описанием, ключевыми словами и категорией. Поле Keywords отредактировано вручную — его подпись подсвечена. 2 файла с ошибками и ссылка «Retry failed (2)».">
+      <img src="../screenshots/07_review_metadata_preview.png" width="3424" height="2626" alt="Шаг Review" loading="lazy">
       <span class="meta"><b>Шаг 4 — Review</b><span>Таблица результатов и панель «Metadata Preview».</span></span>
     </button>
-    <button type="button" data-src="../screenshots/08_retry_failed.png" data-title="Повтор упавших файлов" data-caption="Прогресс «Processing: 1/2» отмена по «Cancel» останавливает только повторный прогон.">
-      <img src="../screenshots/08_retry_failed.png" alt="Повтор упавших файлов" loading="lazy">
-      <span class="meta"><b>Повтор упавших</b><span>Прогресс «Processing: 1/2» отмена по «Cancel» останавливает только повторный прогон.</span></span>
+    <button type="button" id="shot-08_retry_failed" data-src="../screenshots/08_retry_failed.png" data-title="Повтор упавших файлов" data-caption="Прогресс «Processing: 1/2» отмена по «Cancel» останавливает только повторный прогон.">
+      <img src="../screenshots/08_retry_failed.png" width="3424" height="2626" alt="Повтор упавших файлов" loading="lazy">
+      <span class="meta"><b>Повтор упавших</b><span>Повторный прогон только для файлов с ошибкой.</span></span>
     </button>
-    <button type="button" data-src="../screenshots/09_review_recommendations_filter.png" data-title="Фильтр рекомендаций" data-caption="Быстрый фильтр «Recommendations»: 16 из 113 фотографий, навигация по группе и подсказка о релизах для съёмок с людьми.">
-      <img src="../screenshots/09_review_recommendations_filter.png" alt="Фильтр рекомендаций" loading="lazy">
+    <button type="button" id="shot-09_review_recommendations_filter" data-src="../screenshots/09_review_recommendations_filter.png" data-title="Фильтр рекомендаций" data-caption="Быстрый фильтр «Recommendations»: 16 из 113 фотографий, навигация по группе и подсказка о релизах для съёмок с людьми.">
+      <img src="../screenshots/09_review_recommendations_filter.png" width="3424" height="2626" alt="Фильтр рекомендаций" loading="lazy">
       <span class="meta"><b>Фильтр рекомендаций</b><span>Навигация по группе и подсказка о релизах для съёмок с людьми.</span></span>
     </button>
-    <button type="button" data-src="../screenshots/10_review_regenerating.png" data-title="Перегенерация" data-caption="Перегенерация метаданных для выбранного файла: поля в состоянии «Regenerating…».">
-      <img src="../screenshots/10_review_regenerating.png" alt="Перегенерация метаданных" loading="lazy">
+    <button type="button" id="shot-10_review_regenerating" data-src="../screenshots/10_review_regenerating.png" data-title="Перегенерация" data-caption="Перегенерация метаданных для выбранного файла: поля в состоянии «Regenerating…».">
+      <img src="../screenshots/10_review_regenerating.png" width="3424" height="2626" alt="Перегенерация метаданных" loading="lazy">
       <span class="meta"><b>Перегенерация</b><span>Поля отдельного файла в состоянии «Regenerating…».</span></span>
     </button>
-    <button type="button" data-src="../screenshots/11_select_ready_only.png" data-title="Editorial-поля" data-caption="License Type = Editorial, подпись, локация и ошибка об обязательной editorial-дате; экспорт в CSV и IPTC, выбраны только Ready (66 из 113).">
-      <img src="../screenshots/11_select_ready_only.png" alt="Редакционные поля" loading="lazy">
+    <button type="button" id="shot-11_select_ready_only" data-src="../screenshots/11_select_ready_only.png" data-title="Editorial-поля" data-caption="License Type = Editorial, подпись, локация и ошибка об обязательной editorial-дате; экспорт в CSV и IPTC, выбраны только Ready (66 из 113).">
+      <!-- Уменьшенное превью: при сжатии оригинала браузером у красной рамки
+           обязательной editorial-даты пропадала правая грань. В лайтбокс
+           открывается оригинал. -->
+      <img src="../screenshots/11_select_ready_only_preview.png" width="1200" height="920" alt="Редакционные поля" loading="lazy">
       <span class="meta"><b>Editorial-поля</b><span>Подпись, локация и ошибка об обязательной editorial-дате.</span></span>
     </button>
-    <button type="button" data-src="../screenshots/12_export_in_progress.png" data-title="Шаг 5 — Export" data-caption="Модальное окно прогресса «Exporting: 48/70» с возможностью отмены.">
-      <img src="../screenshots/12_export_in_progress.png" alt="Экспорт в процессе" loading="lazy">
-      <span class="meta"><b>Шаг 5 — Export</b><span>Прогресс «Exporting: 48/70» с возможностью отмены.</span></span>
+    <button type="button" id="shot-12_export_in_progress" data-src="../screenshots/12_export_in_progress.png" data-title="Шаг 5 — Export" data-caption="Модальное окно прогресса «Exporting: 48/70» с возможностью отмены.">
+      <img src="../screenshots/12_export_in_progress.png" width="3424" height="2626" alt="Экспорт в процессе" loading="lazy">
+      <span class="meta"><b>Шаг 5 — Export</b><span>Запись CSV и копий фотографий с метаданными.</span></span>
     </button>
-    <button type="button" data-src="../screenshots/13_export_completed.png" data-title="Экспорт завершён" data-caption="70 фотографий готовы к загрузке на сток, кнопки «Open CSV file» и «Open folder».">
-      <img src="../screenshots/13_export_completed.png" alt="Экспорт завершён" loading="lazy">
+    <button type="button" id="shot-13_export_completed" data-src="../screenshots/13_export_completed.png" data-title="Экспорт завершён" data-caption="70 фотографий готовы к загрузке на сток, кнопки «Open CSV file» и «Open folder».">
+      <img src="../screenshots/13_export_completed.png" width="3424" height="2626" alt="Экспорт завершён" loading="lazy">
       <span class="meta"><b>Экспорт завершён</b><span>70 фотографий готовы, CSV и папка открываются из приложения.</span></span>
     </button>
-    <button type="button" data-src="../screenshots/14_exported_csv_adobe_stock.png" data-title="Готовый CSV" data-caption="Выгруженный CSV для Adobe Stock, открытый в Numbers: колонки Filename, Title, Description, Keywords, Category и флаги.">
-      <img src="../screenshots/14_exported_csv_adobe_stock.png" alt="Выгруженный CSV для Adobe Stock" loading="lazy">
+    <button type="button" id="shot-14_exported_csv_adobe_stock" data-src="../screenshots/14_exported_csv_adobe_stock.png" data-title="Готовый CSV" data-caption="Выгруженный CSV для Adobe Stock, открытый в Numbers: колонки Filename, Title, Description, Keywords, Category, Editorial Caption, Location и флаги.">
+      <img src="../screenshots/14_exported_csv_adobe_stock.png" width="3358" height="3104" alt="Выгруженный CSV для Adobe Stock" loading="lazy">
       <span class="meta"><b>Готовый CSV</b><span>Колонки Filename, Title, Description, Keywords, Category и флаги.</span></span>
     </button>
-    <button type="button" data-src="../screenshots/15_exported_file_iptc_metadata.png" data-title="IPTC в файле" data-caption="Экспортированный JPEG в «Просмотре» macOS: вшитые IPTC-поля — описание, город, страна, ключевые слова, название, категория.">
-      <img src="../screenshots/15_exported_file_iptc_metadata.png" alt="IPTC-метаданные в экспортированном файле" loading="lazy">
+    <button type="button" id="shot-15_exported_file_iptc_metadata" data-src="../screenshots/15_exported_file_iptc_metadata.png" data-title="IPTC в файле" data-caption="Экспортированный JPEG в «Просмотре» macOS: вшитые IPTC-поля — название, описание, ключевые слова, категория, страна, область, город, а также лицензия и флаги в «Инструкциях».">
+      <!-- Уменьшенное PNG-превью: оригинал весит 11 МБ и в сетке не нужен.
+           В лайтбокс открывается полноразмерный PNG. -->
+      <img src="../screenshots/15_exported_file_iptc_metadata_preview.png" width="1200" height="950" alt="IPTC-метаданные в экспортированном файле" loading="lazy">
       <span class="meta"><b>IPTC в файле</b><span>Описание, город, страна, ключевые слова, название и категория.</span></span>
     </button>
   </div>
 </main>
 
-<dialog class="lightbox" id="lightbox">
-  <div class="lb-bar">
+<dialog class="lightbox" id="lightbox" tabindex="-1">
+  <div class="lb-bar" id="lb-bar">
     <span class="lb-title" id="lb-title"></span>
     <span class="lb-count" id="lb-count"></span>
     <button type="button" class="lb-btn" id="lb-prev" aria-label="Предыдущий экран">
@@ -302,60 +723,642 @@
       <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
     </button>
   </div>
-  <div class="lb-body"><img id="lb-img" src="" alt=""></div>
+  <div class="lb-body" id="lb-body">
+    <img class="lb-layer" src="" alt="">
+    <img class="lb-layer" src="" alt="" aria-hidden="true">
+  </div>
   <p class="lb-caption" id="lb-caption"></p>
 </dialog>
 
+<script src="ambient-particle-flags.js"></script>
 <script>
   (function () {
     var items = Array.prototype.slice.call(
       document.querySelectorAll('#gallery button')
     );
     var dialog = document.getElementById('lightbox');
-    var img = document.getElementById('lb-img');
+    var layers = Array.prototype.slice.call(document.querySelectorAll('.lb-layer'));
+    var bar = document.getElementById('lb-bar');
     var title = document.getElementById('lb-title');
     var caption = document.getElementById('lb-caption');
     var count = document.getElementById('lb-count');
     var prev = document.getElementById('lb-prev');
     var next = document.getElementById('lb-next');
+    var body = document.getElementById('lb-body');
     var current = 0;
+    var active = 0;
+    var token = 0;
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-    function show(index) {
-      if (index < 0 || index >= items.length) return;
-      current = index;
-      var item = items[index];
-      img.src = item.getAttribute('data-src');
-      img.alt = item.getAttribute('data-title');
+    // Дистанция сдвига — ширина области просмотра: кадр уезжает ровно за край.
+    function updateShift() {
+      // У закрытого диалога ширина нулевая — прежнее значение лучше нуля.
+      if (!body.clientWidth) return;
+      body.style.setProperty('--lb-shift', body.clientWidth + 'px');
+    }
+    window.addEventListener('resize', updateShift);
+
+    // Декодируем снимок заранее: подмена src без этого даёт вспышку и
+    // скачок размера, пока картинка догружается.
+    function preload(index) {
+      if (index < 0 || index >= items.length) return null;
+      var loader = new Image();
+      loader.src = items[index].getAttribute('data-src');
+      return loader;
+    }
+
+    function applyText(item, index) {
       title.textContent = item.getAttribute('data-title');
       caption.textContent = item.getAttribute('data-caption');
       count.textContent = (index + 1) + ' / ' + items.length;
-      prev.disabled = index === 0;
-      next.disabled = index === items.length - 1;
+    }
+
+    // Зацикливание: с первого — на последний и наоборот. direction: +1 / −1.
+    function wrap(index) {
+      var n = items.length;
+      return ((index % n) + n) % n;
+    }
+
+    function go(direction) {
+      if (!items.length) return;
+      show(wrap(current + direction), direction);
+    }
+
+    function show(index, direction) {
+      if (index < 0 || index >= items.length) return;
+      var item = items[index];
+      var src = item.getAttribute('data-src');
+      var incoming = layers[1 - active];
+      var outgoing = layers[active];
+      var mine = ++token;
+      current = index;
+
+      if (!direction || reduced.matches) {
+        // Первое открытие: показываем сразу в активном слое, без перехода.
+        outgoing.className = 'lb-layer';
+        incoming.src = src;
+        incoming.alt = item.getAttribute('data-title');
+        incoming.className = 'lb-layer no-anim is-active';
+        void incoming.offsetWidth;
+        incoming.className = 'lb-layer is-active';
+        outgoing.setAttribute('aria-hidden', 'true');
+        incoming.removeAttribute('aria-hidden');
+        active = 1 - active;
+        applyText(item, index);
+        updateShift();
+        preload(wrap(index + 1));
+        preload(wrap(index - 1));
+        return;
+      }
+
+      // Подписи гасим на время подмены, чтобы текст не «прыгал» раньше кадра.
+      bar.classList.add('is-swapping');
+      caption.classList.add('is-swapping');
+
+      var loader = new Image();
+      loader.src = src;
+      var ready = loader.decode ? loader.decode().catch(function () {}) : Promise.resolve();
+
+      ready.then(function () {
+        if (mine !== token) return;
+        var side = direction > 0 ? 'from-right' : 'from-left';
+        var away = direction > 0 ? 'to-left' : 'to-right';
+
+        incoming.src = src;
+        incoming.alt = item.getAttribute('data-title');
+        // Ставим входящий кадр за край без анимации…
+        incoming.className = 'lb-layer no-anim is-entering ' + side;
+        // …форсируем reflow, иначе старт и финиш схлопнутся в один кадр…
+        void incoming.offsetWidth;
+        // …и запускаем оба кадра в одном кадре отрисовки — лента едет целиком.
+        incoming.className = 'lb-layer is-entering is-active';
+        outgoing.className = 'lb-layer is-leaving ' + away;
+        outgoing.setAttribute('aria-hidden', 'true');
+        incoming.removeAttribute('aria-hidden');
+
+        active = 1 - active;
+        applyText(item, index);
+        bar.classList.remove('is-swapping');
+        caption.classList.remove('is-swapping');
+        preload(wrap(index + direction));
+      });
+    }
+
+    // Фокус «оболочки» dialog: стрелки с клавиатуры работают, а кнопки bar
+    // не остаются с :focus после клика / showModal (липнет та, что первой).
+    function shellFocus() {
+      if (!dialog.open) return;
+      dialog.focus({ preventScroll: true });
+    }
+
+    function openAt(index) {
+      if (!dialog.open) dialog.showModal();
+      show(index);
+      shellFocus();
+      // showModal-фокус может сдвинуть activeElement чуть позже.
+      queueMicrotask(shellFocus);
     }
 
     items.forEach(function (item, index) {
       item.addEventListener('click', function () {
-        show(index);
-        dialog.showModal();
+        // Сначала открываем: у закрытого диалога нет ширины, а она нужна
+        // для расчёта дистанции сдвига.
+        openAt(index);
       });
     });
 
-    prev.addEventListener('click', function () { show(current - 1); });
-    next.addEventListener('click', function () { show(current + 1); });
+    prev.addEventListener('click', function () {
+      go(-1);
+      shellFocus();
+    });
+    next.addEventListener('click', function () {
+      go(1);
+      shellFocus();
+    });
     document.getElementById('lb-close').addEventListener('click', function () {
       dialog.close();
     });
 
-    dialog.addEventListener('keydown', function (event) {
-      if (event.key === 'ArrowRight') { event.preventDefault(); show(current + 1); }
-      if (event.key === 'ArrowLeft') { event.preventDefault(); show(current - 1); }
+    // Слушаем document: надёжнее, чем только dialog — стрелки работают сразу,
+    // даже если фокус ещё не внутри (и после клика по картинке).
+    document.addEventListener('keydown', function (event) {
+      if (!dialog.open) return;
+      if (event.key === 'ArrowRight') { event.preventDefault(); go(1); }
+      if (event.key === 'ArrowLeft') { event.preventDefault(); go(-1); }
     });
 
     // Клик по подложке вокруг картинки закрывает окно.
     dialog.addEventListener('click', function (event) {
       if (event.target === dialog) dialog.close();
     });
+
+    // После Esc/close UA возвращает фокус на плитку-открыватель.
+    // Раз закрытие с клавиатуры, :focus-visible оставляет обводку и «Открыть».
+    // Снимаем фокус после restore (он может быть чуть позже close).
+    dialog.addEventListener('close', function () {
+      queueMicrotask(function () {
+        var el = document.activeElement;
+        if (el && items.indexOf(el) !== -1) el.blur();
+      });
+    });
+
+    // Переход с лендинга по ссылке вида screens.html#shot-06 — открываем
+    // именно этот снимок в полном размере, а не просто страницу галереи.
+    function openFromHash() {
+      var id = window.location.hash.slice(1);
+      if (!id) return;
+      var index = -1;
+      items.forEach(function (item, i) { if (item.id === id) index = i; });
+      if (index < 0) return;
+      openAt(index);
+    }
+    window.addEventListener('hashchange', openFromHash);
+    openFromHash();
   })();
+
+  // Тень у шапки и кнопка «наверх» зависят от одной величины,
+  // поэтому считаем их в одном обработчике.
+  (function () {
+    var header = document.querySelector('header');
+
+    var toTop = document.createElement('button');
+    toTop.type = 'button';
+    toTop.className = 'to-top';
+    toTop.setAttribute('aria-label', 'Наверх');
+    toTop.innerHTML =
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V6"/><path d="M6 11.5L12 5.5l6 6"/></svg>';
+    toTop.addEventListener('click', function () {
+      var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' });
+    });
+    document.body.appendChild(toTop);
+
+    var ticking = false;
+
+    function update() {
+      var y = window.scrollY;
+
+      if (header) header.classList.toggle('stuck', y > 8);
+      toTop.classList.toggle('show', y > window.innerHeight * 0.9);
+    }
+
+    window.addEventListener('scroll', function () {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(function () {
+        update();
+        ticking = false;
+      });
+    }, { passive: true });
+    window.addEventListener('resize', update);
+    update();
+  })();
+
+  // Подсказка «Открыть» в углу снимка. Рисуем из JS: без скрипта лайтбокс
+  // всё равно не работает, и подсказка обещала бы несуществующее действие.
+  (function () {
+    var cards = document.querySelectorAll('#gallery button');
+    Array.prototype.forEach.call(cards, function (card) {
+      var hint = document.createElement('span');
+      hint.className = 'zoom';
+      hint.setAttribute('aria-hidden', 'true');
+      hint.innerHTML =
+        '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" ' +
+        'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+        '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6M11 8.5v5M8.5 11h5"/></svg>Открыть';
+      card.appendChild(hint);
+    });
+  })();
+
+  // Каскад плиток при скролле. Прячем через html.js-cascade (head);
+  // здесь только задержки соседей и запуск keyframes.
+  (function () {
+    if (!document.documentElement.classList.contains('js-cascade')) return;
+    if (!('IntersectionObserver' in window)) {
+      // Класс стоит, а IO нет — иначе сетка останется невидимой.
+      document.documentElement.classList.remove('js-cascade');
+      return;
+    }
+
+    var cards = Array.prototype.slice.call(
+      document.querySelectorAll('#gallery button')
+    );
+    if (!cards.length) return;
+
+    var gallery = document.getElementById('gallery');
+
+    var io = new IntersectionObserver(function (entries) {
+      // Один «залёт» в вид: соседние плитки — ступеньками по --d.
+      var wave = entries
+        .filter(function (entry) { return entry.isIntersecting; })
+        .map(function (entry) { return entry.target; })
+        .sort(function (a, b) {
+          return cards.indexOf(a) - cards.indexOf(b);
+        });
+
+      wave.forEach(function (card, i) {
+        card.style.setProperty('--d', Math.min(i, 4) * 0.08 + 's');
+        card.classList.add('cascade-in');
+        io.unobserve(card);
+      });
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+
+    cards.forEach(function (card) { io.observe(card); });
+
+    // После каскада: is-shown + снимаем cascade-in, иначе fill-mode
+    // держит transform и ломает hover-подъём.
+    gallery.addEventListener('animationend', function (event) {
+      if (event.animationName !== 'reveal-in') return;
+      var card = event.target;
+      if (!card || card.tagName !== 'BUTTON') return;
+      card.classList.remove('cascade-in');
+      card.classList.add('is-shown');
+      card.style.removeProperty('--d');
+    });
+  })();
+
+  // Частица движется по плавной неповторяющейся кривой поверх всей страницы.
+  // Координаты — в пространстве документа: при скролле пятно уезжает вместе со страницей,
+  // а не «висит» в viewport. Становится прозрачной над контентом и реагирует на мышь.
+  // Флаги ENABLE_* — в ambient-particle-flags.js, ключ 'screens' (отдельно от index).
+  (function () {
+    var particleFlags = getLandingParticleFlags('screens');
+    var ENABLE_AMBIENT_PARTICLE = particleFlags.ENABLE_AMBIENT_PARTICLE;
+    var ENABLE_HOVER_ATTRACTION = particleFlags.ENABLE_HOVER_ATTRACTION;
+    var particle = document.querySelector('.ambient-particle');
+    if (!ENABLE_AMBIENT_PARTICLE) {
+      if (particle) particle.remove();
+      return;
+    }
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (!particle) return;
+
+    // pageX/pageY — позиция в документе; viewX/viewY — в viewport для fixed-transform.
+    var pageX;
+    var pageY;
+    var viewX;
+    var viewY;
+    var heading = Math.PI * 1.08; // от правого края — влево по странице
+    var speed = 70;
+    var last = 0;
+    var margin = 40;
+    var phaseA = Math.random() * Math.PI * 2;
+    var phaseB = Math.random() * Math.PI * 2;
+    var phaseC = Math.random() * Math.PI * 2;
+
+    // Интерактивность: отслеживание курсора мыши и кликов
+    var mouseX = -1000;
+    var mouseY = -1000;
+    var clickImpulseTime = -Infinity;
+    var clickDirection = heading;
+    var clickPhase = null;
+    var hoverSuppressedUntil = 0;
+    var isHoverCaptured = false;
+    // После клика курсор не перехватывает, пока частица не улетит достаточно далеко.
+    var flightLockedAfterClick = false;
+    var clickStartTime = -Infinity;
+    // Чередуем вверх/вниз между кликами — строго 50/50, без «всегда вверх» по ощущению.
+    var nextVerticalUp = Math.random() < .5;
+    var contentZoneSelector = '.intro, .gallery button, .lightbox, footer .inner';
+
+    function getVisibleContentRects() {
+      var zones = document.querySelectorAll(contentZoneSelector);
+      var rects = [];
+      for (var i = 0; i < zones.length; i += 1) {
+        var rect = zones[i].getBoundingClientRect();
+        if (!rect.width || !rect.height ||
+            rect.right <= 0 || rect.left >= window.innerWidth ||
+            rect.bottom <= 0 || rect.top >= window.innerHeight) continue;
+        rects.push(rect);
+      }
+      return rects;
+    }
+
+    function pointIsOverContent(px, py) {
+      var rects = getVisibleContentRects();
+      for (var i = 0; i < rects.length; i += 1) {
+        var r = rects[i];
+        if (px >= r.left && px <= r.right && py >= r.top && py <= r.bottom) return true;
+      }
+      return false;
+    }
+
+    // Примерно влево или вправо — к ближайшему выходу из контента по горизонтали.
+    // Не строго: добавляем небольшой случайный наклон.
+    function getHorizontalEscapeDirection(px, py) {
+      var rects = getVisibleContentRects();
+      var leftEdge = Infinity;
+      var rightEdge = -Infinity;
+      var covered = false;
+      var i;
+
+      for (i = 0; i < rects.length; i += 1) {
+        var rect = rects[i];
+        if (py < rect.top || py > rect.bottom) continue;
+        covered = true;
+        leftEdge = Math.min(leftEdge, rect.left);
+        rightEdge = Math.max(rightEdge, rect.right);
+      }
+
+      var goRight;
+      if (covered && px >= leftEdge && px <= rightEdge) {
+        goRight = (rightEdge - px) <= (px - leftEdge);
+      } else if (covered) {
+        goRight = px < (leftEdge + rightEdge) / 2;
+      } else {
+        goRight = px < window.innerWidth / 2;
+      }
+
+      // ~±7° wobble so the path is not a straight line.
+      var wobble = (Math.random() - .5) * .24;
+      return (goRight ? 0 : Math.PI) + wobble;
+    }
+
+    function getVerticalWanderDirection() {
+      // Строго 50/50 за счёт чередования направлений между кликами.
+      var up = nextVerticalUp;
+      nextVerticalUp = !nextVerticalUp;
+      var base = up ? -Math.PI / 2 : Math.PI / 2;
+      // Небольшой боковой уклон, без перевеса вверх.
+      var wobble = (Math.random() - .5) * .28;
+      return base + wobble;
+    }
+
+    function applyClickImpulse(delta, progress) {
+      // Мягкий ease-in-out: разгон растёт без рывка, но держит крейсерскую скорость.
+      var t = Math.min(1, Math.max(0, progress));
+      var clickEase = t * t * (3 - 2 * t);
+      // Минимум ~92: сразу есть уход от курсора; пик ~150.
+      var clickTargetSpeed = 92 + clickEase * 58;
+      var currentClickX = Math.cos(heading) * speed;
+      var currentClickY = Math.sin(heading) * speed;
+      var targetClickX = Math.cos(clickDirection) * clickTargetSpeed;
+      var targetClickY = Math.sin(clickDirection) * clickTargetSpeed;
+      var clickBlend = Math.min(1, delta * 1.5 * (.18 + clickEase * .7));
+      var clickVelocityX = currentClickX + (targetClickX - currentClickX) * clickBlend;
+      var clickVelocityY = currentClickY + (targetClickY - currentClickY) * clickBlend;
+
+      heading = Math.atan2(clickVelocityY, clickVelocityX);
+      speed = Math.sqrt(clickVelocityX * clickVelocityX + clickVelocityY * clickVelocityY);
+    }
+
+    function syncViewFromPage() {
+      viewX = pageX - window.scrollX;
+      viewY = pageY - window.scrollY;
+    }
+
+    function wrapInViewport() {
+      var viewW = window.innerWidth;
+      var viewH = window.innerHeight;
+      if (viewX < -margin) {
+        viewX = viewW + margin;
+        pageX = window.scrollX + viewX;
+      } else if (viewX > viewW + margin) {
+        viewX = -margin;
+        pageX = window.scrollX + viewX;
+      }
+      if (viewY < -margin) {
+        viewY = viewH + margin;
+        pageY = window.scrollY + viewY;
+      } else if (viewY > viewH + margin) {
+        viewY = -margin;
+        pageY = window.scrollY + viewY;
+      }
+    }
+
+    window.addEventListener('pointermove', function (e) {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+    }, { passive: true });
+
+    window.addEventListener('pointerleave', function () {
+      mouseX = -1000;
+      mouseY = -1000;
+      isHoverCaptured = false;
+    });
+
+    window.addEventListener('click', function (event) {
+      if (pageX === undefined || pageY === undefined) return;
+      syncViewFromPage();
+      var clickX = event.clientX - viewX;
+      var clickY = event.clientY - viewY;
+      var clickDist = Math.sqrt(clickX * clickX + clickY * clickY);
+      // Клик по частице — по близости; при вкл. притяжении ещё нужен «захват».
+      if (clickDist > 76) return;
+      if (ENABLE_HOVER_ATTRACTION && !isHoverCaptured) return;
+
+      // Сначала примерно влево/вправо из контента, затем случайно вверх/вниз.
+      clickPhase = 'out';
+      clickDirection = getHorizontalEscapeDirection(viewX, viewY);
+      clickImpulseTime = performance.now();
+      clickStartTime = clickImpulseTime;
+      // Курсор не ловит, пока не прошло время И частица не отошла далеко.
+      hoverSuppressedUntil = clickImpulseTime + 5200;
+      flightLockedAfterClick = true;
+      isHoverCaptured = false;
+    }, { passive: true });
+
+    function move(time) {
+      if (pageX === undefined) {
+        // Галерея экранов: появление справа посередине.
+        pageX = window.scrollX + window.innerWidth * .88;
+        pageY = window.scrollY + window.innerHeight * .5;
+      }
+
+      if (!last) last = time;
+      var delta = Math.min((time - last) / 1000, .05);
+      last = time;
+
+      // pageX/pageY — document-space; view* = page* − scroll* (fixed-layer).
+      // При скролле page* не двигаем — пятно уезжает вместе со страницей.
+      syncViewFromPage();
+
+      var seconds = time / 1000;
+      var clickProgress = (time - clickImpulseTime) / 1800;
+      var isClickActive = clickPhase !== null;
+      var dx = mouseX - viewX;
+      var dy = mouseY - viewY;
+      var mouseDist = Math.sqrt(dx * dx + dy * dy);
+
+      // Снимаем блок только после ухода от курсора (≥300px) и не раньше suppress-таймера.
+      // ENABLE_HOVER_ATTRACTION = false — захват и follow заглушены, код остаётся.
+      if (!ENABLE_HOVER_ATTRACTION) {
+        isHoverCaptured = false;
+      } else if (flightLockedAfterClick) {
+        isHoverCaptured = false;
+        if (
+          time >= hoverSuppressedUntil &&
+          mouseDist >= 300 &&
+          clickPhase === null
+        ) {
+          flightLockedAfterClick = false;
+        }
+        // Жёсткий потолок, если курсор «едет» за частицей.
+        if (time - clickStartTime > 7000) {
+          flightLockedAfterClick = false;
+        }
+      } else if (isClickActive || time < hoverSuppressedUntil) {
+        isHoverCaptured = false;
+      } else if (mouseDist < 170) {
+        isHoverCaptured = true;
+      } else if (mouseDist > 240) {
+        isHoverCaptured = false;
+      }
+      var isNear = ENABLE_HOVER_ATTRACTION && isHoverCaptured && !flightLockedAfterClick;
+
+      if (clickPhase === 'out') {
+        applyClickImpulse(delta, Math.min(clickProgress, .95));
+
+        // После выхода на свободную зону — плавно поворачиваем вверх или вниз (50/50).
+        // Дольше держим горизонтальный разгон, чтобы уйти от курсора.
+        if (time - clickImpulseTime > 520 && !pointIsOverContent(viewX, viewY)) {
+          clickPhase = 'turn';
+          clickDirection = getVerticalWanderDirection();
+          clickImpulseTime = time;
+        } else if (time - clickImpulseTime > 2400) {
+          // Подстраховка: если долго не вышли — всё равно начинаем вертикальный дрейф.
+          clickPhase = 'turn';
+          clickDirection = getVerticalWanderDirection();
+          clickImpulseTime = time;
+        }
+      } else if (clickPhase === 'turn') {
+        applyClickImpulse(delta, Math.min((time - clickImpulseTime) / 1400, 1));
+        if (time - clickImpulseTime > 1400) {
+          clickPhase = null;
+        }
+      } else if (isNear) {
+        // Под курсором частица следует за медленно меняющейся хаотичной целью.
+        // Демпфирование гасит инерцию и не даёт ей вращаться вокруг указателя.
+        var hoverX =
+          mouseX +
+          Math.sin(seconds * 1.17 + phaseA) * 10 +
+          Math.sin(seconds * .53 + phaseC) * 5;
+        var hoverY =
+          mouseY +
+          Math.sin(seconds * .91 + phaseB) * 8 +
+          Math.cos(seconds * .47 + phaseA) * 5;
+        // Скорость в screen-space → применяем к page-space (одинаковый шаг).
+        var desiredX = (hoverX - viewX) * 3.2;
+        var desiredY = (hoverY - viewY) * 3.2;
+        var desiredSpeed = Math.sqrt(desiredX * desiredX + desiredY * desiredY);
+        if (desiredSpeed > 105) {
+          desiredX = desiredX / desiredSpeed * 105;
+          desiredY = desiredY / desiredSpeed * 105;
+        }
+
+        var currentX = Math.cos(heading) * speed;
+        var currentY = Math.sin(heading) * speed;
+        var follow = Math.min(1, delta * 4.2);
+        currentX += (desiredX - currentX) * follow;
+        currentY += (desiredY - currentY) * follow;
+        heading = Math.atan2(currentY, currentX);
+        speed = Math.sqrt(currentX * currentX + currentY * currentY);
+      } else {
+        var turnRate =
+          Math.sin(seconds * .37 + phaseA) * .22 +
+          Math.sin(seconds * .73 + phaseB) * .11 +
+          Math.sin(seconds * .11 + phaseC) * .06;
+        var targetSpeed = 70 + Math.sin(seconds * .29 + phaseB) * 9;
+
+        heading += turnRate * delta;
+        speed += (targetSpeed - speed) * Math.min(1, delta * 1.4);
+      }
+
+      // Полёт в document-space: страница уезжает, pageX/Y держат точку на документе.
+      pageX += Math.cos(heading) * speed * delta;
+      pageY += Math.sin(heading) * speed * delta;
+      syncViewFromPage();
+      wrapInViewport();
+
+      // Определение нахождения частицы над зонами с контентом (чтобы сделать её прозрачнее)
+      var elem = document.elementFromPoint(viewX, viewY);
+      var overContent = false;
+      if (elem) {
+        var contentBlock = elem.closest(
+          '.card, .hero-grid, .hero-visual, .showcase, .showcase-card, .feature-card, ' +
+          '.features, .steps, .step, .faq, .faq-item, .field-details, .mapping-grid, ' +
+          '.metadata-orbit, .metadata-delivery, .thumbs, .thumb-card, .intro-content, ' +
+          '.screens-grid, .nav, .btn, .cta, h1, h2, h3, h4, p, code, pre, table, input, button, a, figure, img, .dialog, .modal'
+        );
+        if (contentBlock) {
+          overContent = true;
+        }
+      }
+
+      if (overContent) {
+        particle.classList.add('is-dimmed');
+      } else {
+        particle.classList.remove('is-dimmed');
+      }
+
+      if (isNear) {
+        particle.classList.add('is-near-cursor');
+      } else {
+        particle.classList.remove('is-near-cursor');
+      }
+
+      // Вычисление динамического масштаба частицы
+      var scale = 1;
+      if (clickPhase) {
+        scale = 1 + Math.sin(Math.min(1, Math.max(0, clickProgress)) * Math.PI) * .12;
+        particle.classList.add('is-impulsed');
+      } else if (isNear) {
+        scale = 1.12;
+        particle.classList.remove('is-impulsed');
+      } else {
+        particle.classList.remove('is-impulsed');
+      }
+
+      particle.style.transform =
+        'translate3d(' + viewX.toFixed(1) + 'px,' + viewY.toFixed(1) + 'px,0) scale(' + scale.toFixed(2) + ')';
+      particle.classList.add('is-moving');
+
+      requestAnimationFrame(move);
+    }
+
+    requestAnimationFrame(move);
+  })();
+
 </script>
 
 </body>

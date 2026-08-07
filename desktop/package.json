@@ -10,6 +10,8 @@
   "scripts": {
     "dev": "electron .",
     "build:mac": "electron-builder --mac",
+    "build:og": "node scripts/build-og.js",
+    "hooks:install": "node scripts/install-hooks.js",
     "test": "jest --runInBand",
     "test:coverage": "npm test -- --coverage"
   },
