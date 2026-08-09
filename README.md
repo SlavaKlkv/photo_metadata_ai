@@ -1,4 +1,4 @@
-![Photo Metadata AI — приложение для macOS, генерирующее метаданные для фотостоков](docs/landing/og.png)
+Photo Metadata AI — приложение для macOS, генерирующее метаданные для фотостоков
 
 # Photo Metadata AI
 
@@ -7,11 +7,11 @@
 их под выбранную площадку (Adobe Stock, Shutterstock, Getty Images), вшивает IPTC
 в файлы и выгружает CSV.
 
-Обзор продукта, возможности, состав полей и скриншоты — на странице проекта:
-**<https://slavaklkv.github.io/photo_metadata_ai/landing/>**
-все экраны приложения — на [/landing/screens.html](https://slavaklkv.github.io/photo_metadata_ai/landing/screens.html),
-исходники страницы — в [docs/landing/](docs/landing/)
-(переключатели эффектов — [docs/landing/README.md](docs/landing/README.md)).
+Обзор продукта, возможности, состав полей и скриншоты — на странице проекта:  
+**[https://slavaklkv.github.io/photo_metadata_ai/landing/](https://slavaklkv.github.io/photo_metadata_ai/landing/)**  
+все экраны приложения — на [/landing/screens.html](https://slavaklkv.github.io/photo_metadata_ai/landing/screens.html),  
+исходники страницы — в [docs/landing/](docs/landing/)  
+(переключатели эффектов — [docs/landing/README.md](docs/landing/README.md)).  
 Здесь — то, что нужно для работы с кодом.
 
 Приложение работает локально: фотографии не покидают компьютер, кроме кадров,
@@ -22,7 +22,7 @@
 1. Скачайте `.dmg` из [Releases](https://github.com/SlavaKlkv/photo_metadata_ai/releases).
 2. Откройте образ и перетащите **Photo Metadata AI.app** в `Applications`.
 3. При первом запуске приложение проведёт через AI Setup: подключение локальной Ollama
-   и/или ввод ключей Gemini и OpenRouter.
+  и/или ввод ключей Gemini и OpenRouter.
 
 Сборка universal2 — работает и на Apple Silicon, и на Intel.
 
@@ -40,6 +40,8 @@ ollama serve
 ollama pull qwen2.5vl
 ```
 
+
+
 ## Как это устроено
 
 ```
@@ -53,7 +55,7 @@ React + TypeScript (frontend/) — мастер из пяти шагов: Upload
 ```
 
 Бэкенд сам раздаёт фронтенд, поэтому в собранном приложении один origin и нет CORS.
-Подробности сборки и релиза — в [`desktop/README.md`](desktop/README.md).
+Подробности сборки и релиза — в `[desktop/README.md](desktop/README.md)`.
 
 Ключевое архитектурное решение: AI возвращает platform-agnostic набор полей, а правила
 конкретного стока (лимиты title, число и словари ключевых слов и категорий, типы лицензий,
@@ -67,25 +69,31 @@ editorial-поля, состав колонок CSV) применяются по
 с запасом, чтобы под конкретный сток их можно было урезать, а не догенерировать.
 Все текстовые поля — только на английском, как требуют площадки.
 
-| Группа | Поля |
-| --- | --- |
-| Основное | `title` (минимум 5 значимых слов), `description` (минимум одно фактическое предложение), `keywords` (минимум 15 уникальных, по убыванию важности) |
-| Классификация | `categories` (1–2 широких кандидата), `license_type` (commercial/editorial), `is_illustration`, `mature_content`, `ai_generated_content_disclosure` |
-| Локация | `location` — `sublocation`, `city`, `province_state`, `country` — и читаемая строка `location_metadata`; заполняются только когда место действительно известно |
-| Editorial | `is_editorial`, `editorial_caption`, `editorial_date` |
-| Люди и права | `has_people`, `people_count`, `model_release_available`, `releases` |
+
+| Группа        | Поля                                                                                                                                                           |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Основное      | `title` (минимум 5 значимых слов), `description` (минимум одно фактическое предложение), `keywords` (минимум 15 уникальных, по убыванию важности)              |
+| Классификация | `categories` (1–2 широких кандидата), `license_type` (commercial/editorial), `is_illustration`, `mature_content`, `ai_generated_content_disclosure`            |
+| Локация       | `location` — `sublocation`, `city`, `province_state`, `country` — и читаемая строка `location_metadata`; заполняются только когда место действительно известно |
+| Editorial     | `is_editorial`, `editorial_caption`, `editorial_date`                                                                                                          |
+| Люди и права  | `has_people`, `people_count`, `model_release_available`, `releases`                                                                                            |
+
+
+
 
 ### Правила площадок
 
 Живут в `services/metadata` и применяются к уже сгенерированным полям:
 
-| Что делает маппинг | Значения |
-| --- | --- |
-| Урезает title под лимит площадки | Adobe Stock — 70 символов, Getty — 200, Shutterstock — 2048 (предупреждение после 150) |
-| Приводит число ключевых слов к диапазону | Adobe Stock — до 49, Getty и Shutterstock — до 50; дубликаты удаляются, порядок по важности сохраняется |
-| Переводит категории в словарь площадки | «wildlife» → `Nature` у Getty, `Animals/Wildlife` у Shutterstock, `Animals` у Adobe Stock; Adobe принимает одну категорию, остальные — две |
-| Подставляет допустимый тип лицензии | Getty — creative/editorial, Adobe Stock — standard/extended/editorial, Shutterstock — commercial/editorial |
-| Собирает свой набор колонок CSV | У Getty есть `Category 2`, `License Type` и `Editorial Date`, у Adobe Stock — `AI Disclosure`, у Shutterstock — `Illustration` и `Mature Content` |
+
+| Что делает маппинг                       | Значения                                                                                                                                          |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Урезает title под лимит площадки         | Adobe Stock — 70 символов, Getty — 200, Shutterstock — 2048 (предупреждение после 150)                                                            |
+| Приводит число ключевых слов к диапазону | Adobe Stock — до 49, Getty и Shutterstock — до 50; дубликаты удаляются, порядок по важности сохраняется                                           |
+| Переводит категории в словарь площадки   | «wildlife» → `Nature` у Getty, `Animals/Wildlife` у Shutterstock, `Animals` у Adobe Stock; Adobe принимает одну категорию, остальные — две        |
+| Подставляет допустимый тип лицензии      | Getty — creative/editorial, Adobe Stock — standard/extended/editorial, Shutterstock — commercial/editorial                                        |
+| Собирает свой набор колонок CSV          | У Getty есть `Category 2`, `License Type` и `Editorial Date`, у Adobe Stock — `AI Disclosure`, у Shutterstock — `Illustration` и `Mature Content` |
+
 
 Валидация делит замечания на ошибки и рекомендации, а автофикс чинит формальные:
 добивает слишком короткий title, обрезает длинный, приводит число ключевых слов
@@ -106,13 +114,19 @@ editorial-поля, состав колонок CSV) применяются по
 
 ### Стек
 
-| Слой | Технологии |
-| --- | --- |
-| Backend | Python 3.11+, FastAPI, Uvicorn, Pydantic, aiohttp, httpx, Pillow, structlog, iptcinfo3, uv, Ruff, pytest |
-| Frontend | React 18, TypeScript, Zustand, Sass, axios, react-scripts, Jest, Testing Library |
-| Desktop | Electron 33, electron-builder, PyInstaller (universal2), Jest |
+
+| Слой     | Технологии                                                                                               |
+| -------- | -------------------------------------------------------------------------------------------------------- |
+| Backend  | Python 3.11+, FastAPI, Uvicorn, Pydantic, aiohttp, httpx, Pillow, structlog, iptcinfo3, uv, Ruff, pytest |
+| Frontend | React 18, TypeScript, Zustand, Sass, axios, react-scripts, Jest, Testing Library                         |
+| Desktop  | Electron 33, electron-builder, PyInstaller (universal2), Jest                                            |
+
+
+
 
 ## Разработка
+
+
 
 ### Переменные окружения
 
@@ -126,6 +140,8 @@ cp .env.example .env
 OLLAMA_BASE_URL=http://localhost:11434
 ```
 
+
+
 ### Backend
 
 ```bash
@@ -133,6 +149,8 @@ cd backend
 uv sync --dev
 uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+
 
 ### Frontend
 
@@ -142,6 +160,8 @@ npm install
 npm start
 ```
 
+
+
 ### Desktop
 
 ```bash
@@ -150,14 +170,20 @@ npm install
 npm run dev
 ```
 
+
+
 ### Адреса
 
-| Что | Адрес |
-| --- | --- |
-| Frontend | http://localhost:3000 |
-| Backend | http://localhost:8000 |
-| Swagger UI | http://localhost:8000/docs |
-| ReDoc | http://localhost:8000/redoc |
+
+| Что        | Адрес                                                      |
+| ---------- | ---------------------------------------------------------- |
+| Frontend   | [http://localhost:3000](http://localhost:3000)             |
+| Backend    | [http://localhost:8000](http://localhost:8000)             |
+| Swagger UI | [http://localhost:8000/docs](http://localhost:8000/docs)   |
+| ReDoc      | [http://localhost:8000/redoc](http://localhost:8000/redoc) |
+
+
+
 
 ## Проверки
 
@@ -189,6 +215,8 @@ cd frontend && npm run build
 desktop/scripts/build-mac.sh
 ```
 
+
+
 ### Новые зависимости
 
 ```bash
@@ -196,6 +224,8 @@ cd backend  && uv add <lib>          # runtime
 cd backend  && uv add --dev <lib>    # dev
 cd frontend && npm install <lib>
 ```
+
+
 
 ## Релизы
 

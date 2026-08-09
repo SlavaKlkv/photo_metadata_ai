@@ -30,8 +30,11 @@ test('OG использует стили страницы и не тянет в�
   expect(og).toContain(landingCss);
   expect(og).not.toMatch(/(?:src|href)="https?:/);
   // Картинка рендерится из временного каталога: относительные пути не найдутся.
-  expect(og).not.toMatch(/src="icon\.svg"/);
-  expect(og).toContain(`src="file://${landingDir}/icon.svg"`);
+  expect(og).not.toMatch(/src="logo\.svg"/);
+  // Слева и в мокапе — UI-метка без плитки, не favicon icon.svg.
+  expect(og).toContain(`src="file://${landingDir}/logo.svg"`);
+  expect(og).not.toMatch(/src="file:\/\/[^"]*icon\.svg"/);
+  expect([...og.matchAll(/src="file:\/\/[^"]*logo\.svg"/g)]).toHaveLength(2);
 });
 
 test('фактический og.png совпадает с размерами, объявленными в разметке', () => {

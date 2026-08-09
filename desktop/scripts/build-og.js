@@ -85,16 +85,9 @@ const OG_CSS = `
   }
   .og-left { position: relative; z-index: 1; padding-left: 58px; }
   .og-brand { display: flex; align-items: center; gap: 21px; margin-bottom: 92px; }
-  .og-logo {
-    display: grid;
-    place-items: center;
-    width: 58px;
-    height: 58px;
-    border: 1px solid rgba(139, 136, 248, .3);
-    border-radius: 16px;
-    background: rgba(139, 136, 248, .1);
-  }
-  .og-logo img { width: 38px; height: 38px; }
+  /* logo.svg — UI-метка без плитки icon.svg (как в приложении и в шапке). */
+  .og-logo { display: grid; place-items: center; }
+  .og-logo img { width: 58px; height: 58px; }
   .og-brand b {
     color: var(--text);
     font-size: 30px;
@@ -139,9 +132,11 @@ function buildOgHtml(indexHtml = fs.readFileSync(INDEX_HTML, 'utf8')) {
     throw new Error('В index.html не найден блок <style>');
   }
 
+  // Мокап и бренд слева — logo.svg (метка без плитки). favicon icon.svg
+  // в OG не попадает.
   const heroVisual = extractDiv(indexHtml, '<div class="hero-visual">').replace(
-    /src="icon\.svg"/g,
-    `src="file://${LANDING_DIR}/icon.svg"`,
+    /src="logo\.svg"/g,
+    `src="file://${LANDING_DIR}/logo.svg"`,
   );
 
   return `<!DOCTYPE html>
@@ -155,7 +150,7 @@ function buildOgHtml(indexHtml = fs.readFileSync(INDEX_HTML, 'utf8')) {
 <body>
   <div class="og-left">
     <div class="og-brand">
-      <span class="og-logo"><img src="file://${LANDING_DIR}/icon.svg" alt=""></span>
+      <span class="og-logo"><img src="file://${LANDING_DIR}/logo.svg" alt=""></span>
       <b>Photo Metadata AI</b>
     </div>
     <h1>Метаданные<br>для фотостоков<br><span class="grad">за минуты</span></h1>
