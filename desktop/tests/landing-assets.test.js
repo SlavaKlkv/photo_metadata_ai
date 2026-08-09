@@ -132,8 +132,9 @@ describe('мета-данные страницы', () => {
     expect(html).toContain('<link rel="icon" href="icon.svg">');
   });
 
-  test('icon.svg и og.png лежат рядом со страницами', () => {
+  test('icon.svg, logo.svg и og.png лежат рядом со страницами', () => {
     expect(fs.existsSync(path.join(landingDir, 'icon.svg'))).toBe(true);
+    expect(fs.existsSync(path.join(landingDir, 'logo.svg'))).toBe(true);
     expect(fs.existsSync(path.join(landingDir, 'og.png'))).toBe(true);
   });
 });

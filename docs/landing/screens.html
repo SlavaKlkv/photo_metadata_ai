@@ -32,6 +32,35 @@
   document.documentElement.classList.add('js-cascade');
 })();
 </script>
+<!-- Ранний маркер смены шапки: opaque class до первой отрисовки, без FOUC.
+     sessionStorage — та же вкладка; localStorage+TTL — новая (target=_blank). -->
+<script>
+(function () {
+  try {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      sessionStorage.removeItem('landing-header-swap');
+      try { localStorage.removeItem('landing-header-swap'); } catch (e0) {}
+      return;
+    }
+    sessionStorage.removeItem('landing-last-page');
+    var mark = false;
+    if (sessionStorage.getItem('landing-header-swap') === '1') {
+      mark = true;
+      sessionStorage.removeItem('landing-header-swap');
+    }
+    try {
+      var ts = localStorage.getItem('landing-header-swap');
+      if (ts != null) {
+        localStorage.removeItem('landing-header-swap');
+        var n = Number(ts);
+        // 5s — то же окно, что CROSS_TTL в header-swap.js
+        if (n && Date.now() - n < 5000) mark = true;
+      }
+    } catch (e1) { /* private mode */ }
+    if (mark) document.documentElement.classList.add('header-swap');
+  } catch (e) { /* private mode */ }
+})();
+</script>
 <style>
   :root {
     --bg: #0b0b0f;
@@ -53,8 +82,8 @@
 
   * { box-sizing: border-box; }
 
-  /* Тёмный canvas задан до первой отрисовки; межстраничный View Transition не используется,
-     чтобы возврат на главную не создавал промежуточный светлый кадр. */
+  /* Тёмный canvas задан до первой отрисовки; межстраничный View Transition не
+     используется (вспышка в Chrome). Вместо — opacity-swap шапки (header-swap.js). */
   html { background: var(--bg); color-scheme: dark; }
 
   body {
@@ -89,6 +118,23 @@
     background: rgba(11, 11, 15, 0.92);
     box-shadow: 0 10px 30px -22px rgba(0, 0, 0, 1);
   }
+  /* Смена шапки peer index ↔ screens (header-swap.js):
+     — соседи бренда гаснут/проявляются;
+     — .brand на входе скрыт, FLIP + handoff. */
+  html.header-swap .nav > :not(.brand),
+  html.header-swap-out .nav > :not(.brand) {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .32s cubic-bezier(.22, .8, .3, 1);
+  }
+  html.header-swap-out .nav > :not(.brand) { transition-duration: .22s; }
+  html.header-swap.header-swap-ready .nav > :not(.brand):not(.nav-cta) {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  html.header-swap .brand { opacity: 0; }
+  html.header-swap.header-swap-ready .brand { opacity: 1; transition: opacity .12s ease; }
+  html.header-swap-out .brand { opacity: 1; }
 
   /* ---------- кнопка «наверх» ---------- */
 
@@ -131,13 +177,22 @@
     margin-right: auto;
   }
   .brand:hover { text-decoration: none; }
-  .brand img {
+  /* Как в приложении: только метка-затвор, без плитки icon.svg. */
+  .brand-logo {
+    display: block;
+    flex: none;
     width: 30px;
     height: 30px;
-    border-radius: 8px;
-    transition: transform .3s cubic-bezier(.22, .8, .3, 1);
   }
-  .brand:hover img { transform: rotate(-8deg) scale(1.08); }
+  .brand-mark { display: block; width: 100%; height: 100%; }
+  /* Диафрагму пересчитывают модули brand-iris/; подсветка wordmark — отдельно. */
+  .brand-name { transition: color .3s ease, text-shadow .3s ease; }
+  /* Надпись отзывается вместе с затвором — сдержанно, без сдвига соседей. */
+  .brand:hover .brand-name,
+  .brand:focus-visible .brand-name {
+    color: #fff;
+    text-shadow: 0 0 16px rgba(139, 136, 248, .38);
+  }
 
   .btn {
     display: inline-flex;
@@ -222,82 +277,74 @@
   /* Текст поднимаем над свечением: абсолютный ::before иначе рисуется поверх. */
   .intro > * { position: relative; z-index: 1; }
 
-  /* Та же частица, что на главной: мягкий световой туман без хвоста и без
-     чёткой круглой границы. */
+  /* Та же искра, что на главной: точечное ядро с мягким ореолом, без хвоста. */
   .ambient-particle {
+    /* fixed: не расширяет scrollHeight (в отличие от absolute за краем).
+       Логика полёта в page-space; transform = page − scroll — едет со страницей. */
     position: fixed;
     top: 0;
     left: 0;
     z-index: 9;
-    width: 56px;
-    height: 56px;
-    margin-left: -28px;
-    margin-top: -28px;
-    border-radius: 58% 42% 63% 37% / 46% 54% 46% 54%;
+    width: 18px;
+    height: 18px;
+    margin-left: -9px;
+    margin-top: -9px;
+    border-radius: 50%;
     background:
-      radial-gradient(45% 42% at 38% 40%, rgba(236, 232, 255, .55) 0%, rgba(186, 176, 255, .22) 42%, transparent 72%),
-      radial-gradient(38% 40% at 62% 58%, rgba(148, 136, 248, .28) 0%, transparent 70%),
-      radial-gradient(55% 50% at 52% 48%, rgba(120, 108, 235, .12) 0%, transparent 78%);
-    filter: blur(5px) saturate(1.08);
+      radial-gradient(circle at 50% 50%, rgba(252, 250, 255, .5) 0%, rgba(196, 189, 255, .24) 34%, transparent 68%);
+    filter: blur(.6px);
     mix-blend-mode: screen;
     opacity: 0;
     pointer-events: none;
     will-change: transform, opacity, filter;
-    transition: opacity .4s cubic-bezier(.2,0,.3,1), filter .4s ease;
-    animation: particle-morph 7.2s ease-in-out infinite alternate;
+    transition: opacity .5s cubic-bezier(.2,0,.3,1), filter .5s ease;
   }
+  /* Ореол отдельным слоем — иначе, чтобы получить свечение, пришлось бы
+     размывать само ядро, и искра снова расплылась бы в пятно. */
   .ambient-particle::before {
     content: "";
     position: absolute;
-    left: 8px;
-    top: 10px;
-    width: 28px;
-    height: 26px;
-    border-radius: 48% 52% 41% 59% / 55% 42% 58% 45%;
-    background: radial-gradient(ellipse at 50% 45%, rgba(255, 252, 255, .42), rgba(198, 190, 255, .16) 48%, transparent 78%);
-    filter: blur(3px);
-    animation: particle-breathe 4.2s ease-in-out infinite alternate;
+    inset: -10px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%, rgba(152, 143, 246, .26), transparent 64%);
+    filter: blur(5px);
+    animation: particle-halo 6.4s ease-in-out infinite alternate;
   }
+  /* Ядро едва заметно дышит: искра живая, но не мигает и не зовёт кликнуть. */
   .ambient-particle::after {
     content: "";
     position: absolute;
-    right: 4px;
-    bottom: 6px;
-    width: 24px;
-    height: 22px;
-    border-radius: 61% 39% 52% 48% / 43% 57% 43% 57%;
-    background: radial-gradient(ellipse at 45% 50%, rgba(157, 145, 250, .26), transparent 74%);
-    filter: blur(5.5px);
-    animation: particle-drift 5.4s ease-in-out infinite alternate;
+    inset: 6px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .92);
+    filter: blur(1.1px);
+    animation: particle-twinkle 5.6s ease-in-out infinite;
   }
-  .ambient-particle.is-moving { opacity: .72; }
+  .ambient-particle.is-moving { opacity: .55; }
 
-  @keyframes particle-morph {
-    from { border-radius: 58% 42% 63% 37% / 46% 54% 46% 54%; }
-    to { border-radius: 41% 59% 38% 62% / 57% 40% 60% 43%; }
+  @keyframes particle-halo {
+    from { opacity: .5; transform: scale(.92); }
+    to { opacity: .82; transform: scale(1.1); }
   }
-  @keyframes particle-breathe {
-    from { opacity: .55; transform: translate(-2px, 3px) scale(.88); }
-    to { opacity: 1; transform: translate(3px, -2px) scale(1.12); }
-  }
-  @keyframes particle-drift {
-    from { opacity: .4; transform: translate(2px, -3px) scale(.9); }
-    to { opacity: .85; transform: translate(-3px, 2px) scale(1.18); }
+  @keyframes particle-twinkle {
+    0%, 100% { opacity: .72; transform: scale(1); }
+    44% { opacity: .96; transform: scale(1.08); }
+    74% { opacity: .6; transform: scale(.94); }
   }
 
-  /* Прозрачность при пролёте над блоками с контентом: частица становится едва заметной, чтобы не мешать чтению */
+  /* Прозрачность при пролёте над блоками с контентом: искра становится едва заметной, чтобы не мешать чтению */
   .ambient-particle.is-dimmed {
-    opacity: .08 !important;
-    filter: blur(7px) saturate(.8);
+    opacity: .07 !important;
+    filter: blur(1.4px);
   }
 
-  /* Рядом с курсором пятно чуть ярче, но остаётся мягким. */
+  /* Рядом с курсором искра чуть ярче, но остаётся спокойной. */
   .ambient-particle.is-near-cursor {
-    opacity: .86;
-    filter: blur(4px) saturate(1.22) drop-shadow(0 0 8px rgba(159, 146, 255, .32));
+    opacity: .74;
+    filter: blur(.4px) drop-shadow(0 0 6px rgba(166, 157, 255, .34));
   }
   .ambient-particle.is-impulsed {
-    filter: blur(3.5px) saturate(1.35) drop-shadow(0 0 12px rgba(181, 170, 255, .4));
+    filter: blur(.3px) drop-shadow(0 0 9px rgba(194, 186, 255, .44));
   }
 
   @keyframes aurora {
@@ -583,6 +630,15 @@
     .lb-title { font-size: 14px; }
   }
   @media (prefers-reduced-motion: reduce) {
+    html.header-swap .nav > :not(.brand),
+    html.header-swap.header-swap-ready .nav > :not(.brand),
+    html.header-swap-out .nav > :not(.brand),
+    html.header-swap .brand,
+    html.header-swap.header-swap-ready .brand {
+      opacity: 1;
+      pointer-events: auto;
+      transition: none;
+    }
     .ambient-particle { display: none; }
     .gallery button { transition: none; }
     .gallery button:hover { transform: none; }
@@ -595,7 +651,10 @@
       transform: none;
       animation: none;
     }
-    .brand:hover img { transform: none; }
+    /* Затвор остаётся раскрытым (это же проверяют модули brand-iris/), надпись
+       не подсвечивается. */
+    .brand:hover .brand-name,
+    .brand:focus-visible .brand-name { color: var(--text); text-shadow: none; }
     .to-top { transition: opacity .2s ease; transform: none; }
     .to-top:hover svg { animation: none; }
     .btn, .btn-primary { transition: none; }
@@ -619,8 +678,14 @@
 <header>
   <div class="wrap nav">
     <a class="brand" href="index.html">
-      <img src="icon.svg" width="30" height="30" alt="">
-      Photo Metadata AI
+      <span class="brand-logo" aria-hidden="true">
+        <!-- Координаты затвора 0…31.875 — те же, что в frontend/logo.svg и brand-iris/geometry.js. -->
+        <svg class="brand-mark" viewBox="0 0 31.875 31.875" fill="none" aria-hidden="true">
+          <!-- brand-iris/ подменяет d при наведении. -->
+          <path class="brand-blades" d="M8.32812 29.4688L7.26562 27.6094L14.0625 23.6875L13.3438 23.3281C12.5833 22.974 11.8229 22.599 11.0625 22.2031C10.3125 21.8073 9.57292 21.3958 8.84375 20.9688L0.34375 16.0625L1.40625 14.2188L8.3125 18.2031C8.22917 17.849 8.16146 17.4792 8.10938 17.0938C8.06771 16.7083 8.04688 16.3229 8.04688 15.9375V2.51562H10.1719V10.4531C10.9635 9.89062 11.7812 9.33854 12.625 8.79688C13.4792 8.25521 14.3333 7.73438 15.1875 7.23438L23.5469 2.40625L24.625 4.26562L17.8125 8.1875L18.125 8.3125C18.9479 8.69792 19.7656 9.10938 20.5781 9.54688C21.401 9.98438 22.2135 10.4323 23.0156 10.8906L31.5312 15.7969L30.4844 17.6562L23.5625 13.6719C23.6458 14.026 23.7083 14.3958 23.75 14.7812C23.8021 15.1562 23.8281 15.5417 23.8281 15.9375V29.3594H21.7188V21.4062C20.9167 21.9792 20.0885 22.5365 19.2344 23.0781C18.3906 23.6198 17.5312 24.1458 16.6562 24.6562L8.32812 29.4688ZM15.9375 21.7031C17 21.7031 17.9635 21.4427 18.8281 20.9219C19.7031 20.401 20.401 19.7083 20.9219 18.8438C21.4427 17.9688 21.7031 17 21.7031 15.9375C21.7031 14.875 21.4427 13.9115 20.9219 13.0469C20.401 12.1719 19.7031 11.474 18.8281 10.9531C17.9635 10.4323 17 10.1719 15.9375 10.1719C14.875 10.1719 13.9062 10.4323 13.0312 10.9531C12.1667 11.474 11.474 12.1719 10.9531 13.0469C10.4323 13.9115 10.1719 14.875 10.1719 15.9375C10.1719 17 10.4323 17.9688 10.9531 18.8438C11.474 19.7083 12.1667 20.401 13.0312 20.9219C13.9062 21.4427 14.875 21.7031 15.9375 21.7031ZM15.9375 31.875C13.7396 31.875 11.6771 31.4583 9.75 30.625C7.82292 29.8021 6.13021 28.6615 4.67188 27.2031C3.21354 25.7448 2.06771 24.0521 1.23438 22.125C0.411458 20.1979 0 18.1354 0 15.9375C0 13.7396 0.411458 11.6771 1.23438 9.75C2.06771 7.82292 3.21354 6.13021 4.67188 4.67188C6.13021 3.20312 7.82292 2.05729 9.75 1.23438C11.6771 0.411458 13.7396 0 15.9375 0C18.1354 0 20.1979 0.411458 22.125 1.23438C24.0521 2.05729 25.7448 3.20312 27.2031 4.67188C28.6615 6.13021 29.8021 7.82292 30.625 9.75C31.4583 11.6771 31.875 13.7396 31.875 15.9375C31.875 18.1354 31.4583 20.1979 30.625 22.125C29.8021 24.0521 28.6615 25.7448 27.2031 27.2031C25.7448 28.6615 24.0521 29.8021 22.125 30.625C20.1979 31.4583 18.1354 31.875 15.9375 31.875ZM15.9375 29.2188C17.7708 29.2188 19.4896 28.875 21.0938 28.1875C22.6979 27.5 24.1094 26.5469 25.3281 25.3281C26.5469 24.1094 27.5 22.6979 28.1875 21.0938C28.875 19.4896 29.2188 17.7708 29.2188 15.9375C29.2188 14.1042 28.875 12.3854 28.1875 10.7812C27.5 9.16667 26.5469 7.75521 25.3281 6.54688C24.1094 5.32812 22.6979 4.375 21.0938 3.6875C19.4896 3 17.7708 2.65625 15.9375 2.65625C14.1042 2.65625 12.3854 3 10.7812 3.6875C9.17708 4.375 7.76562 5.32812 6.54688 6.54688C5.32812 7.75521 4.375 9.16667 3.6875 10.7812C3 12.3854 2.65625 13.7396 2.65625 15.9375C2.65625 17.7708 3 19.4896 3.6875 21.0938C4.375 22.6979 5.32812 24.1094 6.54688 25.3281C7.76562 26.5469 9.17708 27.5 10.7812 28.1875C12.3854 28.875 14.1042 29.2188 15.9375 29.2188Z" fill="#9191F3"/>
+        </svg>
+      </span>
+      <span class="brand-name">Photo Metadata AI</span>
     </a>
     <a class="btn" href="index.html">← На главную</a>
     <a class="btn btn-primary" href="https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.1.0/Photo-Metadata-AI-1.1.0-universal.dmg"><svg class="apple" viewBox="0 0 384 512" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>Скачать</a>
@@ -697,7 +762,10 @@
       <span class="meta"><b>Экспорт завершён</b><span>70 фотографий готовы, CSV и папка открываются из приложения.</span></span>
     </button>
     <button type="button" id="shot-14_exported_csv_adobe_stock" data-src="../screenshots/14_exported_csv_adobe_stock.png" data-title="Готовый CSV" data-caption="Выгруженный CSV для Adobe Stock, открытый в Numbers: колонки Filename, Title, Description, Keywords, Category, Editorial Caption, Location и флаги.">
-      <img src="../screenshots/14_exported_csv_adobe_stock.png" width="3358" height="3104" alt="Выгруженный CSV для Adobe Stock" loading="lazy">
+      <!-- Уменьшенное превью с перерисованной сеткой: в оригинале линии
+           ячеек — 1 px #a6a6a6 и при сжатии до ширины карточки пропадают
+           целиком. В лайтбокс открывается оригинал. -->
+      <img src="../screenshots/14_exported_csv_adobe_stock_preview.png" width="1200" height="1109" alt="Выгруженный CSV для Adobe Stock" loading="lazy">
       <span class="meta"><b>Готовый CSV</b><span>Колонки Filename, Title, Description, Keywords, Category и флаги.</span></span>
     </button>
     <button type="button" id="shot-15_exported_file_iptc_metadata" data-src="../screenshots/15_exported_file_iptc_metadata.png" data-title="IPTC в файле" data-caption="Экспортированный JPEG в «Просмотре» macOS: вшитые IPTC-поля — название, описание, ключевые слова, категория, страна, область, город, а также лицензия и флаги в «Инструкциях».">
@@ -731,6 +799,12 @@
 </dialog>
 
 <script src="ambient-particle-flags.js"></script>
+<script src="brand-iris/geometry.js"></script>
+<script src="brand-iris/motion.js"></script>
+<script src="brand-iris/handoff.js"></script>
+<script src="brand-iris/presence.js"></script>
+<script src="brand-iris/init.js"></script>
+<script src="header-swap.js"></script>
 <script>
   (function () {
     var items = Array.prototype.slice.call(
@@ -1033,13 +1107,14 @@
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     if (!particle) return;
 
-    // pageX/pageY — позиция в документе; viewX/viewY — в viewport для fixed-transform.
+    // pageX/pageY — логическая позиция в документе. viewX/viewY — client-координаты
+    // для fixed-transform и hit-test (elementFromPoint, clientX/Y).
     var pageX;
     var pageY;
     var viewX;
     var viewY;
-    var heading = Math.PI * 1.08; // от правого края — влево по странице
-    var speed = 70;
+    var heading = 0; // задаётся при появлении: spawnAtRandomOnPage()
+    var speed = 30;
     var last = 0;
     var margin = 40;
     var phaseA = Math.random() * Math.PI * 2;
@@ -1128,8 +1203,8 @@
       // Мягкий ease-in-out: разгон растёт без рывка, но держит крейсерскую скорость.
       var t = Math.min(1, Math.max(0, progress));
       var clickEase = t * t * (3 - 2 * t);
-      // Минимум ~92: сразу есть уход от курсора; пик ~150.
-      var clickTargetSpeed = 92 + clickEase * 58;
+      // Минимум ~48: уход от курсора заметен, но остаётся неспешным; пик ~78.
+      var clickTargetSpeed = 48 + clickEase * 30;
       var currentClickX = Math.cos(heading) * speed;
       var currentClickY = Math.sin(heading) * speed;
       var targetClickX = Math.cos(clickDirection) * clickTargetSpeed;
@@ -1147,22 +1222,62 @@
       viewY = pageY - window.scrollY;
     }
 
-    function wrapInViewport() {
-      var viewW = window.innerWidth;
-      var viewH = window.innerHeight;
-      if (viewX < -margin) {
-        viewX = viewW + margin;
-        pageX = window.scrollX + viewX;
-      } else if (viewX > viewW + margin) {
-        viewX = -margin;
-        pageX = window.scrollX + viewX;
+    // Появление: случайная точка на краю всего документа (не viewport) и
+    // курс в полностью произвольную сторону — не «внутрь экрана».
+    function spawnAtRandomOnPage() {
+      var root = document.documentElement;
+      var body = document.body;
+      var docW = Math.max(
+        root.clientWidth, root.scrollWidth,
+        body ? body.clientWidth : 0,
+        window.innerWidth
+      );
+      var docH = Math.max(
+        root.clientHeight, root.scrollHeight,
+        body ? body.clientHeight : 0,
+        window.innerHeight
+      );
+      var edge = Math.floor(Math.random() * 4); // 0 верх, 1 право, 2 низ, 3 лево
+      var along = .08 + Math.random() * .84; // не впритык к углам
+
+      if (edge === 0) {
+        pageX = docW * along;
+        pageY = -margin;
+      } else if (edge === 1) {
+        pageX = docW + margin;
+        pageY = docH * along;
+      } else if (edge === 2) {
+        pageX = docW * along;
+        pageY = docH + margin;
+      } else {
+        pageX = -margin;
+        pageY = docH * along;
       }
-      if (viewY < -margin) {
-        viewY = viewH + margin;
-        pageY = window.scrollY + viewY;
-      } else if (viewY > viewH + margin) {
-        viewY = -margin;
-        pageY = window.scrollY + viewY;
+
+      heading = Math.random() * Math.PI * 2;
+      clickDirection = heading;
+    }
+
+    // Wrap по границам контента документа (тор): за краем — с противоположной
+    // стороны. fixed-слой не раздувает scrollHeight, поэтому размеры стабильны.
+    function wrapInDocument() {
+      var root = document.documentElement;
+      var body = document.body;
+      // clientWidth/Height — layout без overflow от декора; scroll* — фактический контент.
+      var docW = Math.max(root.clientWidth, root.scrollWidth, body ? body.clientWidth : 0, window.innerWidth);
+      var docH = Math.max(root.clientHeight, root.scrollHeight, body ? body.clientHeight : 0, window.innerHeight);
+      // Период = ширина/высота + 2*margin, чтобы выйти за край и сразу войти с другого.
+      var spanX = docW + margin * 2;
+      var spanY = docH + margin * 2;
+      if (pageX < -margin) {
+        pageX += spanX * Math.ceil((-margin - pageX) / spanX);
+      } else if (pageX > docW + margin) {
+        pageX -= spanX * Math.ceil((pageX - (docW + margin)) / spanX);
+      }
+      if (pageY < -margin) {
+        pageY += spanY * Math.ceil((-margin - pageY) / spanY);
+      } else if (pageY > docH + margin) {
+        pageY -= spanY * Math.ceil((pageY - (docH + margin)) / spanY);
       }
     }
 
@@ -1200,17 +1315,14 @@
 
     function move(time) {
       if (pageX === undefined) {
-        // Галерея экранов: появление справа посередине.
-        pageX = window.scrollX + window.innerWidth * .88;
-        pageY = window.scrollY + window.innerHeight * .5;
+        spawnAtRandomOnPage();
       }
 
       if (!last) last = time;
       var delta = Math.min((time - last) / 1000, .05);
       last = time;
 
-      // pageX/pageY — document-space; view* = page* − scroll* (fixed-layer).
-      // При скролле page* не двигаем — пятно уезжает вместе со страницей.
+      // pageX/pageY — document-space; view* только для курсора/хит-тестов.
       syncViewFromPage();
 
       var seconds = time / 1000;
@@ -1295,20 +1407,21 @@
         speed = Math.sqrt(currentX * currentX + currentY * currentY);
       } else {
         var turnRate =
-          Math.sin(seconds * .37 + phaseA) * .22 +
-          Math.sin(seconds * .73 + phaseB) * .11 +
-          Math.sin(seconds * .11 + phaseC) * .06;
-        var targetSpeed = 70 + Math.sin(seconds * .29 + phaseB) * 9;
+          Math.sin(seconds * .37 + phaseA) * .3 +
+          Math.sin(seconds * .73 + phaseB) * .15 +
+          Math.sin(seconds * .11 + phaseC) * .08;
+        var targetSpeed = 30 + Math.sin(seconds * .29 + phaseB) * 6;
 
         heading += turnRate * delta;
         speed += (targetSpeed - speed) * Math.min(1, delta * 1.4);
       }
 
-      // Полёт в document-space: страница уезжает, pageX/Y держат точку на документе.
+      // Полёт в document-space; fixed рисует view* = page* − scroll*.
+      // За краем документа — с противоположной стороны, страницу не раздуваем.
       pageX += Math.cos(heading) * speed * delta;
       pageY += Math.sin(heading) * speed * delta;
+      wrapInDocument();
       syncViewFromPage();
-      wrapInViewport();
 
       // Определение нахождения частицы над зонами с контентом (чтобы сделать её прозрачнее)
       var elem = document.elementFromPoint(viewX, viewY);
@@ -1349,6 +1462,7 @@
         particle.classList.remove('is-impulsed');
       }
 
+      // fixed-слой: view* = page* − scroll — скролл не отлипает.
       particle.style.transform =
         'translate3d(' + viewX.toFixed(1) + 'px,' + viewY.toFixed(1) + 'px,0) scale(' + scale.toFixed(2) + ')';
       particle.classList.add('is-moving');

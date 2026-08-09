@@ -58,4 +58,12 @@ test('блок скриншотов ведёт на галерею из 15 эк�
   expect(screens[1]).toContain('screens.html#shot-06_processing');
   expect(screens[1]).toContain('screens.html#shot-13_export_completed');
   expect(screens[1]).toContain('screens.html#shot-15_exported_file_iptc_metadata');
+  // Галерея с главной — в новой вкладке.
+  const screenAnchors = [...screens[1].matchAll(/<a\b[^>]*href="screens\.html[^"]*"[^>]*>/g)].map(
+    (m) => m[0]
+  );
+  expect(screenAnchors.length).toBeGreaterThanOrEqual(5);
+  for (const tag of screenAnchors) {
+    expect(tag).toMatch(/target="_blank"/);
+  }
 });

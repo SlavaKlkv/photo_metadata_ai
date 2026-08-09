@@ -118,10 +118,30 @@ describe('галерея экранов', () => {
     expect(html).toContain("classList.add('is-shown')");
   });
 
-  test('летающая частица появляется справа посередине', () => {
+  test('летающая частица появляется со случайного края документа', () => {
     const html = readScreens();
 
-    expect(html).toContain('pageX = window.scrollX + window.innerWidth * .88');
-    expect(html).toContain('pageY = window.scrollY + window.innerHeight * .5');
+    expect(html).toContain('spawnAtRandomOnPage()');
+    expect(html).toContain('pageX = docW * along');
+    expect(html).toContain('pageY = docH * along');
+    expect(html).toContain('heading = Math.random() * Math.PI * 2');
+    expect(html).not.toContain('spawnFromRandomEdge');
+    expect(html).not.toContain('pageX = Math.random() * docW');
+    // Фиксированная точка появления справа посередине больше не должна выигрывать.
+    expect(html).not.toContain('pageX = window.scrollX + window.innerWidth * .88');
+  });
+
+  test('частица screens: fixed + wrap по документу, не раздувает страницу', () => {
+    const html = readScreens();
+    const particleCss = html.match(/\.ambient-particle\s*\{([^}]*)\}/);
+
+    expect(particleCss).not.toBeNull();
+    expect(particleCss[1]).toMatch(/position:\s*fixed/);
+    expect(html).toContain('function wrapInDocument()');
+    expect(html).toContain('var spanY = docH + margin * 2');
+    expect(html).not.toContain('function wrapInViewport()');
+    expect(html).toContain(
+      "'translate3d(' + viewX.toFixed(1) + 'px,' + viewY.toFixed(1) + 'px,0) scale(' + scale.toFixed(2) + ')'"
+    );
   });
 });

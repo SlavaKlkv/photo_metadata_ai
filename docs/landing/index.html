@@ -23,6 +23,35 @@
 <meta name="twitter:title" content="Photo Metadata AI — метаданные для фотостоков за минуты">
 <meta name="twitter:description" content="AI генерирует метаданные для фотостоков, вшивает их в IPTC и выгружает в CSV. Десктопное приложение для macOS.">
 <meta name="twitter:image" content="https://slavaklkv.github.io/photo_metadata_ai/landing/og.png">
+<!-- Ранний маркер смены шапки: opaque class до первой отрисовки, без FOUC.
+     sessionStorage — та же вкладка; localStorage+TTL — новая (target=_blank). -->
+<script>
+(function () {
+  try {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      sessionStorage.removeItem('landing-header-swap');
+      try { localStorage.removeItem('landing-header-swap'); } catch (e0) {}
+      return;
+    }
+    sessionStorage.removeItem('landing-last-page');
+    var mark = false;
+    if (sessionStorage.getItem('landing-header-swap') === '1') {
+      mark = true;
+      sessionStorage.removeItem('landing-header-swap');
+    }
+    try {
+      var ts = localStorage.getItem('landing-header-swap');
+      if (ts != null) {
+        localStorage.removeItem('landing-header-swap');
+        var n = Number(ts);
+        // 5s — то же окно, что CROSS_TTL в header-swap.js
+        if (n && Date.now() - n < 5000) mark = true;
+      }
+    } catch (e1) { /* private mode */ }
+    if (mark) document.documentElement.classList.add('header-swap');
+  } catch (e) { /* private mode */ }
+})();
+</script>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -63,7 +92,8 @@
   * { box-sizing: border-box; }
 
   /* Тёмный canvas задан до первой отрисовки. Межстраничный View Transition намеренно
-     не используется: в Chrome он давал вспышку при возврате из screens.html. */
+     не используется: в Chrome он давал вспышку при возврате из screens.html.
+     Вместо него — opacity-swap шапки (header-swap.js + класс на <html>). */
   html { scroll-behavior: smooth; background: var(--bg); color-scheme: dark; }
 
   body {
@@ -104,9 +134,49 @@
     background: rgba(11, 11, 15, 0.92);
     box-shadow: 0 10px 30px -22px rgba(0, 0, 0, 1);
   }
+  /* Смена шапки peer index ↔ screens (header-swap.js):
+     — соседи бренда гаснут/проявляются;
+     — .brand на входе скрыт, brand-iris FLIP + handoff;
+     — .nav-cta не форсим: на главной сверху её прячет hero-cta-visible.
+     In-page (якоря, «Скачать») — только opacity у .nav-cta, шапку не гасим. */
+  html.header-swap .nav > :not(.brand),
+  html.header-swap-out .nav > :not(.brand) {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .32s cubic-bezier(.22, .8, .3, 1);
+  }
+  html.header-swap-out .nav > :not(.brand) { transition-duration: .22s; }
+  html.header-swap.header-swap-ready .nav > :not(.brand):not(.nav-cta) {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  /* Без hero-cta-visible .nav-cta проявляется вместе с соседями. */
+  html.header-swap.header-swap-ready .nav-cta {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  /* Специфичнее: дубль «Скачать» не мигает при peer fade-in. */
+  html.header-swap.header-swap-ready header.hero-cta-visible .nav-cta {
+    opacity: 0;
+    transform: translateY(-6px);
+    pointer-events: none;
+  }
+  html.header-swap .brand { opacity: 0; }
+  html.header-swap.header-swap-ready .brand { opacity: 1; transition: opacity .12s ease; }
+  /* Бренд на peer-leave остаётся. */
+  html.header-swap-out .brand { opacity: 1; }
 
-  .brand img { transition: transform .3s cubic-bezier(.22, .8, .3, 1); }
-  .brand:hover img { transform: rotate(-8deg) scale(1.08); }
+  /* При наведении на бренд лепестки затвора сходятся до упора, при уходе
+     курсора расходятся обратно. Двигается только диафрагма внутри метки:
+     геометрию покадрово пересчитывают модули brand-iris/, плитка неподвижна,
+     overflow подрезает всё, что вышло бы за её края. */
+  .brand-name { transition: color .3s ease, text-shadow .3s ease; }
+  /* Надпись отзывается вместе с затвором — сдержанно, без сдвига соседей. */
+  .brand:hover .brand-name,
+  .brand:focus-visible .brand-name {
+    color: #fff;
+    text-shadow: 0 0 16px rgba(139, 136, 248, .38);
+  }
 
   .nav {
     display: flex;
@@ -124,7 +194,14 @@
     margin-right: auto;
   }
   .brand:hover { text-decoration: none; }
-  .brand img { width: 30px; height: 30px; border-radius: 8px; }
+  /* Как в приложении: только метка-затвор, без плитки icon.svg. */
+  .brand-logo {
+    display: block;
+    flex: none;
+    width: 30px;
+    height: 30px;
+  }
+  .brand-mark { display: block; width: 100%; height: 100%; }
 
   .nav-links { display: flex; gap: 22px; font-size: 14.5px; }
   .nav-links a {
@@ -149,16 +226,21 @@
   .nav-links a.active { color: var(--text); }
   .nav-links a.active::after { transform: scaleX(1); }
 
-  /* Кнопка в шапке дублирует те, что в первом экране и в финальном блоке,
-     поэтому появляется, только когда ни одной из них не видно. Класс ставит
-     JS: без скрипта кнопка видна всегда — так безопаснее, чем спрятать её
-     насовсем. */
+  /* Кнопка «Скачать» в шапке — только когда hero/final CTA не в кадре.
+     По умолчанию (и в HTML) header уже с .hero-cta-visible: иначе при refresh
+     .nav-cta мелькал, пока скрипт внизу не спрячет. Без JS кнопка скрыта,
+     если hero в первом экране — для noscript ниже есть hero-cta. */
   header.hero-cta-visible .nav-cta {
     opacity: 0;
     transform: translateY(-6px);
     pointer-events: none;
   }
   .nav-cta {
+    /* transition только после первого sync (html.nav-cta-ready) — иначе
+       opacity 1→0 на refresh анимировалась как «вспышка». */
+    transition: none;
+  }
+  html.nav-cta-ready .nav-cta {
     transition: opacity .25s ease, transform .25s cubic-bezier(.22, .8, .3, 1),
                 background .18s ease, border-color .18s ease;
   }
@@ -258,82 +340,75 @@
   }
   .hero > * { position: relative; }
 
-  /* Мягкий световой «пылинка-туман»: несколько размытых пятен без хвоста и без
-     чёткой круглой границы — не комета и не точка. */
+  /* Искра, а не облако: точечное ядро с мягким ореолом. Крупное размытое пятно
+     ловило взгляд и мешало читать — искра держится на периферии внимания. */
   .ambient-particle {
+    /* fixed: не расширяет scrollHeight (в отличие от absolute за краем).
+       Логика полёта в page-space; transform = page − scroll — едет со страницей. */
     position: fixed;
     top: 0;
     left: 0;
     z-index: 9;
-    width: 56px;
-    height: 56px;
-    margin-left: -28px;
-    margin-top: -28px;
-    border-radius: 58% 42% 63% 37% / 46% 54% 46% 54%;
+    width: 18px;
+    height: 18px;
+    margin-left: -9px;
+    margin-top: -9px;
+    border-radius: 50%;
     background:
-      radial-gradient(45% 42% at 38% 40%, rgba(236, 232, 255, .55) 0%, rgba(186, 176, 255, .22) 42%, transparent 72%),
-      radial-gradient(38% 40% at 62% 58%, rgba(148, 136, 248, .28) 0%, transparent 70%),
-      radial-gradient(55% 50% at 52% 48%, rgba(120, 108, 235, .12) 0%, transparent 78%);
-    filter: blur(5px) saturate(1.08);
+      radial-gradient(circle at 50% 50%, rgba(252, 250, 255, .5) 0%, rgba(196, 189, 255, .24) 34%, transparent 68%);
+    filter: blur(.6px);
     mix-blend-mode: screen;
     opacity: 0;
     pointer-events: none;
     will-change: transform, opacity, filter;
-    transition: opacity .4s cubic-bezier(.2,0,.3,1), filter .4s ease;
-    animation: particle-morph 7.2s ease-in-out infinite alternate;
+    transition: opacity .5s cubic-bezier(.2,0,.3,1), filter .5s ease;
   }
+  /* Ореол отдельным слоем — иначе, чтобы получить свечение, пришлось бы
+     размывать само ядро, и искра снова расплылась бы в пятно. */
   .ambient-particle::before {
     content: "";
     position: absolute;
-    left: 8px;
-    top: 10px;
-    width: 28px;
-    height: 26px;
-    border-radius: 48% 52% 41% 59% / 55% 42% 58% 45%;
-    background: radial-gradient(ellipse at 50% 45%, rgba(255, 252, 255, .42), rgba(198, 190, 255, .16) 48%, transparent 78%);
-    filter: blur(3px);
-    animation: particle-breathe 4.2s ease-in-out infinite alternate;
+    inset: -10px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%, rgba(152, 143, 246, .26), transparent 64%);
+    filter: blur(5px);
+    animation: particle-halo 6.4s ease-in-out infinite alternate;
   }
+  /* Ядро едва заметно дышит: искра живая, но не мигает и не зовёт кликнуть. */
   .ambient-particle::after {
     content: "";
     position: absolute;
-    right: 4px;
-    bottom: 6px;
-    width: 24px;
-    height: 22px;
-    border-radius: 61% 39% 52% 48% / 43% 57% 43% 57%;
-    background: radial-gradient(ellipse at 45% 50%, rgba(157, 145, 250, .26), transparent 74%);
-    filter: blur(5.5px);
-    animation: particle-drift 5.4s ease-in-out infinite alternate;
+    inset: 6px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .92);
+    filter: blur(1.1px);
+    animation: particle-twinkle 5.6s ease-in-out infinite;
   }
-  .ambient-particle.is-moving { opacity: .72; }
+  .ambient-particle.is-moving { opacity: .55; }
 
-  @keyframes particle-morph {
-    from { border-radius: 58% 42% 63% 37% / 46% 54% 46% 54%; }
-    to { border-radius: 41% 59% 38% 62% / 57% 40% 60% 43%; }
+  @keyframes particle-halo {
+    from { opacity: .5; transform: scale(.92); }
+    to { opacity: .82; transform: scale(1.1); }
   }
-  @keyframes particle-breathe {
-    from { opacity: .55; transform: translate(-2px, 3px) scale(.88); }
-    to { opacity: 1; transform: translate(3px, -2px) scale(1.12); }
-  }
-  @keyframes particle-drift {
-    from { opacity: .4; transform: translate(2px, -3px) scale(.9); }
-    to { opacity: .85; transform: translate(-3px, 2px) scale(1.18); }
+  @keyframes particle-twinkle {
+    0%, 100% { opacity: .72; transform: scale(1); }
+    44% { opacity: .96; transform: scale(1.08); }
+    74% { opacity: .6; transform: scale(.94); }
   }
 
-  /* Прозрачность при пролёте над блоками с контентом: частица становится едва заметной, чтобы не мешать чтению */
+  /* Прозрачность при пролёте над блоками с контентом: искра становится едва заметной, чтобы не мешать чтению */
   .ambient-particle.is-dimmed {
-    opacity: .08 !important;
-    filter: blur(7px) saturate(.8);
+    opacity: .07 !important;
+    filter: blur(1.4px);
   }
 
-  /* Рядом с курсором пятно чуть ярче, но остаётся мягким. */
+  /* Рядом с курсором искра чуть ярче, но остаётся спокойной. */
   .ambient-particle.is-near-cursor {
-    opacity: .86;
-    filter: blur(4px) saturate(1.22) drop-shadow(0 0 8px rgba(159, 146, 255, .32));
+    opacity: .74;
+    filter: blur(.4px) drop-shadow(0 0 6px rgba(166, 157, 255, .34));
   }
   .ambient-particle.is-impulsed {
-    filter: blur(3.5px) saturate(1.35) drop-shadow(0 0 12px rgba(181, 170, 255, .4));
+    filter: blur(.3px) drop-shadow(0 0 9px rgba(194, 186, 255, .44));
   }
 
   /* Текст слева, окно приложения справа. Правая колонка чуть шире:
@@ -526,12 +601,17 @@
      3D (rotateY -9°, rotateX 1.6°) окно визуально сплющивается по вертикали,
      поэтому в CSS оно заметно выше — 8:7. Ширина чуть меньше колонки: окно
      не должно распирать hero от края до края. */
+  /* Нижняя граница clamp — не «читаемый минимум», а точка, ниже которой окно
+     ломается: рамка продолжает сжиматься с колонкой, а начинка уже нет, и
+     нижнее поле Metadata Preview срезается. Самая узкая двухколоночная hero —
+     около 1000px ширины окна (дальше hero разворачивается в одну колонку и
+     мокап снова широкий), там 100cqi/620 даёт ~.74px. */
   .mock {
-    --u: clamp(.78px, calc(100cqi / 620), 1.04px);
+    --u: clamp(.73px, calc(100cqi / 620), 1.04px);
     position: relative;
     width: 92%;
     margin-inline: auto;
-    aspect-ratio: 8 / 7.6;
+    aspect-ratio: 8 / 7.3;
     display: flex;
     flex-direction: column;
     transform: translateZ(0);
@@ -714,19 +794,22 @@
   .mock-chips {
     display: flex;
     flex-wrap: wrap;
-    gap: calc(4 * var(--u));
-    margin: 0 0 calc(10 * var(--u));
+    gap: calc(3.5 * var(--u));
+    margin: 0 0 calc(9 * var(--u));
   }
+  /* Фильтры не должны распирать панель от края до края: в приложении это
+     вспомогательная полоса, а не главный элемент экрана. Поэтому чипы чуть
+     мельче подписей в строках и оставляют запас справа. */
   .mock-chips span {
     display: inline-flex;
     align-items: center;
-    gap: calc(4 * var(--u));
-    padding: calc(3.5 * var(--u)) calc(6.5 * var(--u));
+    gap: calc(3.5 * var(--u));
+    padding: calc(3 * var(--u)) calc(5.5 * var(--u));
     border: 1px solid rgba(255, 255, 255, .075);
-    border-radius: calc(5.5 * var(--u));
+    border-radius: calc(5 * var(--u));
     background: rgba(255, 255, 255, .022);
     color: #aaa9b5;
-    font-size: calc(6.8 * var(--u));
+    font-size: calc(6.4 * var(--u));
     white-space: nowrap;
   }
   .mock-chips .on {
@@ -735,11 +818,18 @@
     color: #e5e4ec;
     box-shadow: inset 0 0 calc(8 * var(--u)) rgba(139, 136, 248, .05);
   }
-  .mock-chips i { width: calc(4 * var(--u)); height: calc(4 * var(--u)); border-radius: 50%; }
+  /* Точки статуса — только в фильтрах: там они легенда, объясняющая счётчики.
+     В строках списка их нет намеренно: мокап — оживлённая демонстрация
+     интерфейса, и лишняя мелочь в каждой строке только дробит её. */
+  .mock-chips i {
+    flex: 0 0 auto;
+    width: calc(4 * var(--u));
+    height: calc(4 * var(--u));
+    border-radius: 50%;
+  }
   .dot-ok { background: #49bd87; box-shadow: 0 0 calc(4 * var(--u)) rgba(73, 189, 135, .42); }
   .dot-warn { background: #dda64f; box-shadow: 0 0 calc(4 * var(--u)) rgba(221, 166, 79, .36); }
   .dot-err { background: #e4696e; box-shadow: 0 0 calc(4 * var(--u)) rgba(228, 105, 110, .34); }
-  .dot-process { background: #8d8b98; }
 
   .mock-rows {
     flex: 1 1 auto;
@@ -748,17 +838,24 @@
     grid-auto-rows: minmax(calc(22 * var(--u)), 1fr);
     gap: calc(4.5 * var(--u));
     align-content: stretch;
+    /* Отбивка до итоговой строки: иначе линия mock-foot прилипает к последней
+       строке списка, хотя между остальными строками есть просвет. */
+    margin-bottom: calc(5 * var(--u));
   }
+  /* Последняя колонка фиксированной ширины, а не auto: у auto её размер задаёт
+     самый длинный провайдер *в своей строке*, поэтому у каждой строки колонки
+     получались свои — заголовки и плашки провайдеров шли лестницей. Фиксация
+     делает список таблицей: у всех строк одни и те же границы колонок. */
   .mock-row {
     position: relative;
     display: grid;
     grid-template-columns:
-      calc(11 * var(--u)) calc(23 * var(--u))
-      minmax(0, 1fr) minmax(0, 1.15fr) auto;
+      calc(11 * var(--u)) calc(24 * var(--u))
+      minmax(0, 1fr) minmax(0, 1.15fr) calc(50 * var(--u));
     align-items: center;
     gap: calc(7 * var(--u));
     min-height: calc(22 * var(--u));
-    padding: calc(5 * var(--u)) calc(5.5 * var(--u));
+    padding: calc(4 * var(--u)) calc(5.5 * var(--u));
     border: 1px solid transparent;
     border-radius: calc(6 * var(--u));
     overflow: hidden;
@@ -801,9 +898,12 @@
     border-bottom: calc(1.1 * var(--u)) solid #fff;
     transform: rotate(41deg);
   }
+  /* Кадр в строке — 4:3 во всю высоту строки за вычетом её отступов: в
+     приложении превью занимает строку почти целиком, а не висит точкой
+     в середине. */
   .mock-thumb {
     position: relative;
-    height: calc(17 * var(--u));
+    height: calc(18 * var(--u));
     border: 1px solid rgba(255, 255, 255, .09);
     border-radius: calc(3.5 * var(--u));
     overflow: hidden;
@@ -811,6 +911,13 @@
       radial-gradient(circle at 68% 38%, #e79d52 0 8%, transparent 9%),
       radial-gradient(ellipse at 59% 52%, #3986a0 0 14%, transparent 15%),
       linear-gradient(165deg, #9ac6d2 0 42%, #3d7181 43% 62%, #1d3440 63%);
+    /* После шорткода: плитка градиента по умолчанию равна padding-box, а
+       закрашивается border-box, поэтому рамка в 1px добирается повтором —
+       сверху проступает низ картинки, снизу верх. На кадре в полсотни
+       пикселей это читалось как штрих за рамкой: молния t4 «продолжалась»
+       над и под превью. Отсюда же background-image у t1…t8 — шорткод
+       сбросил бы origin обратно. */
+    background-origin: border-box;
     box-shadow: inset 0 0 calc(5 * var(--u)) rgba(0, 0, 0, .3);
   }
   .mock-thumb::after {
@@ -820,46 +927,62 @@
     background: linear-gradient(130deg, rgba(255, 255, 255, .16), transparent 36% 75%, rgba(0, 0, 0, .22));
   }
   .mock-thumb.t1 {
-    background:
+    background-image:
       repeating-conic-gradient(from 25deg at 48% 52%, #b98a53 0 10deg, #674b31 11deg 21deg, #2d241e 22deg 30deg);
   }
   .mock-thumb.t2 {
-    background:
+    background-image:
       radial-gradient(ellipse at 62% 43%, #18231b 0 10%, transparent 11%),
       radial-gradient(circle at 69% 37%, #d6b363 0 4%, transparent 5%),
       linear-gradient(164deg, #a8b982 0 44%, #5d794d 45% 67%, #253522 68%);
   }
   .mock-thumb.t3 {
-    background:
+    background-image:
       radial-gradient(ellipse at 60% 48%, #2f86a8 0 12%, transparent 13%),
       radial-gradient(circle at 69% 52%, #dd883d 0 6%, transparent 7%),
       linear-gradient(164deg, #96b5ba 0 43%, #4f6d69 44% 65%, #243b36 66%);
   }
   .mock-thumb.t4 {
-    background:
-      linear-gradient(104deg, transparent 0 43%, rgba(247, 240, 255, .95) 44% 46%, transparent 47%),
+    background-image:
       radial-gradient(ellipse at 38% 22%, rgba(225, 210, 255, .6), transparent 42%),
       linear-gradient(177deg, #8a74a8 0 59%, #43385e 60% 79%, #191322 80%);
   }
+  /* Молния в миниатюре — та же фигура, что и на большом превью. Полосой
+     градиента она не рисуется: линия идёт через весь кадр от края до края и
+     читается как царапина, а не как разряд в небе. */
+  .mock-thumb.t4::before {
+    content: "";
+    position: absolute;
+    top: 10%;
+    left: 45%;
+    width: calc(3 * var(--u));
+    height: 47%;
+    background: linear-gradient(#fff, #ded4ff);
+    clip-path: polygon(44% 0, 72% 0, 54% 36%, 83% 36%, 23% 100%, 40% 54%, 14% 54%);
+    filter: drop-shadow(0 0 calc(2 * var(--u)) rgba(226, 216, 255, .75));
+    transform: rotate(7deg);
+  }
   .mock-thumb.t5 {
-    background:
+    background-image:
       radial-gradient(ellipse at 72% 31%, #f2c77b 0 7%, transparent 8%),
       linear-gradient(168deg, #ddaa68 0 45%, #a56e3a 46% 64%, #51341f 65% 78%, #251914 79%);
   }
   .mock-thumb.t6 {
-    background:
+    background-image:
       radial-gradient(circle at 63% 45%, #d8c8a4 0 9%, transparent 10%),
       radial-gradient(circle at 60% 43%, #171714 0 2%, transparent 3%),
       linear-gradient(165deg, #90a77e 0 42%, #54674b 43% 65%, #263126 66%);
   }
+  /* 047 — единственный тёплый кадр среди зелёных: в превью на полсотни
+     пикселей t2, t6 и t7 сливались в одно пятно. */
   .mock-thumb.t7 {
-    background:
-      radial-gradient(ellipse at 58% 46%, #7f79d8 0 11%, transparent 12%),
-      radial-gradient(circle at 65% 39%, #e8d9a8 0 4%, transparent 5%),
-      linear-gradient(160deg, #b9c6a4 0 41%, #6f8261 42% 66%, #2b3627 67%);
+    background-image:
+      radial-gradient(ellipse at 58% 46%, #5d1b1f 0 11%, transparent 12%),
+      radial-gradient(circle at 65% 39%, #edc9a0 0 4%, transparent 5%),
+      linear-gradient(160deg, #c1897c 0 41%, #8a4a42 42% 66%, #33201f 67%);
   }
   .mock-thumb.t8 {
-    background:
+    background-image:
       radial-gradient(ellipse at 54% 58%, #e7e3d8 0 13%, transparent 14%),
       radial-gradient(circle at 47% 52%, #4b4034 0 4%, transparent 5%),
       linear-gradient(172deg, #cfd8e2 0 46%, #8fa0ae 47% 68%, #46525c 69%);
@@ -879,6 +1002,7 @@
     white-space: nowrap;
   }
   .mock-prov {
+    justify-self: start;
     padding: calc(2.5 * var(--u)) calc(5 * var(--u));
     border-radius: calc(4 * var(--u));
     background: rgba(255, 255, 255, .055);
@@ -899,19 +1023,25 @@
   .mock-foot em { color: var(--accent-2); font-style: normal; }
 
   /* Кадр из выбранной строки: гроза в сумерках с мягко пульсирующим небом
-     и короткой вспышкой молнии. Ширину задаёт доля preview-панели (2/3), а
-     высота считается из неё по 4:3 — так кадр остаётся фотографией, а не
-     панорамой, и его размер не зависит от того, сколько места осталось по
-     вертикали. Раньше было наоборот (высота от flex, ширина из неё), и кадр
-     ужимался до ~55% панели. align-self: center отключает flex-растяжку по
-     ширине и центрует кадр; flex: 0 0 auto не даёт соседям его сплющить.
+     и короткой вспышкой молнии. Кадр — единственный тянущийся элемент панели:
+     подписи и поля высотой строго по тексту, а весь остаток высоты забирает
+     он. Так пропорция окна (aspect-ratio у .mock) остаётся свободным
+     параметром: окно ниже — кадр меньше, окно выше — кадр крупнее, и ни при
+     каком значении Category не выдавливается за нижний край, а панель не
+     заканчивается пустотой. Ширина считается из высоты по 4:3 (width: auto),
+     поэтому кадр всегда фотография, а не панорама; align-self: center
+     отключает flex-растяжку по ширине и центрует его. Ограничители нужны на
+     краях диапазона: min — чтобы кадр не выродился в полоску, max (≈94%
+     ширины панели) — чтобы он не упёрся в её края и не потерял 4:3.
      Габариты окна и слои 3D при этом не трогаются. */
   .mock-photo {
     position: relative;
-    flex: 0 0 auto;
+    flex: 1 1 auto;
     align-self: center;
-    width: 66.6%;
+    width: auto;
     max-width: 100%;
+    min-height: calc(76 * var(--u));
+    max-height: calc(142 * var(--u));
     aspect-ratio: 4 / 3;
     margin: 0 0 calc(8 * var(--u));
     border: 1px solid rgba(255, 255, 255, .11);
@@ -921,6 +1051,9 @@
       radial-gradient(ellipse at 35% 22%, rgba(231, 218, 255, .58), transparent 34%),
       radial-gradient(ellipse at 70% 42%, rgba(153, 126, 188, .32), transparent 42%),
       linear-gradient(178deg, #75638f 0 55%, #4b3f68 56% 73%, #28223a 74% 84%, #15121e 85%);
+    /* См. .mock-thumb: без этого рамка в 1px добирается повтором плитки и
+       снизу кадра проступала светлая полоса неба. */
+    background-origin: border-box;
     box-shadow:
       inset 0 0 calc(18 * var(--u)) rgba(16, 12, 26, .34),
       0 calc(7 * var(--u)) calc(15 * var(--u)) calc(-12 * var(--u)) #000;
@@ -1029,26 +1162,26 @@
   }
   /* Поля высотой строго по тексту: пустые строки внутри рамки выглядят как
      недозаполненная форма, а не как заполненная AI карточка. */
-  .mock-field.description,
   .mock-field.keywords {
     color: #a9a8b3;
     line-height: 1.28;
   }
   .mock-preview .mock-label-line,
   .mock-preview .mock-field { flex: 0 0 auto; }
-  /* Высота панели задана пропорциями окна, а внутрь идут кадр и четыре поля
-     фиксированной высоты — запас панель отдаёт вертикальными интервалами.
-     Ужимаем только по вертикали и только в preview: боковые отступы держат
-     ширину колонки (от неё считается 2/3 кадра), а левая панель Results
-     остаётся с прежним воздухом. */
-  .mock-preview { padding-block: calc(9 * var(--u)); }
+  /* В панель влезают кадр и три поля: Title, Keywords, Category. Description
+     здесь нет намеренно: при нынешней пропорции окна четвёртое поле сначала
+     съедает кадр до минимума, а потом всё равно выдавливает Category за нижний
+     край — а именно категория показывает, что приложение заполняет и стоковые
+     справочники, а не только текст. Интервалы держим чуть плотнее базовых:
+     запас по высоте уходит кадру. */
+  .mock-preview { padding-block: calc(10 * var(--u)); }
   .mock-preview .mock-panel-top { margin-bottom: calc(7 * var(--u)); }
-  .mock-preview .mock-label-line { margin-bottom: calc(3 * var(--u)); }
+  .mock-preview .mock-label-line { margin-bottom: calc(3.5 * var(--u)); }
   .mock-preview .mock-field {
-    padding-block: calc(5 * var(--u));
-    margin-bottom: calc(6 * var(--u));
+    padding-block: calc(6 * var(--u));
+    margin-bottom: calc(7 * var(--u));
   }
-  .mock-preview .mock-field u { margin-top: calc(2 * var(--u)); }
+  .mock-preview .mock-field u { margin-top: calc(3 * var(--u)); }
   .mock-preview .mock-field.mock-category { margin-bottom: 0; }
   .mock-field u {
     display: block;
@@ -2673,6 +2806,10 @@
     /* Узкий hero: только Results; Metadata Preview прячем. */
     .mock-cols { grid-template-columns: 1fr; }
     .mock-preview { display: none; }
+    /* На узком экране окно ниже, а строка списка меньше 22u не становится:
+       восемь строк перестают помещаться и наезжают на полосу шагов. Показываем
+       пять — выбранная строка (четвёртая) остаётся на виду. */
+    .mock-row:nth-child(n+6) { display: none; }
     .thumbs { grid-template-columns: repeat(2, 1fr); }
     .platforms { gap: 14px 26px; }
     .platforms b { font-size: 15px; }
@@ -2688,8 +2825,8 @@
     #install pre { padding: 16px; font-size: 13px; }
     .mock-row {
       grid-template-columns:
-        calc(11 * var(--u)) calc(23 * var(--u))
-        minmax(0, 1fr) auto;
+        calc(11 * var(--u)) calc(24 * var(--u))
+        minmax(0, 1fr) calc(50 * var(--u));
     }
     .mock-title { display: none; }
     .mock-chips span { padding-inline: calc(5 * var(--u)); }
@@ -2697,6 +2834,15 @@
   }
   @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
+    html.header-swap .nav > :not(.brand),
+    html.header-swap.header-swap-ready .nav > :not(.brand),
+    html.header-swap-out .nav > :not(.brand),
+    html.header-swap .brand,
+    html.header-swap.header-swap-ready .brand {
+      opacity: 1;
+      pointer-events: auto;
+      transition: none;
+    }
     .nav-links a, .nav-links a::after { transition: none; }
     /* Ничего не движется: показываем всё сразу и глушим анимации. */
     .reveal, .reveal.in { opacity: 1; transform: none; transition: none; }
@@ -2726,7 +2872,10 @@
     .nav-cta { transition: opacity .2s ease; }
     header.hero-cta-visible .nav-cta { transform: none; }
     h1 .grad { animation: none; }
-    .brand:hover img { transform: none; }
+    /* Затвор остаётся раскрытым (это же проверяют модули brand-iris/), надпись
+       не подсвечивается. */
+    .brand:hover .brand-name,
+    .brand:focus-visible .brand-name { color: var(--text); text-shadow: none; }
     .to-top { transition: opacity .2s ease; transform: none; }
     .to-top:hover svg { animation: none; }
     .reveal.in .stack tr, .reveal .stack tr { animation: none; opacity: 1; }
@@ -2795,13 +2944,23 @@
 </head>
 <body>
 
+<!-- Якорь «наверх» в самом начале документа: id на <main> останавливал
+     прокрутку у начала main (ниже sticky-шапки), а не у scrollY = 0. -->
+<span id="top" aria-hidden="true"></span>
+
 <span class="ambient-particle" aria-hidden="true"></span>
 
-<header>
+<header class="hero-cta-visible">
   <div class="wrap nav">
     <a class="brand" href="#top">
-      <img src="icon.svg" width="30" height="30" alt="">
-      Photo Metadata AI
+      <span class="brand-logo" aria-hidden="true">
+        <!-- Координаты затвора 0…31.875 — те же, что в frontend/logo.svg и brand-iris/geometry.js. -->
+        <svg class="brand-mark" viewBox="0 0 31.875 31.875" fill="none" aria-hidden="true">
+          <!-- brand-iris/ подменяет d при наведении. -->
+          <path class="brand-blades" d="M8.32812 29.4688L7.26562 27.6094L14.0625 23.6875L13.3438 23.3281C12.5833 22.974 11.8229 22.599 11.0625 22.2031C10.3125 21.8073 9.57292 21.3958 8.84375 20.9688L0.34375 16.0625L1.40625 14.2188L8.3125 18.2031C8.22917 17.849 8.16146 17.4792 8.10938 17.0938C8.06771 16.7083 8.04688 16.3229 8.04688 15.9375V2.51562H10.1719V10.4531C10.9635 9.89062 11.7812 9.33854 12.625 8.79688C13.4792 8.25521 14.3333 7.73438 15.1875 7.23438L23.5469 2.40625L24.625 4.26562L17.8125 8.1875L18.125 8.3125C18.9479 8.69792 19.7656 9.10938 20.5781 9.54688C21.401 9.98438 22.2135 10.4323 23.0156 10.8906L31.5312 15.7969L30.4844 17.6562L23.5625 13.6719C23.6458 14.026 23.7083 14.3958 23.75 14.7812C23.8021 15.1562 23.8281 15.5417 23.8281 15.9375V29.3594H21.7188V21.4062C20.9167 21.9792 20.0885 22.5365 19.2344 23.0781C18.3906 23.6198 17.5312 24.1458 16.6562 24.6562L8.32812 29.4688ZM15.9375 21.7031C17 21.7031 17.9635 21.4427 18.8281 20.9219C19.7031 20.401 20.401 19.7083 20.9219 18.8438C21.4427 17.9688 21.7031 17 21.7031 15.9375C21.7031 14.875 21.4427 13.9115 20.9219 13.0469C20.401 12.1719 19.7031 11.474 18.8281 10.9531C17.9635 10.4323 17 10.1719 15.9375 10.1719C14.875 10.1719 13.9062 10.4323 13.0312 10.9531C12.1667 11.474 11.474 12.1719 10.9531 13.0469C10.4323 13.9115 10.1719 14.875 10.1719 15.9375C10.1719 17 10.4323 17.9688 10.9531 18.8438C11.474 19.7083 12.1667 20.401 13.0312 20.9219C13.9062 21.4427 14.875 21.7031 15.9375 21.7031ZM15.9375 31.875C13.7396 31.875 11.6771 31.4583 9.75 30.625C7.82292 29.8021 6.13021 28.6615 4.67188 27.2031C3.21354 25.7448 2.06771 24.0521 1.23438 22.125C0.411458 20.1979 0 18.1354 0 15.9375C0 13.7396 0.411458 11.6771 1.23438 9.75C2.06771 7.82292 3.21354 6.13021 4.67188 4.67188C6.13021 3.20312 7.82292 2.05729 9.75 1.23438C11.6771 0.411458 13.7396 0 15.9375 0C18.1354 0 20.1979 0.411458 22.125 1.23438C24.0521 2.05729 25.7448 3.20312 27.2031 4.67188C28.6615 6.13021 29.8021 7.82292 30.625 9.75C31.4583 11.6771 31.875 13.7396 31.875 15.9375C31.875 18.1354 31.4583 20.1979 30.625 22.125C29.8021 24.0521 28.6615 25.7448 27.2031 27.2031C25.7448 28.6615 24.0521 29.8021 22.125 30.625C20.1979 31.4583 18.1354 31.875 15.9375 31.875ZM15.9375 29.2188C17.7708 29.2188 19.4896 28.875 21.0938 28.1875C22.6979 27.5 24.1094 26.5469 25.3281 25.3281C26.5469 24.1094 27.5 22.6979 28.1875 21.0938C28.875 19.4896 29.2188 17.7708 29.2188 15.9375C29.2188 14.1042 28.875 12.3854 28.1875 10.7812C27.5 9.16667 26.5469 7.75521 25.3281 6.54688C24.1094 5.32812 22.6979 4.375 21.0938 3.6875C19.4896 3 17.7708 2.65625 15.9375 2.65625C14.1042 2.65625 12.3854 3 10.7812 3.6875C9.17708 4.375 7.76562 5.32812 6.54688 6.54688C5.32812 7.75521 4.375 9.16667 3.6875 10.7812C3 12.3854 2.65625 13.7396 2.65625 15.9375C2.65625 17.7708 3 19.4896 3.6875 21.0938C4.375 22.6979 5.32812 24.1094 6.54688 25.3281C7.76562 26.5469 9.17708 27.5 10.7812 28.1875C12.3854 28.875 14.1042 29.2188 15.9375 29.2188Z" fill="#9191F3"/>
+        </svg>
+      </span>
+      <span class="brand-name">Photo Metadata AI</span>
     </a>
     <nav class="nav-links" id="nav-links">
       <a href="#features">Возможности</a>
@@ -2814,7 +2973,7 @@
   </div>
 </header>
 
-<main id="top">
+<main>
 
   <!-- HERO -->
   <div class="hero">
@@ -2853,7 +3012,7 @@
                 </div>
                 <div class="mock-body" aria-hidden="true">
                   <div class="mock-head">
-                    <img src="icon.svg" width="20" height="20" alt="">
+                    <img src="logo.svg" width="20" height="20" alt="">
                     <div>
                       <b>Photo Metadata AI</b>
                       <small>Prepare your photos for stock platforms in minutes</small>
@@ -2886,56 +3045,56 @@
                           <span class="mock-check"></span>
                           <span class="mock-thumb t1"></span>
                           <span class="mock-name">026_001117_15-44-2…</span>
-                          <span class="mock-title"><i class="dot-ok"></i><span>Persian Ceramic Tile…</span></span>
+                          <span class="mock-title"><span>Persian Ceramic Tile…</span></span>
                           <span class="mock-prov">QWEN 2.5 VL</span>
                         </div>
                         <div class="mock-row">
                           <span class="mock-check"></span>
                           <span class="mock-thumb t2"></span>
                           <span class="mock-name">027_002_Asian_gree…</span>
-                          <span class="mock-title"><i class="dot-ok"></i><span>Two Green Bee-eaters…</span></span>
+                          <span class="mock-title"><span>Two Green Bee-eaters…</span></span>
                           <span class="mock-prov">OpenRouter</span>
                         </div>
                         <div class="mock-row">
                           <span class="mock-check"></span>
                           <span class="mock-thumb t3"></span>
                           <span class="mock-name">038_003_Ringed_kin…</span>
-                          <span class="mock-title"><i class="dot-ok"></i><span>Kingfisher with Catch…</span></span>
+                          <span class="mock-title"><span>Kingfisher with Catch…</span></span>
                           <span class="mock-prov">Gemini</span>
                         </div>
                         <div class="mock-row on">
                           <span class="mock-check"></span>
                           <span class="mock-thumb t4"></span>
                           <span class="mock-name">040_004_2018_05_1…</span>
-                          <span class="mock-title"><i class="dot-warn"></i><span>Lightning Storm at…</span></span>
+                          <span class="mock-title"><span>Lightning Storm at…</span></span>
                           <span class="mock-prov">QWEN 2.5 VL</span>
                         </div>
                         <div class="mock-row">
                           <span class="mock-check"></span>
                           <span class="mock-thumb t5"></span>
                           <span class="mock-name">052_006_Dune_45_i…</span>
-                          <span class="mock-title"><i class="dot-ok"></i><span>Giant Orange Sand…</span></span>
+                          <span class="mock-title"><span>Giant Orange Sand…</span></span>
                           <span class="mock-prov">OpenRouter</span>
                         </div>
                         <div class="mock-row">
                           <span class="mock-check"></span>
                           <span class="mock-thumb t6"></span>
                           <span class="mock-name">043_004_Great_horn…</span>
-                          <span class="mock-title"><i class="dot-ok"></i><span>Majestic Owl Perched…</span></span>
+                          <span class="mock-title"><span>Majestic Owl Perched…</span></span>
                           <span class="mock-prov">Gemini</span>
                         </div>
                         <div class="mock-row">
                           <span class="mock-check"></span>
                           <span class="mock-thumb t7"></span>
                           <span class="mock-name">047_005_Lilac-breast…</span>
-                          <span class="mock-title"><i class="dot-err"></i><span>Lilac-breasted Roller…</span></span>
+                          <span class="mock-title"><span>Lilac-breasted Roller…</span></span>
                           <span class="mock-prov">QWEN 2.5 VL</span>
                         </div>
                         <div class="mock-row">
                           <span class="mock-check"></span>
                           <span class="mock-thumb t8"></span>
                           <span class="mock-name">055_006_Wild_Baby_…</span>
-                          <span class="mock-title"><i class="dot-ok"></i><span>Winter Wildlife Scene…</span></span>
+                          <span class="mock-title"><span>Winter Wildlife Scene…</span></span>
                           <span class="mock-prov">QWEN 2.5 VL</span>
                         </div>
                       </div>
@@ -2969,15 +3128,6 @@
                       <div class="mock-field">
                         Lightning Storm at Twilight
                         <u>27/200 characters</u>
-                      </div>
-                      <div class="mock-label-line">
-                        <span class="mock-label">Description</span>
-                        <span class="mock-field-state">AI generated</span>
-                      </div>
-                      <div class="mock-field description">
-                        A dramatic scene of lightning illuminating the night sky during
-                        a thunderstorm.
-                        <u>79/2000 characters</u>
                       </div>
                       <div class="mock-label-line">
                         <span class="mock-label edited">Keywords</span>
@@ -3476,6 +3626,12 @@ ollama pull qwen2.5vl</code></pre>
 </footer>
 
 <script src="ambient-particle-flags.js"></script>
+<script src="brand-iris/geometry.js"></script>
+<script src="brand-iris/motion.js"></script>
+<script src="brand-iris/handoff.js"></script>
+<script src="brand-iris/presence.js"></script>
+<script src="brand-iris/init.js"></script>
+<script src="header-swap.js"></script>
 <script>
   // Подсветка активного пункта меню: берём самую верхнюю секцию,
   // которая уже пересекла нижнюю границу шапки.
@@ -3619,21 +3775,51 @@ ollama pull qwen2.5vl</code></pre>
 
   // Кнопка «Скачать» в шапке нужна только когда такой же кнопки нет на экране:
   // на первом экране и в финальном блоке они бы дублировались.
+  // Только opacity самой кнопки — шапку (nav-links) не гасим: иначе якорь
+  // top → раздел давал full fade через compose.
   (function () {
     var header = document.querySelector('header');
+    var root = document.documentElement;
     var ctas = [document.getElementById('hero-cta'), document.getElementById('final-cta')]
       .filter(Boolean);
-    if (!header || !ctas.length || !('IntersectionObserver' in window)) return;
+    if (!header || !ctas.length) return;
 
-    // Состояние держим по каждому блоку отдельно: со счётчиком легко
-    // разъехаться на стартовых колбэках наблюдателя.
-    var shown = [];
+    // rootMargin совпадает с IO: верх режем на высоту sticky-шапки.
+    var topPad = 72;
+
+    function ctaInView(el) {
+      var r = el.getBoundingClientRect();
+      return r.bottom > topPad && r.top < window.innerHeight;
+    }
+
+    function syncCta() {
+      header.classList.toggle('hero-cta-visible', ctas.some(ctaInView));
+    }
+
+    // Сразу по layout — до paint со transition и без ожидания IO.
+    syncCta();
+    // scroll restoration / шрифты: повтор на следующем кадре.
+    if (window.requestAnimationFrame) {
+      window.requestAnimationFrame(function () {
+        syncCta();
+        root.classList.add('nav-cta-ready');
+      });
+    } else {
+      root.classList.add('nav-cta-ready');
+    }
+
+    if (!('IntersectionObserver' in window)) return;
+
+    // Состояние по каждому блоку: IO уточняет при скролле.
+    var shown = ctas.map(ctaInView);
+    header.classList.toggle('hero-cta-visible', shown.some(Boolean));
+
     var io = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
         shown[ctas.indexOf(entry.target)] = entry.isIntersecting;
       });
       header.classList.toggle('hero-cta-visible', shown.some(Boolean));
-    }, { rootMargin: '-72px 0px 0px 0px' });
+    }, { rootMargin: '-' + topPad + 'px 0px 0px 0px' });
 
     ctas.forEach(function (cta) { io.observe(cta); });
   })();
@@ -3701,13 +3887,14 @@ ollama pull qwen2.5vl</code></pre>
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     if (!particle) return;
 
-    // pageX/pageY — позиция в документе; viewX/viewY — в viewport для fixed-transform.
+    // pageX/pageY — логическая позиция в документе. viewX/viewY — client-координаты
+    // для fixed-transform и hit-test (elementFromPoint, clientX/Y).
     var pageX;
     var pageY;
     var viewX;
     var viewY;
-    var heading = Math.PI * -.15; // от левого низа — вправо-вверх по странице
-    var speed = 70;
+    var heading = 0; // задаётся при появлении: spawnAtRandomOnPage()
+    var speed = 30;
     var last = 0;
     var margin = 40;
     var phaseA = Math.random() * Math.PI * 2;
@@ -3828,8 +4015,8 @@ ollama pull qwen2.5vl</code></pre>
       // Мягкий ease-in-out: разгон растёт без рывка, но держит крейсерскую скорость.
       var t = Math.min(1, Math.max(0, progress));
       var clickEase = t * t * (3 - 2 * t);
-      // Минимум ~92: сразу есть уход от курсора; пик ~150.
-      var clickTargetSpeed = 92 + clickEase * 58;
+      // Минимум ~48: уход от курсора заметен, но остаётся неспешным; пик ~78.
+      var clickTargetSpeed = 48 + clickEase * 30;
       var currentClickX = Math.cos(heading) * speed;
       var currentClickY = Math.sin(heading) * speed;
       var targetClickX = Math.cos(clickDirection) * clickTargetSpeed;
@@ -3847,22 +4034,62 @@ ollama pull qwen2.5vl</code></pre>
       viewY = pageY - window.scrollY;
     }
 
-    function wrapInViewport() {
-      var viewW = window.innerWidth;
-      var viewH = window.innerHeight;
-      if (viewX < -margin) {
-        viewX = viewW + margin;
-        pageX = window.scrollX + viewX;
-      } else if (viewX > viewW + margin) {
-        viewX = -margin;
-        pageX = window.scrollX + viewX;
+    // Появление: случайная точка на краю всего документа (не viewport) и
+    // курс в полностью произвольную сторону — не «внутрь экрана».
+    function spawnAtRandomOnPage() {
+      var root = document.documentElement;
+      var body = document.body;
+      var docW = Math.max(
+        root.clientWidth, root.scrollWidth,
+        body ? body.clientWidth : 0,
+        window.innerWidth
+      );
+      var docH = Math.max(
+        root.clientHeight, root.scrollHeight,
+        body ? body.clientHeight : 0,
+        window.innerHeight
+      );
+      var edge = Math.floor(Math.random() * 4); // 0 верх, 1 право, 2 низ, 3 лево
+      var along = .08 + Math.random() * .84; // не впритык к углам
+
+      if (edge === 0) {
+        pageX = docW * along;
+        pageY = -margin;
+      } else if (edge === 1) {
+        pageX = docW + margin;
+        pageY = docH * along;
+      } else if (edge === 2) {
+        pageX = docW * along;
+        pageY = docH + margin;
+      } else {
+        pageX = -margin;
+        pageY = docH * along;
       }
-      if (viewY < -margin) {
-        viewY = viewH + margin;
-        pageY = window.scrollY + viewY;
-      } else if (viewY > viewH + margin) {
-        viewY = -margin;
-        pageY = window.scrollY + viewY;
+
+      heading = Math.random() * Math.PI * 2;
+      clickDirection = heading;
+    }
+
+    // Wrap по границам контента документа (тор): за краем — с противоположной
+    // стороны. fixed-слой не раздувает scrollHeight, поэтому размеры стабильны.
+    function wrapInDocument() {
+      var root = document.documentElement;
+      var body = document.body;
+      // clientWidth/Height — layout без overflow от декора; scroll* — фактический контент.
+      var docW = Math.max(root.clientWidth, root.scrollWidth, body ? body.clientWidth : 0, window.innerWidth);
+      var docH = Math.max(root.clientHeight, root.scrollHeight, body ? body.clientHeight : 0, window.innerHeight);
+      // Период = ширина/высота + 2*margin, чтобы выйти за край и сразу войти с другого.
+      var spanX = docW + margin * 2;
+      var spanY = docH + margin * 2;
+      if (pageX < -margin) {
+        pageX += spanX * Math.ceil((-margin - pageX) / spanX);
+      } else if (pageX > docW + margin) {
+        pageX -= spanX * Math.ceil((pageX - (docW + margin)) / spanX);
+      }
+      if (pageY < -margin) {
+        pageY += spanY * Math.ceil((-margin - pageY) / spanY);
+      } else if (pageY > docH + margin) {
+        pageY -= spanY * Math.ceil((pageY - (docH + margin)) / spanY);
       }
     }
 
@@ -3900,16 +4127,14 @@ ollama pull qwen2.5vl</code></pre>
 
     function move(time) {
       if (pageX === undefined) {
-        // Главная: появление слева снизу.
-        pageX = window.scrollX + window.innerWidth * .12;
-        pageY = window.scrollY + window.innerHeight * .88;
+        spawnAtRandomOnPage();
       }
 
       if (!last) last = time;
       var delta = Math.min((time - last) / 1000, .05);
       last = time;
 
-      // pageX/pageY — document-space; view* = page* − scroll* (fixed-layer).
+      // pageX/pageY — document-space; view* только для hit-test / курсора.
       // При скролле page* не двигаем — пятно уезжает вместе со страницей.
       syncViewFromPage();
 
@@ -3995,20 +4220,21 @@ ollama pull qwen2.5vl</code></pre>
         speed = Math.sqrt(currentX * currentX + currentY * currentY);
       } else {
         var turnRate =
-          Math.sin(seconds * .37 + phaseA) * .22 +
-          Math.sin(seconds * .73 + phaseB) * .11 +
-          Math.sin(seconds * .11 + phaseC) * .06;
-        var targetSpeed = 70 + Math.sin(seconds * .29 + phaseB) * 9;
+          Math.sin(seconds * .37 + phaseA) * .3 +
+          Math.sin(seconds * .73 + phaseB) * .15 +
+          Math.sin(seconds * .11 + phaseC) * .08;
+        var targetSpeed = 30 + Math.sin(seconds * .29 + phaseB) * 6;
 
         heading += turnRate * delta;
         speed += (targetSpeed - speed) * Math.min(1, delta * 1.4);
       }
 
-      // Полёт в document-space: страница уезжает, pageX/Y держат точку на документе.
+      // Полёт в document-space; fixed рисует view* = page* − scroll*.
+      // За краем документа — с противоположной стороны, страницу не раздуваем.
       pageX += Math.cos(heading) * speed * delta;
       pageY += Math.sin(heading) * speed * delta;
+      wrapInDocument();
       syncViewFromPage();
-      wrapInViewport();
 
       // Определение нахождения частицы над зонами с контентом (чтобы сделать её прозрачнее)
       // elementFromPoint форсирует layout, поэтому опрашиваем его ~10 раз в

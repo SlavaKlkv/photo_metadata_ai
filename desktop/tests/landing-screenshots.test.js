@@ -135,6 +135,36 @@ describe('скриншот Editorial-полей подключается чер�
   });
 });
 
+// Линии сетки в снимке из Numbers — 1 px #a6a6a6: при сжатии оригинала
+// браузером они пропадают целиком и таблица читается серой заливкой.
+// В карточке грузится превью с перерисованной сеткой.
+describe('скриншот готового CSV подключается через превью', () => {
+  test.each([
+    '14_exported_csv_adobe_stock.png',
+    '14_exported_csv_adobe_stock_preview.png',
+  ])('%s существует', (name) => {
+    expect(fs.existsSync(path.join(screenshotsDir, name))).toBe(true);
+  });
+
+  test.each(landingPages)('%s не грузит оригинал в <img>', (filename) => {
+    const html = fs.readFileSync(path.join(landingDir, filename), 'utf8');
+
+    expect(html).not.toContain('<img src="../screenshots/14_exported_csv_adobe_stock.png"');
+  });
+
+  test('сетка экранов грузит превью', () => {
+    const screens = fs.readFileSync(path.join(landingDir, 'screens.html'), 'utf8');
+
+    expect(screens).toContain('<img src="../screenshots/14_exported_csv_adobe_stock_preview.png"');
+  });
+
+  test('лайтбокс на screens.html открывает полноразмерный оригинал', () => {
+    const html = fs.readFileSync(path.join(landingDir, 'screens.html'), 'utf8');
+
+    expect(html).toContain('data-src="../screenshots/14_exported_csv_adobe_stock.png"');
+  });
+});
+
 // Онбординг и AI Setup — вертикальные окна; cover при aspect-ratio 4/3
 // обрезал бы OpenRouter и поле ключа с ошибкой внизу карточки.
 describe('вертикальные диалоги в галерее показываются целиком', () => {
