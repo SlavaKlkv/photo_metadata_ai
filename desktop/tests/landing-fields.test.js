@@ -26,7 +26,7 @@ const FIELD_GROUPS = {
   editorial: [
     'is_editorial',
     'editorial_caption',
-    'event_date',
+    'editorial_date',
     'people_count',
     'model_release',
   ],
