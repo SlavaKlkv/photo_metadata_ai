@@ -36,6 +36,11 @@ test('ответы фиксируют Gatekeeper, AI-вариант, JPEG и р�
   const faq = faqSection(html)[1];
 
   expect(faq).toContain('Gatekeeper');
+  // На macOS 15+ обход через правый щелчок убран, поэтому основной путь —
+  // «Открыть всё равно» в настройках безопасности; правый щелчок остаётся
+  // только как вариант для старых систем.
+  expect(faq).toContain('Открыть всё равно');
+  expect(faq).toContain('Конфиденциальность');
   expect(faq).toContain('правым щелчком');
   expect(faq).toMatch(/Ollama|Qwen2\.5-VL|Gemini|OpenRouter/);
   expect(faq).toContain('JPEG');
