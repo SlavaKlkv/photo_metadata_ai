@@ -53,6 +53,60 @@ describe('сборка подписывает DMG', () => {
   });
 });
 
+// electron-builder публикует результат упаковки, то есть неподписанный
+// образ. Именно так в релиз v1.1.0 уехал DMG, который не открывался из
+// браузера. Публикацию делаем сами — строго после подписи.
+describe('публикация артефактов', () => {
+  it('не даёт electron-builder публиковать самому', () => {
+    expect(buildScript).toMatch(/npx electron-builder --mac --publish never/);
+  });
+
+  it('перехватывает --publish, а не пробрасывает его сборщику', () => {
+    expect(buildScript).toMatch(/--publish=\*\)/);
+    expect(buildScript).toMatch(/PUBLISH="\$\{arg#--publish=\}"/);
+  });
+
+  it('грузит артефакты после подписи и пересчёта манифеста', () => {
+    const signIndex = buildScript.indexOf('sign_dmg\n  publish_artifacts');
+
+    expect(signIndex).toBeGreaterThan(-1);
+    expect(buildScript.indexOf('gh release upload')).toBeGreaterThan(
+      buildScript.indexOf('update-latest-mac.js'),
+    );
+  });
+
+  it('молчит без --publish и при --publish never', () => {
+    expect(buildScript).toMatch(/\[\[ -n "\$PUBLISH" && "\$PUBLISH" != "never" \]\] \|\| return 0/);
+  });
+
+  // Лендинг и latest-mac.yml ссылаются на дефисный вариант имени,
+  // а на диске файлы с пробелами — без переименования ссылки бьются в 404.
+  it('приводит имена артефактов к url-safe виду', () => {
+    expect(buildScript).toMatch(/tr ' ' '-'/);
+  });
+
+  it('создаёт релиз черновиком, чтобы обновление не увидело его сразу', () => {
+    expect(buildScript).toMatch(/gh release create "\$tag" --draft/);
+  });
+});
+
+// Workflow не должен возвращаться к публикации силами electron-builder.
+describe('release.yml', () => {
+  const workflow = fs.readFileSync(
+    path.resolve(__dirname, '../../.github/workflows/release.yml'),
+    'utf8',
+  );
+
+  it('собирает и публикует через build-mac.sh', () => {
+    expect(workflow).toMatch(/build-mac\.sh --app-only --publish always/);
+  });
+
+  it('собирает срезы бэкенда нативно, без Rosetta', () => {
+    expect(workflow).toMatch(/os: macos-13 # Intel/);
+    expect(workflow).toMatch(/os: macos-14 # Apple Silicon/);
+  });
+});
+
 // codesign дописывает подпись внутрь образа, меняя его размер и sha512.
 // Автообновление сверяет их побайтно, поэтому манифест обязан догонять.
 describe('updateManifest', () => {
