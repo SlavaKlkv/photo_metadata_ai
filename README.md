@@ -27,7 +27,8 @@ AI анализирует каждый кадр, генерирует полны
 </div>
 
 > [!NOTE]
-> Здесь — то, что нужно для работы с кодом. Обзор продукта — на [странице проекта](https://slavaklkv.github.io/photo_metadata_ai/landing/);  
+> Здесь — то, что нужно для работы с кодом.  
+> Обзор продукта — на [странице проекта](https://slavaklkv.github.io/photo_metadata_ai/landing/);  
 > исходники страницы лежат в [docs/landing/](docs/landing/),  
 > переключатели эффектов описаны в [docs/landing/README.md](docs/landing/README.md).
 
