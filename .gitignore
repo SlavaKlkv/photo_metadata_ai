@@ -32,3 +32,42 @@ yarn-error.log*
 Thumbs.db
 
 backend/uploads/
+
+# Runtime Artifacts
+/jobs/
+/results/
+/temp/
+backend/jobs/
+backend/results/
+backend/temp/
+desktop_settings.json
+ai_provider_api_keys.json
+marketplace_credentials.json
+
+# Desktop app (Electron + PyInstaller)
+desktop/node_modules/
+desktop/out/
+desktop/resources/
+backend/dist-x86_64/
+backend/.venv-x86_64/
+# PyInstaller workpath для архитектурно-специфичных сборок (universal2);
+# паттерн build/ выше матчит только каталог, буквально названный "build"
+backend/desktop_build/build-*/
+# desktop/build содержит коммитимые ассеты (иконка, entitlements),
+# переисключаем из общего паттерна build/
+!desktop/build/
+desktop/build/icon.icns
+
+# Local test caches and reports
+backend/.uv-cache/
+backend/.coverage
+frontend/.npm-cache/
+frontend/coverage/
+desktop/.npm-cache/
+desktop/coverage/
+
+# AI
+.claude/
+.kodik/
+.cursor/
+TASK.md

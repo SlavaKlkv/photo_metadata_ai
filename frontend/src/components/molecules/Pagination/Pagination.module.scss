@@ -1,0 +1,147 @@
+//frontend/src/components/molecules/Pagination/Pagination.module.scss
+/* Pagination molecule styles */
+@import '../../../styles/variables.module.scss';
+
+.pagination {
+  --page-btn-size: 28px;
+
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+/* Окно промежуточных страниц: ровно три номера, которые едут за текущей
+   страницей. Никакого нативного скролла — позиция окна живёт в состоянии. */
+.strip {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+/* Окно и полоска прокрутки под ним */
+.stripColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.track {
+  position: relative;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--border-color);
+  cursor: pointer;
+}
+
+/* Прокручивать нечего — дорожку прячем, но место под неё держим,
+   иначе ряд номеров скачет по высоте при смене числа страниц */
+.trackHidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.thumb {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  min-width: 8px;
+  border-radius: inherit;
+  background: var(--accent-main);
+  transition:
+    left var(--transition-fast),
+    width var(--transition-fast);
+}
+
+/* «…» — признак того, что лента скрывает номера с этой стороны.
+   Место под него зарезервировано всегда, чтобы ряд не дёргался. */
+.ellipsis {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1;
+  flex-shrink: 0;
+  padding: 0 2px;
+  transition: opacity var(--transition-normal);
+}
+
+.ellipsisHidden {
+  opacity: 0;
+}
+
+.pageBtn {
+  background: none;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  width: var(--page-btn-size);
+  height: var(--page-btn-size);
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  /* Переход фона симметричный: пока окно едет, подсветка вообще не меняет
+     кнопку (слоты — стабильные узлы), а там, где ехать некуда, она должна
+     плавно переходить на выбранный номер. */
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast),
+    opacity var(--transition-normal);
+
+  &:hover:not(:disabled) {
+    border-color: var(--border-hover);
+    color: var(--text-primary);
+  }
+
+  &:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+}
+
+.pageBtnActive {
+  background: var(--accent-main);
+  color: var(--text-primary);
+  border-color: var(--accent-main);
+}
+
+/* Цифра въезжает в неподвижный слот со стороны, откуда пришло окно */
+@keyframes slideFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(6px);
+  }
+}
+
+@keyframes slideFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+}
+
+.pageNumber {
+  display: block;
+}
+
+.slideForward .pageNumber {
+  animation: slideFromRight var(--transition-fast) ease-out;
+}
+
+.slideBack .pageNumber {
+  animation: slideFromLeft var(--transition-fast) ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pageBtn,
+  .ellipsis,
+  .thumb {
+    transition: none;
+  }
+
+  .pageNumber {
+    animation: none;
+  }
+}

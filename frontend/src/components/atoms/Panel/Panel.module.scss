@@ -1,0 +1,23 @@
+// frontend/src/components/atoms/Panel/Panel.module.scss
+/* Panel atom styles */
+@import '../../../styles/variables.module.scss';
+
+.panel {
+  display: flex;
+  padding: 20px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+
+  // DIRECTION
+  &.column { flex-direction: column; }
+  &.row    { flex-direction: row; }
+
+  // GAP
+  &.gap-sm { gap: var(--spacing-sm); }
+  &.gap-md { gap: var(--spacing-md); }
+  &.gap-lg { gap: var(--spacing-lg); }
+}

@@ -1,0 +1,134 @@
+import { useUIStore } from './useUIStore';
+
+const initialState = useUIStore.getState();
+
+beforeEach(() => {
+  useUIStore.setState(initialState, true);
+});
+
+test('opens and closes modal state independently', () => {
+  const state = useUIStore.getState();
+
+  state.openAiSetup();
+  state.openProgressModal();
+  state.openExportModal();
+  state.openSuccessModal();
+
+  expect(useUIStore.getState()).toMatchObject({
+    isAiSetupOpen: true,
+    isProgressModalOpen: true,
+    isExportModalOpen: true,
+    isSuccessModalOpen: true,
+  });
+
+  useUIStore.getState().closeAiSetup();
+  useUIStore.getState().closeProgressModal();
+  useUIStore.getState().closeExportModal();
+  useUIStore.getState().closeSuccessModal();
+
+  expect(useUIStore.getState()).toMatchObject({
+    isAiSetupOpen: false,
+    isProgressModalOpen: false,
+    isExportModalOpen: false,
+    isSuccessModalOpen: false,
+  });
+});
+
+test('updates processing, selection and export state', () => {
+  const state = useUIStore.getState();
+
+  state.toggleFileList();
+  state.setIsProcessing(true);
+  state.setIsUploaded(true);
+  state.setIsExportReady(true);
+  state.setCurrentJobId('job-1');
+  state.setSelectedJobId('file-1');
+  state.setIsPollingActive(true);
+  state.setIsExporting(true);
+  state.setCurrentProcessingProvider('gemini', 'gemini-model');
+  state.setExportArtifacts([
+    {
+      export_format: 'csv',
+      filename: 'metadata.csv',
+      path: '/tmp/metadata.csv',
+      size_bytes: 10,
+      count: 2,
+    },
+  ]);
+
+  expect(useUIStore.getState()).toMatchObject({
+    isFileListOpen: false,
+    isProcessing: true,
+    isUploaded: true,
+    isExportReady: true,
+    currentJobId: 'job-1',
+    selectedJobId: 'file-1',
+    isPollingActive: true,
+    isExporting: true,
+    currentProcessingProvider: 'gemini',
+    currentProcessingModel: 'gemini-model',
+  });
+  expect(useUIStore.getState().exportArtifacts).toHaveLength(1);
+
+  useUIStore.getState().setCurrentProcessingProvider(null);
+  expect(useUIStore.getState()).toMatchObject({
+    currentProcessingProvider: null,
+    currentProcessingModel: null,
+  });
+});
+
+test('resets every processing flag but keeps the current job id', () => {
+  useUIStore.setState({
+    isProcessing: true,
+    isPollingActive: true,
+    isProgressModalOpen: true,
+    isExportReady: true,
+    currentProcessingProvider: 'gemini',
+    currentProcessingModel: 'gemini-pro',
+    currentJobId: 'job-1',
+    isUploaded: true,
+  });
+
+  useUIStore.getState().resetProcessingState();
+
+  expect(useUIStore.getState()).toMatchObject({
+    isProcessing: false,
+    isPollingActive: false,
+    isProgressModalOpen: false,
+    isExportReady: false,
+    currentProcessingProvider: null,
+    currentProcessingModel: null,
+    // Повторный запуск идёт по тому же job_id, а фото остаются загруженными.
+    currentJobId: 'job-1',
+    isUploaded: true,
+  });
+});
+
+test('keeps the results page at one or above', () => {
+  const state = useUIStore.getState();
+
+  expect(state.resultsPage).toBe(1);
+
+  state.setResultsPage(3);
+  expect(useUIStore.getState().resultsPage).toBe(3);
+
+  state.setResultsPage(0);
+  expect(useUIStore.getState().resultsPage).toBe(1);
+});
+
+test('область частичного прогона переживает сброс и обнуляется новым прогоном', () => {
+  useUIStore.getState().openProgressModal(['file-2']);
+
+  expect(useUIStore.getState().processingScopeIds).toEqual(['file-2']);
+
+  // Ответ опроса приходит уже после сброса — область должна уцелеть,
+  // иначе его примут за отмену всего батча.
+  useUIStore.getState().resetProcessingState();
+
+  expect(useUIStore.getState().processingScopeIds).toEqual(['file-2']);
+
+  // Полный прогон открывает модалку без области — прогресс снова по батчу.
+  useUIStore.getState().openProgressModal();
+
+  expect(useUIStore.getState().processingScopeIds).toBeNull();
+});

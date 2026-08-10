@@ -1,0 +1,75 @@
+appId: com.slavaklkv.photometadataai
+productName: Photo Metadata AI
+directories:
+  output: out
+  buildResources: build
+
+files:
+  - src/**/*
+  - package.json
+
+# Бинарники backend (resources/backend/arm64/ и resources/backend/x86_64/)
+# подкладываются скриптом scripts/build-mac.sh. Раздельно, а не склеенные
+# lipo в universal2: spec собирает onefile с overlay'ем в конце файла,
+# который lipo сохраняет лишь для одного среза. Нужный выбирается в
+# рантайме — desktop/src/backend-process.js по process.arch.
+extraResources:
+  - from: resources/backend/
+    to: backend/
+
+mac:
+  category: public.app-category.photography
+  target:
+    - target: dmg
+      arch: [universal]
+    - target: zip
+      arch: [universal]
+  # electron-builder сам конвертирует исходный PNG 1024x1024 в ICNS.
+  icon: build/icon.png
+  # Бинарники backend одинаковы в x64- и arm64-ветках сборки (их кладёт
+  # build-mac.sh, а не electron). @electron/universal не берётся сам
+  # решать, что делать с идентичным Mach-O файлом, и требует явного
+  # правила — без него сборка падает на universal-merge.
+  x64ArchFiles: Contents/Resources/backend/*/photo-metadata-backend
+  # Ad-hoc подпись. Учётных данных Apple Developer нет, полноценная
+  # подпись и нотаризация невозможны — но и оставлять бандл вовсе без
+  # подписи нельзя: `identity: null` давал "code object is not signed at
+  # all", и на чужой машине с флагом quarantine macOS показывала
+  # «приложение повреждено» без всякой возможности открыть его из GUI.
+  # Ad-hoc запечатывает Info.plist и ресурсы, поэтому остаётся штатное
+  # «неизвестный разработчик» с обходом через правый клик -> «Открыть».
+  identity: '-'
+  # Hardened runtime без нотаризации только мешает: он включает
+  # library validation, а ad-hoc подписанные .dylib внутри бинарника
+  # backend (PyInstaller) её не проходят — приложение падало бы на
+  # старте. Отключаем осознанно, вместе с ad-hoc подписью.
+  hardenedRuntime: false
+
+# Кастомный фон намеренно не задан: при любом фоне Finder рисует
+# подписи файлов чёрными независимо от темы. Без фона окно нативное
+# (фон и подписи следуют теме), а стрелка «приложение -> Applications»
+# и строка-подсказка добавляются отдельными файлами с кастомными
+# иконками (build/dmg-arrow.icns, dmg-hint*.icns из
+# scripts/generate-dmg-icons.py) через scripts/dmgbuild-wrapper.sh —
+# позиции ниже согласованы с ним.
+dmg:
+  window:
+    width: 600
+    height: 400
+  iconSize: 128
+  iconTextSize: 16
+  contents:
+    - x: 160
+      y: 150
+      type: file
+    - x: 440
+      y: 150
+      type: link
+      path: /Applications
+
+# publish используется только для загрузки артефактов в GitHub Releases
+# (сама загрузка не требует подписи)
+publish:
+  provider: github
+  owner: SlavaKlkv
+  repo: photo_metadata_ai

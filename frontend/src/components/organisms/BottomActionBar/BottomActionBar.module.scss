@@ -1,0 +1,111 @@
+/* BottomActionBar organism styles */
+@import '../../../styles/variables.module.scss';
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
+  flex-wrap: wrap;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+
+  @media (max-width: 768px) {
+    justify-content: center;
+  }
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  transition: color var(--transition-normal);
+
+  &.active {
+    color: var(--accent-main);
+
+    .stepNumber {
+      border-color: var(--accent-main);
+      color: var(--accent-main);
+    }
+  }
+
+  @media (max-width: 480px) {
+    .stepLabel {
+      display: none;
+    }
+  }
+}
+
+.stepNumber {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-default);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  transition: all var(--transition-normal);
+}
+
+.stepLabel {
+  font-size: var(--font-size-sm);
+}
+
+.line {
+  width: 32px;
+  height: 1px;
+  background: var(--border-default);
+  margin: 0 var(--spacing-xs);
+  transition: background var(--transition-normal);
+
+  @media (max-width: 480px) {
+    width: 16px;
+  }
+
+  &.activeLine {
+    background: var(--accent-main);
+  }
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-shrink: 0;
+  margin-left: auto;
+
+  @media (max-width: 1200px) {
+    justify-content: flex-end;
+    margin-left: 0;
+  }
+
+  @media (max-width: 1080px) {
+    flex-wrap: wrap;
+
+    > * {
+      flex: 1;
+    }
+  }
+}
+
+.btnIcon {
+  width: 16px;
+  height: 16px;
+}
+
+@media (max-width: 1200px) {
+  .bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-md);
+  }
+}

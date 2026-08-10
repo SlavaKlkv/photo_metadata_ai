@@ -1,0 +1,37 @@
+/* InfoCard molecule styles */
+@import '../../../styles/variables.module.scss';
+
+.card {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  background: var(--bg-tretiary);
+  border-radius: var(--radius-md);
+}
+
+.icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  background: var(--bg-foreground);
+  color: var(--accent-color);
+  font-size: var(--font-size-3xl);
+}
+
+.card h4 {
+  margin: 0 0 4px 0;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+.card p {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-placeholder);
+  line-height: var(--line-height-normal);
+}

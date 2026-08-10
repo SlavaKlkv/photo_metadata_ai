@@ -1,0 +1,111 @@
+/* ValidationSummary molecule styles */
+@import '../../../styles/variables.module.scss';
+
+.summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.groups {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast);
+
+  &:hover:not(:disabled) {
+    background: var(--row-hover-bg);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+}
+
+.chipActive {
+  border-color: var(--accent-main);
+  background: var(--row-active-bg);
+  color: var(--text-primary);
+}
+
+.chipCount {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.ready .dot {
+  background: var(--success-color);
+}
+
+.warnings .dot {
+  background: var(--warning-color);
+}
+
+.errors .dot {
+  background: var(--error-color);
+}
+
+.failed .dot {
+  background: var(--text-secondary);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.exportAction {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent-main);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    text-decoration: underline;
+  }
+
+  &:disabled {
+    color: var(--text-secondary);
+    cursor: default;
+  }
+}
+
+// Повтор упавших файлов — действие по группе ошибок, поэтому цвет ошибки,
+// а не акцентный: визуально связывает кнопку с чипом «Processing errors».
+.retryAction {
+  composes: exportAction;
+  color: var(--error-color);
+}
