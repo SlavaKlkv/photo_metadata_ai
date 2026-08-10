@@ -202,6 +202,61 @@ build_app() {
   export CUSTOM_DMGBUILD_PATH="$DESKTOP_DIR/scripts/dmgbuild-wrapper.sh"
 
   npx electron-builder --mac "${BUILDER_ARGS[@]+"${BUILDER_ARGS[@]}"}"
+
+  sign_dmg
+}
+
+# Ad-hoc подпись самого образа.
+#
+# `identity: '-'` в electron-builder.yml подписывает только бандл
+# приложения, DMG выходит из сборки вовсе без подписи. Локально это
+# незаметно, но браузер вешает на скачанный файл com.apple.quarantine, и
+# тогда Gatekeeper проверяет образ раньше приложения: без подписи он
+# получает "no usable signature" и блокирует монтирование — по клику в
+# панели загрузок не происходит ничего. Ad-hoc подпись возвращает
+# штатный сценарий «неизвестный разработчик» с обходом через настройки
+# безопасности. Полностью диалог убирает только нотаризация, для которой
+# нужны учётные данные Apple Developer.
+sign_dmg() {
+  local dmg found=0 version
+
+  # Только образы текущей версии: в out/ рядом лежат артефакты прошлых
+  # релизов, и переподписывать их сборка не имеет права — однажды это
+  # уже уронило её на чужом DMG, так и не дойдя до собранного.
+  version="$(node -p "require('$DESKTOP_DIR/package.json').version")"
+
+  for dmg in "$DESKTOP_DIR"/out/*-"$version"-*.dmg; do
+    [[ -e "$dmg" ]] || continue
+    found=1
+
+    codesign --force --sign - "$dmg"
+
+    # Подпись обязана быть на месте: молча выпустить неподписанный образ
+    # нельзя — ровно так и уехал релиз, который не открывался из браузера.
+    #
+    # Вывод забирается в переменную, а не через `| grep -q`: под pipefail
+    # код конвейера складывается из обеих команд, и ранний выход grep
+    # давал ложное «подпись не легла» на заведомо подписанном образе.
+    local signature
+    signature="$(codesign -dv "$dmg" 2>&1 || true)"
+
+    if [[ "$signature" != *"Signature=adhoc"* ]]; then
+      echo "ОШИБКА: ad-hoc подпись не легла на $dmg" >&2
+      echo "$signature" >&2
+      exit 1
+    fi
+
+    echo "==> Подписан ad-hoc: $(basename "$dmg")"
+  done
+
+  if [[ "$found" -eq 0 ]]; then
+    echo "ОШИБКА: в $DESKTOP_DIR/out не найдено ни одного .dmg версии $version" >&2
+    exit 1
+  fi
+
+  # codesign меняет содержимое образа, поэтому суммы в манифесте
+  # обновления надо пересчитать — иначе автообновление отвергнет DMG.
+  node "$DESKTOP_DIR/scripts/update-latest-mac.js" "$DESKTOP_DIR/out"
 }
 
 if [[ -n "$APP_ONLY" ]]; then
