@@ -59,16 +59,17 @@ desktop/scripts/build-mac.sh
 Что делает скрипт по шагам:
 
 ```mermaid
-%%{init: {"themeVariables": {"lineColor": "#6f6ce4"}}}%%
 flowchart LR
   F["сборка<br/>фронтенда"] --> A["PyInstaller<br/>arm64"]
-  A --> X["PyInstaller x86_64<br/>Rosetta, .venv-x86_64"]
-  X --> S["дымовой тест<br/>обоих срезов"]
-  S --> C["копирование в<br/>resources/backend/"]
+  A --> X["PyInstaller<br/>x86_64<br/>Rosetta"]
+  X --> S["дымовой тест<br/>срезов"]
+  S --> C["копирование<br/>в resources/"]
   C --> B["electron-builder<br/>universal"]
 ```
 
-Исходный `build/icon.png` 1024×1024 конвертируется в ICNS средствами electron-builder.
+Срез x86_64 собирается в отдельном окружении `.venv-x86_64`, готовые бинарники
+раскладываются по `resources/backend/{arm64,x86_64}/`. Исходный `build/icon.png`
+1024×1024 конвертируется в ICNS средствами electron-builder.
 
 Частичный запуск (как в release workflow):
 
