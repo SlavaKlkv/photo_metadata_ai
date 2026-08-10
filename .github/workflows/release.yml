@@ -104,6 +104,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-        # electron-builder создаёт draft-релиз. Проверка обновлений увидит
-        # его только после ручной публикации — это smoke-test-гейт.
+        # Артефакты грузит сам build-mac.sh — после ad-hoc подписи DMG и
+        # пересчёта latest-mac.yml. Публикацию силами electron-builder
+        # использовать нельзя: он заливает результат упаковки, то есть
+        # неподписанный образ, который под карантином не открывается.
+        #
+        # Релиз создаётся черновиком: проверка обновлений увидит его
+        # только после ручной публикации — это smoke-test-гейт.
         run: desktop/scripts/build-mac.sh --app-only --publish always

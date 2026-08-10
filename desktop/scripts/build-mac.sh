@@ -39,9 +39,28 @@ SMOKE_TEST="$PROJECT_ROOT/desktop/scripts/smoke-test.py"
 
 BACKEND_ONLY=""
 APP_ONLY=""
+PUBLISH=""
 BUILDER_ARGS=()
 for arg in "$@"; do
   case "$arg" in
+    # Публикацию electron-builder не выполняет: он заливает артефакты
+    # прямо из упаковки, то есть до ad-hoc подписи DMG и до пересчёта
+    # latest-mac.yml. Так в релиз v1.1.0 и уехал неподписанный образ,
+    # который не открывался из браузера. Флаг перехватываем и грузим
+    # артефакты сами — после подписи.
+    --publish=*)
+      PUBLISH="${arg#--publish=}"
+      ;;
+    --publish)
+      PUBLISH="pending-value"
+      ;;
+    always | onTag | onTagOrDraft | never)
+      if [[ "$PUBLISH" == "pending-value" ]]; then
+        PUBLISH="$arg"
+      else
+        BUILDER_ARGS+=("$arg")
+      fi
+      ;;
     --backend-only=*)
       BACKEND_ONLY="${arg#--backend-only=}"
       if [[ "$BACKEND_ONLY" != "arm64" && "$BACKEND_ONLY" != "x86_64" ]]; then
@@ -201,9 +220,13 @@ build_app() {
   export REAL_DMGBUILD
   export CUSTOM_DMGBUILD_PATH="$DESKTOP_DIR/scripts/dmgbuild-wrapper.sh"
 
-  npx electron-builder --mac "${BUILDER_ARGS[@]+"${BUILDER_ARGS[@]}"}"
+  # --publish never жёстко: даже если флаг не передали, electron-builder
+  # умеет публиковать сам по наличию тега, а публиковать он может только
+  # неподписанное.
+  npx electron-builder --mac --publish never "${BUILDER_ARGS[@]+"${BUILDER_ARGS[@]}"}"
 
   sign_dmg
+  publish_artifacts
 }
 
 # Ad-hoc подпись самого образа.
@@ -257,6 +280,37 @@ sign_dmg() {
   # codesign меняет содержимое образа, поэтому суммы в манифесте
   # обновления надо пересчитать — иначе автообновление отвергнет DMG.
   node "$DESKTOP_DIR/scripts/update-latest-mac.js" "$DESKTOP_DIR/out"
+}
+
+# Загрузка артефактов в релиз — уже подписанных.
+#
+# Релиз создаётся черновиком: проверка обновлений видит его только после
+# ручной публикации, и это единственный гейт между сборкой и
+# пользователями — до публикации артефакт можно скачать и проверить.
+publish_artifacts() {
+  local version tag staging file target
+
+  [[ -n "$PUBLISH" && "$PUBLISH" != "never" ]] || return 0
+
+  version="$(node -p "require('$DESKTOP_DIR/package.json').version")"
+  tag="v$version"
+
+  # Имена артефактов приводятся к url-safe виду: GitHub всё равно заменит
+  # пробелы в ссылке на скачивание, а лендинг и latest-mac.yml ссылаются
+  # именно на дефисный вариант. Без переименования ссылки бьются в 404.
+  staging="$(mktemp -d)"
+  for file in "$DESKTOP_DIR"/out/*-"$version"-*.{dmg,zip,blockmap} "$DESKTOP_DIR/out/latest-mac.yml"; do
+    [[ -e "$file" ]] || continue
+    target="$(basename "$file" | tr ' ' '-')"
+    cp "$file" "$staging/$target"
+  done
+
+  if ! gh release view "$tag" >/dev/null 2>&1; then
+    gh release create "$tag" --draft --title "$tag" --notes 'Черновик: заметки заполняются вручную перед публикацией.'
+  fi
+
+  gh release upload "$tag" "$staging"/* --clobber
+  echo "==> Артефакты загружены в релиз $tag"
 }
 
 if [[ -n "$APP_ONLY" ]]; then
