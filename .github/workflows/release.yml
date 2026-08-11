@@ -124,3 +124,47 @@ jobs:
           else
             desktop/scripts/build-mac.sh --app-only
           fi
+
+      # Размеры на лендинге правятся только здесь: они должны совпадать с
+      # тем, что реально уехало в релиз. Локальная сборка легче CI-шной
+      # (127,6 МБ против 135,0), поэтому запуск на машине разработчика
+      # лендинг не трогает — иначе сайт получил бы заниженные числа.
+      #
+      # Сайт отдаётся Pages из main:/docs, а разработка идёт в develop,
+      # так что правка коммитится в обе ветки: в main — чтобы обновился
+      # сайт, в develop — чтобы следующая работа не начиналась со
+      # старых чисел и не откатывала их обратно.
+      - name: Update landing with actual release size
+        if: github.ref_type == 'tag' || inputs.publish == true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="$(node -p "require('./desktop/package.json').version")"
+          app="desktop/out/mac-arm64/Photo Metadata AI.app"
+          dmg="desktop/out/Photo Metadata AI-$version-arm64.dmg"
+
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+
+          # Одна и та же правка применяется к каждой ветке отдельным
+          # коммитом, а не мержем main в develop: иначе релизный прогон
+          # затащил бы в develop всё остальное расхождение веток.
+          for branch in main develop; do
+            git fetch origin "$branch"
+            git checkout -B "$branch" "origin/$branch"
+
+            node desktop/scripts/update-landing-release.js \
+              --app "$app" --dmg "$dmg" \
+              --landing docs/landing/index.html --version "$version"
+
+            # Повторный прогон того же релиза ничего не меняет — тогда
+            # и коммитить нечего.
+            if git diff --quiet -- docs/landing/index.html; then
+              echo "==> $branch: лендинг уже актуален"
+              continue
+            fi
+
+            git add docs/landing/index.html
+            git commit -m "chore: update landing download size for v$version"
+            git push origin "$branch"
+          done

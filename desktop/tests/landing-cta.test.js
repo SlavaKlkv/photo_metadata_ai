@@ -4,8 +4,21 @@ const fs = require('fs');
 const path = require('path');
 
 const landingPath = path.resolve(__dirname, '../../docs/landing/index.html');
-const dmgUrl =
-  'https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.2.0/Photo-Metadata-AI-1.2.0-arm64.dmg';
+
+// Версия не зашивается: релизный workflow переписывает её в ссылках сам
+// (desktop/scripts/update-landing-release.js), и тест с константой падал
+// бы на каждом выпуске. Проверяется то, что важно, — ссылки согласованы
+// между собой и ведут на arm64-образ ожидаемого вида.
+const dmgUrl = (() => {
+  const match = fs
+    .readFileSync(landingPath, 'utf8')
+    .match(
+      /https:\/\/github\.com\/SlavaKlkv\/photo_metadata_ai\/releases\/download\/v(\d+\.\d+\.\d+)\/Photo-Metadata-AI-\1-arm64\.dmg/,
+    );
+
+  if (!match) throw new Error('в лендинге нет ссылки на arm64-образ релиза');
+  return match[0];
+})();
 
 function readLanding() {
   return fs.readFileSync(landingPath, 'utf8');
@@ -13,7 +26,7 @@ function readLanding() {
 
 // Все CTA скачивания обязаны указывать на один и тот же релиз: иначе
 // шапка, hero и финальный блок разъедутся по версиям.
-test('кнопки скачивания DMG сходятся на один релиз 1.2.0-arm64', () => {
+test('кнопки скачивания DMG сходятся на один релиз arm64', () => {
   const html = readLanding();
   const dmgHrefs = [...html.matchAll(/href="(https:\/\/github\.com\/SlavaKlkv\/photo_metadata_ai\/releases\/download\/[^"]+\.dmg)"/g)].map(
     (m) => m[1],
