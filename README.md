@@ -10,7 +10,7 @@ AI анализирует каждый кадр, генерирует полны
 выбранную площадку (Adobe Stock, Shutterstock, Getty Images), вшивает IPTC в файлы и выгружает CSV.
 
 [![Release](https://img.shields.io/github/v/release/SlavaKlkv/photo_metadata_ai?style=flat-square&color=6f6ce4&label=release)](https://github.com/SlavaKlkv/photo_metadata_ai/releases)
-[![macOS](https://img.shields.io/badge/macOS-universal2-6f6ce4?style=flat-square&logo=apple&logoColor=white)](#установка)
+[![macOS](https://img.shields.io/badge/macOS-Apple%20Silicon-6f6ce4?style=flat-square&logo=apple&logoColor=white)](#установка)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-6f6ce4?style=flat-square&logo=python&logoColor=white)](backend/)
 [![React](https://img.shields.io/badge/React-18%20%2B%20TS-6f6ce4?style=flat-square&logo=react&logoColor=white)](frontend/)
 [![Electron](https://img.shields.io/badge/Electron-33-6f6ce4?style=flat-square&logo=electron&logoColor=white)](desktop/)
@@ -46,7 +46,7 @@ AI анализирует каждый кадр, генерирует полны
 
 | Что | Подробности |
 | --- | --- |
-| **Архитектуры** | Сборка universal2 — работает и на Apple Silicon, и на Intel |
+| **Архитектуры** | Только Apple Silicon. Intel-маки не поддерживаются: macOS 26 Tahoe — последняя версия macOS для них |
 | **Обновления** | Приложение проверяет опубликованные GitHub Releases и сообщает о новой версии баннером. Загрузка и установка ручные: `.dmg` открывается в системном браузере, приложение заменяется в `Applications` |
 | **Данные пользователя** | `~/Library/Application Support/Photo Metadata AI` и `~/Documents/Photo Metadata AI/results` — хранятся вне бандла и переживают обновление |
 
@@ -155,7 +155,7 @@ flowchart TB
 | --- | --- |
 | **Backend** | Python 3.11+, FastAPI, Uvicorn, Pydantic, aiohttp, httpx, Pillow, structlog, iptcinfo3, uv, Ruff, pytest |
 | **Frontend** | React 18, TypeScript, Zustand, Sass, axios, react-scripts, Jest, Testing Library |
-| **Desktop** | Electron 33, electron-builder, PyInstaller (universal2), Jest |
+| **Desktop** | Electron 33, electron-builder, PyInstaller (arm64), Jest |
 
 ---
 
@@ -244,7 +244,7 @@ desktop/scripts/build-mac.sh     # полная сборка macOS: .app и .dmg
 Релиз собирается GitHub Actions по тегу `v*`:
 
 ```
-срезы бэкенда (arm64, x86_64, нативно) → склейка в universal2 → .dmg → Releases
+бэкенд arm64 (нативно) → .app → .dmg → Releases
 ```
 
 > [!IMPORTANT]
