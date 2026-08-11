@@ -97,6 +97,26 @@ describe('тяжёлые снимки подключены через умень
     expect(html).toContain('<img src="../screenshots/07_review_metadata_preview_1200.png"');
   });
 
+  // Карточки рендерятся примерно в 342 px, а снимки 04–15 сняты в 3424 px:
+  // без копий страница тянула около девяти мегабайт оригиналов.
+  test.each([
+    '04_start_screen',
+    '06_processing',
+    '08_retry_failed',
+    '09_review_recommendations_filter',
+    '10_review_regenerating',
+    '12_export_in_progress',
+    '13_export_completed',
+  ])('карточка %s подключена копией 1200 px', (name) => {
+    const html = readPage('screens.html');
+
+    expect(
+      fs.existsSync(path.resolve(__dirname, '../../docs/screenshots', `${name}_1200.png`)),
+    ).toBe(true);
+    expect(html).toContain(`<img src="../screenshots/${name}_1200.png" width="1200"`);
+    expect(html).not.toContain(`<img src="../screenshots/${name}.png"`);
+  });
+
   test('страница скриншотов открывает в лайтбоксе полноразмерные оригиналы', () => {
     const html = readPage('screens.html');
 

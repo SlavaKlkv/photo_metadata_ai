@@ -59,10 +59,10 @@ desktop/scripts/build-mac.sh
 
 ```mermaid
 flowchart LR
-  F["сборка<br/>фронтенда"] --> A["PyInstaller<br/>arm64"]
-  A --> S["дымовой тест<br/>бинарника"]
-  S --> C["копирование<br/>в resources/"]
-  C --> B["electron-builder<br/>arm64"]
+  F["сборка<br/> фронтенда"] --> A["PyInstaller<br/> arm64"]
+  A --> S["дымовой тест<br/> бинарника"]
+  S --> C["копирование<br/> в resources/"]
+  C --> B["electron-builder<br/> arm64"]
 ```
 
 Готовый бинарник раскладывается в `resources/backend/arm64/`. Исходный `build/icon.png`
