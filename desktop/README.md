@@ -99,9 +99,6 @@ process → results → export.
 | `signIgnore: Contents/Resources/backend/` | бэкенд не подписывается отдельно: на framework-сборке Python electron-builder падает на вложенном `Python.framework` |
 | `hardenedRuntime: false` | вместе с library validation ad-hoc `.dylib` внутри бэкенда не проходят проверку, и приложение падало бы на старте |
 
-Образ (`.dmg`) не подписывается: ad-hoc подпись заставляла Gatekeeper блокировать
-монтирование скачанного файла. Сборка падает, если подпись на образе появится.
-
 > [!IMPORTANT]
 > Порядок первого запуска: перетащить приложение в `Applications` **до** первого
 > запуска, запустить оттуда, в предупреждении нажать «Готово», затем Системные
