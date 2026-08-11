@@ -18,20 +18,18 @@ const BACKEND_CWD = path.join(PROJECT_ROOT, 'backend');
  * Возвращает путь к бинарнику backend или null, если запуск идёт из
  * исходников через uv (бинарника не существует).
  *
- * Упакованное приложение: бинарник из resources/backend/<arch>/.
+ * Упакованное приложение: бинарник из resources/backend/arm64/.
  * Dev-режим: локально собранный backend/dist/photo-metadata-backend.
  */
 function resolveBackendBinaryPath() {
   if (app.isPackaged) {
-    // Бинарники backend лежат раздельно по архитектурам, а не склеенные
-    // в universal2: spec собирает onefile, где Python и .dylib приклеены
-    // overlay'ем в конец файла, а lipo сохраняет лишь один overlay —
-    // Intel-срез тогда получал arm64-библиотеки и падал при старте.
-    const archDir = process.arch === 'x64' ? 'x86_64' : 'arm64';
+    // Приложение собирается только под Apple Silicon, но подкаталог с
+    // архитектурой сохранён: по этому пути бинарник кладёт build-mac.sh,
+    // и по нему же killOrphanedBackends() ищет процесс.
     return path.join(
       process.resourcesPath,
       'backend',
-      archDir,
+      'arm64',
       'photo-metadata-backend'
     );
   }

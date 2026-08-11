@@ -21,8 +21,8 @@ function sha512Base64(filePath) {
 }
 
 // В манифесте имена url-safe: electron-builder заменяет пробелы дефисами,
-// поэтому «Photo-Metadata-AI-1.1.0-universal.dmg» в файле соответствует
-// «Photo Metadata AI-1.1.0-universal.dmg» на диске. Сопоставляем по тому
+// поэтому «Photo-Metadata-AI-1.2.0-arm64.dmg» в файле соответствует
+// «Photo Metadata AI-1.2.0-arm64.dmg» на диске. Сопоставляем по тому
 // же правилу, иначе артефакт не находится и суммы молча остаются старыми.
 function resolveArtifact(outDir, urlName) {
   const direct = path.join(outDir, urlName);
