@@ -159,7 +159,11 @@ ensure_dmgbuild() {
   fi
 
   echo "==> dmgbuild нет в кэше — скачиваю"
-  if ! REAL_DMGBUILD="$(cd "$DESKTOP_DIR" && node scripts/fetch-dmgbuild.js)"; then
+  # Берём последнюю строку: сам fetch-dmgbuild.js печатает только путь, но
+  # логгер dmg-builder подмешивает в stdout строку прогресса загрузки. В
+  # терминале она уходит в tty и не мешает, а в CI попадала в переменную —
+  # и «путь» из двух строк указывал в никуда.
+  if ! REAL_DMGBUILD="$(cd "$DESKTOP_DIR" && node scripts/fetch-dmgbuild.js | tail -1)"; then
     echo "ОШИБКА: не удалось скачать dmgbuild." >&2
     echo "Без него DMG собрался бы с дефолтным фоном и без стрелки." >&2
     exit 1
