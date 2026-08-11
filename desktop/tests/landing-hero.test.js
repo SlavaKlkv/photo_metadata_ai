@@ -101,7 +101,7 @@ test('подпись у кнопки скачивания называет ра�
   const note = html.match(/<p class="cta-note">([\s\S]*?)<\/p>/);
 
   expect(note).not.toBeNull();
-  expect(note[1]).toContain('DMG ~230 МБ');
+  expect(note[1]).toContain('DMG ~120 МБ');
 });
 
 test('числа статусных чипов в hero-мокапе сходятся с «All»', () => {
