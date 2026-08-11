@@ -61,15 +61,15 @@ function applyReleaseInfo(html, { version, dmgBytes, appBytes }) {
     // не «до первого разделителя»: так расхождение с разметкой всплывает
     // проверкой ниже, а не тихой порчей текста.
     .replace(
-      /(<p class="cta-note">)Загрузка \d+ МБ · на диске \d+ МБ ·/,
-      `$1Загрузка ${formatMb(dmgBytes)} МБ · на диске ${formatMb(appBytes)} МБ ·`,
+      /(<p class="cta-note">)Загрузка \d+ МБ · после установки \d+ МБ/,
+      `$1Загрузка ${formatMb(dmgBytes)} МБ · после установки ${formatMb(appBytes)} МБ`,
     );
 
   if (!updated.includes(dmgUrl)) {
     throw new Error('в лендинге не найдено ни одной ссылки на DMG');
   }
 
-  if (!/<p class="cta-note">Загрузка \d+ МБ · на диске \d+ МБ ·/.test(updated)) {
+  if (!/<p class="cta-note">Загрузка \d+ МБ · после установки \d+ МБ/.test(updated)) {
     throw new Error('в лендинге не найдена строка cta-note с размерами');
   }
 
