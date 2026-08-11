@@ -41,7 +41,7 @@ describe('ссылки на скриншоты указывают на суще�
 describe('тяжёлый скриншот IPTC подключается через превью', () => {
   test('превью существует рядом с оригиналом', () => {
     expect(
-      fs.existsSync(path.join(screenshotsDir, '15_exported_file_iptc_metadata_preview.png')),
+      fs.existsSync(path.join(screenshotsDir, '15_exported_file_iptc_metadata_1200.png')),
     ).toBe(true);
     expect(
       fs.existsSync(path.join(screenshotsDir, '15_exported_file_iptc_metadata.png')),
@@ -59,9 +59,9 @@ describe('тяжёлый скриншот IPTC подключается чере
     const index = fs.readFileSync(path.join(landingDir, 'index.html'), 'utf8');
     const screens = fs.readFileSync(path.join(landingDir, 'screens.html'), 'utf8');
 
-    expect(index).toContain('<img src="../screenshots/15_exported_file_iptc_metadata_thumb.png"');
+    expect(index).toContain('<img src="../screenshots/15_exported_file_iptc_metadata_640.png"');
     expect(screens).toContain(
-      '<img src="../screenshots/15_exported_file_iptc_metadata_preview.png"',
+      '<img src="../screenshots/15_exported_file_iptc_metadata_1200.png"',
     );
   });
 
@@ -77,8 +77,8 @@ describe('тяжёлый скриншот IPTC подключается чере
 describe('скриншот Context подключается через превью', () => {
   test.each([
     '05_upload_and_context.png',
-    '05_upload_and_context_preview.png',
-    '05_upload_and_context_thumb.png',
+    '05_upload_and_context_1200.png',
+    '05_upload_and_context_640.png',
   ])('%s существует', (name) => {
     expect(fs.existsSync(path.join(screenshotsDir, name))).toBe(true);
   });
@@ -95,8 +95,8 @@ describe('скриншот Context подключается через прев�
     const index = fs.readFileSync(path.join(landingDir, 'index.html'), 'utf8');
     const screens = fs.readFileSync(path.join(landingDir, 'screens.html'), 'utf8');
 
-    expect(index).toContain('<img src="../screenshots/05_upload_and_context_thumb.png"');
-    expect(screens).toContain('<img src="../screenshots/05_upload_and_context_preview.png"');
+    expect(index).toContain('<img src="../screenshots/05_upload_and_context_640.png"');
+    expect(screens).toContain('<img src="../screenshots/05_upload_and_context_1200.png"');
   });
 
   test('лайтбокс на screens.html открывает полноразмерный оригинал', () => {
@@ -111,7 +111,7 @@ describe('скриншот Context подключается через прев�
 describe('скриншот Editorial-полей подключается через превью', () => {
   test.each([
     '11_select_ready_only.png',
-    '11_select_ready_only_preview.png',
+    '11_select_ready_only_1200.png',
   ])('%s существует', (name) => {
     expect(fs.existsSync(path.join(screenshotsDir, name))).toBe(true);
   });
@@ -125,7 +125,7 @@ describe('скриншот Editorial-полей подключается чер�
   test('сетка экранов грузит превью', () => {
     const screens = fs.readFileSync(path.join(landingDir, 'screens.html'), 'utf8');
 
-    expect(screens).toContain('<img src="../screenshots/11_select_ready_only_preview.png"');
+    expect(screens).toContain('<img src="../screenshots/11_select_ready_only_1200.png"');
   });
 
   test('лайтбокс на screens.html открывает полноразмерный оригинал', () => {
@@ -141,7 +141,7 @@ describe('скриншот Editorial-полей подключается чер�
 describe('скриншот готового CSV подключается через превью', () => {
   test.each([
     '14_exported_csv_adobe_stock.png',
-    '14_exported_csv_adobe_stock_preview.png',
+    '14_exported_csv_adobe_stock_1200.png',
   ])('%s существует', (name) => {
     expect(fs.existsSync(path.join(screenshotsDir, name))).toBe(true);
   });
@@ -155,7 +155,7 @@ describe('скриншот готового CSV подключается чер�
   test('сетка экранов грузит превью', () => {
     const screens = fs.readFileSync(path.join(landingDir, 'screens.html'), 'utf8');
 
-    expect(screens).toContain('<img src="../screenshots/14_exported_csv_adobe_stock_preview.png"');
+    expect(screens).toContain('<img src="../screenshots/14_exported_csv_adobe_stock_1200.png"');
   });
 
   test('лайтбокс на screens.html открывает полноразмерный оригинал', () => {
