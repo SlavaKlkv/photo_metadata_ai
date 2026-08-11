@@ -35,13 +35,12 @@ test('ответы фиксируют Gatekeeper, AI-вариант, JPEG и р�
   const html = readLanding();
   const faq = faqSection(html)[1];
 
-  expect(faq).toContain('Gatekeeper');
-  // На macOS 15+ обход через правый щелчок убран, поэтому основной путь —
-  // «Открыть всё равно» в настройках безопасности; правый щелчок остаётся
-  // только как вариант для старых систем.
-  expect(faq).toContain('Открыть всё равно');
-  expect(faq).toContain('Конфиденциальность');
-  expect(faq).toContain('правым щелчком');
+  // На macOS 15+ ни один GUI-обход не работает: проверено на скачанном из
+  // релиза образе. Обещать «Открыть всё равно» как рабочий путь нельзя —
+  // остаётся только снятие карантина в терминале.
+  expect(faq).toContain('карантин');
+  expect(faq).toContain('xattr -dr com.apple.quarantine');
+  expect(faq).not.toMatch(/нажмите «Открыть всё равно»/);
   expect(faq).toMatch(/Ollama|Qwen2\.5-VL|Gemini|OpenRouter/);
   expect(faq).toContain('JPEG');
   expect(faq).toContain('оригиналы остаются нетронутыми');
