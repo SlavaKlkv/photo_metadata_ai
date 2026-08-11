@@ -28,6 +28,14 @@ describe('electron-builder.yml', () => {
     expect(builderConfig).toMatch(/identity: '-'/);
     expect(builderConfig).toMatch(/hardenedRuntime: false/);
   });
+
+  // На раннерах GitHub Python приезжает framework-сборкой, и electron-builder
+  // спотыкается на вложенном Python.framework внутри onedir-бандла:
+  // "bundle format is ambiguous". На машине разработчика Python обычный,
+  // поэтому локально сборка проходила, а в CI падала.
+  it('не подписывает бэкенд отдельно', () => {
+    expect(builderConfig).toMatch(/signIgnore:\n\s+- Contents\/Resources\/backend\//);
+  });
 });
 
 describe('build-mac.sh', () => {
