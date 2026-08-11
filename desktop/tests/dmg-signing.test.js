@@ -124,6 +124,15 @@ describe('release.yml', () => {
     expect(workflow).toMatch(/build-mac\.sh --app-only --publish always/);
   });
 
+  // Бэкенд собран в onedir: между job'ами обязан ехать весь каталог.
+  // Передача одного файла давала внешне успешную сборку с неработающим
+  // приложением внутри.
+  it('передаёт между job-ами весь onedir-бандл, а не один файл', () => {
+    expect(workflow).toMatch(/path: desktop\/resources\/backend\/arm64\/\n/);
+    expect(workflow).toMatch(/cp -R artifacts\/\. desktop\/resources\/backend\/arm64\//);
+    expect(workflow).toMatch(/test -d desktop\/resources\/backend\/arm64\/_internal/);
+  });
+
   // Тег занят после первой попытки, а перезапустить сборку нечем:
   // единственный триггер по push тега загонял в тупик, когда job падал
   // по внешней причине.
