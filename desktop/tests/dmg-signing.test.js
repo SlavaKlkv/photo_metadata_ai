@@ -99,6 +99,16 @@ describe('поиск dmgbuild в кэше', () => {
 
     expect(fn).toMatch(/\|\| true/);
   });
+
+  // Свежераспакованный бандл приезжает без бита исполняемости: у
+  // разработчика он выставлен прошлыми распаковками, на чистом раннере —
+  // нет, и сборка падала уже после успешного скачивания.
+  it('сам проставляет бит исполняемости скачанному бандлу', () => {
+    const fn = buildScript.match(/ensure_dmgbuild\(\) \{[\s\S]*?\n\}/)[0];
+
+    expect(fn).toMatch(/chmod \+x "\$REAL_DMGBUILD"/);
+    expect(fn).toMatch(/не удалось сделать .* исполняемым/);
+  });
 });
 
 // Workflow не должен возвращаться к публикации силами electron-builder.
@@ -110,6 +120,29 @@ describe('release.yml', () => {
 
   it('собирает и публикует через build-mac.sh', () => {
     expect(workflow).toMatch(/build-mac\.sh --app-only --publish always/);
+  });
+
+  // Тег занят после первой попытки, а перезапустить сборку нечем:
+  // единственный триггер по push тега загонял в тупик, когда job падал
+  // по внешней причине.
+  describe('ручной запуск', () => {
+    it('доступен с вкладки Actions', () => {
+      expect(workflow).toMatch(/workflow_dispatch:/);
+    });
+
+    it('по умолчанию ничего не публикует', () => {
+      const input = workflow.match(/publish:[\s\S]*?default: (\w+)/);
+
+      expect(input[1]).toBe('false');
+    });
+
+    it('не сверяет версию с тегом, когда тега нет', () => {
+      expect(workflow).toMatch(/if: github\.ref_type == 'tag'/);
+    });
+
+    it('публикует по тегу всегда, вручную — только по запросу', () => {
+      expect(workflow).toMatch(/github\.ref_type }}" == "tag" \|\| "\$\{\{ inputs\.publish }}" == "true"/);
+    });
   });
 
   // Intel-срез убран вместе с поддержкой архитектуры. Матрица раннеров

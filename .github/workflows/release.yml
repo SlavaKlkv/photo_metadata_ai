@@ -4,6 +4,15 @@ on:
   push:
     tags:
       - 'v*'
+  # Ручной запуск с вкладки Actions. Нужен, когда сборка упала по внешней
+  # причине или когда надо проверить изменения в самой сборке, не выпуская
+  # релиз: тег уже занят, а создавать лишний ради перезапуска незачем.
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Загрузить артефакты в черновик релиза'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -53,7 +62,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # При ручном запуске тега нет, сверять не с чем.
       - name: Verify tag matches desktop version
+        if: github.ref_type == 'tag'
         shell: bash
         run: |
           package_version="$(node -p "require('./desktop/package.json').version")"
@@ -100,4 +111,12 @@ jobs:
         #
         # Релиз создаётся черновиком: проверка обновлений увидит его
         # только после ручной публикации — это smoke-test-гейт.
-        run: desktop/scripts/build-mac.sh --app-only --publish always
+        #
+        # По тегу публикуем всегда, при ручном запуске — только если
+        # попросили: обычно он нужен, чтобы проверить саму сборку.
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" || "${{ inputs.publish }}" == "true" ]]; then
+            desktop/scripts/build-mac.sh --app-only --publish always
+          else
+            desktop/scripts/build-mac.sh --app-only
+          fi
