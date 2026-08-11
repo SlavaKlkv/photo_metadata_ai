@@ -143,8 +143,12 @@ run_smoke() {
 # версию и её контрольные суммы, поэтому URL здесь не хардкодится).
 # Результат — путь в REAL_DMGBUILD.
 find_cached_dmgbuild() {
+  # `|| true` обязателен: на чистой машине каталога кэша нет, find
+  # возвращает 1, pipefail пробрасывает этот код через head, и под set -e
+  # сборка падала прямо на присваивании — молча, без единого сообщения.
+  # Пустой кэш это норма: ниже bundle просто скачается.
   find "$HOME/Library/Caches/electron-builder" \
-    -type f -name dmgbuild -path '*dmgbuild-bundle*' 2>/dev/null | head -1
+    -type f -name dmgbuild -path '*dmgbuild-bundle*' 2>/dev/null | head -1 || true
 }
 
 ensure_dmgbuild() {

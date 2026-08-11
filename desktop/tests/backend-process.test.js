@@ -56,9 +56,9 @@ test('uses built development binary when available', () => {
   );
 });
 
-// Бинарники backend лежат раздельно по архитектурам: склейка lipo в
-// universal2 отдавала Intel-срезу arm64-библиотеки, и backend падал при
-// старте на Intel. Регрессия видна только по выбранному пути.
+// Путь к бинарнику зашит на arm64: приложение собирается только под
+// Apple Silicon. Подкаталог с архитектурой сохранён — по нему бинарник
+// кладёт build-mac.sh и по нему же ищет процесс killOrphanedBackends().
 function withPackagedArch(arch, action) {
   app.isPackaged = true;
   const previousResourcesPath = process.resourcesPath;
@@ -91,11 +91,13 @@ test('uses arm64 packaged backend on Apple Silicon', () => {
   );
 });
 
-test('uses x86_64 packaged backend on Intel', () => {
+// Intel-сборки больше нет, поэтому путь не зависит от process.arch:
+// прежняя ветка на 'x64' вела к несуществующему каталогу.
+test('не подставляет x86_64-путь даже при process.arch = x64', () => {
   spawnPackagedWithArch('x64');
 
   expect(childProcess.spawn).toHaveBeenCalledWith(
-    '/Applications/Test.app/Contents/Resources/backend/x86_64/photo-metadata-backend',
+    '/Applications/Test.app/Contents/Resources/backend/arm64/photo-metadata-backend',
     [],
     expect.objectContaining({
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -126,13 +128,13 @@ test('kills orphaned arm64 backend by its exact command line', () => {
   ]);
 });
 
-test('kills orphaned x86_64 backend by its exact command line', () => {
+test('ищет осиротевший процесс по arm64-пути независимо от process.arch', () => {
   withPackagedArch('x64', killOrphanedBackends);
 
   expect(childProcess.execFileSync).toHaveBeenCalledWith('/usr/bin/pkill', [
     '-f',
     '-x',
-    '/Applications/Test.app/Contents/Resources/backend/x86_64/photo-metadata-backend',
+    '/Applications/Test.app/Contents/Resources/backend/arm64/photo-metadata-backend',
   ]);
 });
 
