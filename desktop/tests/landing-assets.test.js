@@ -71,9 +71,9 @@ describe('изображения объявляют свои размеры', ()
 // оригиналы на 3424 px (больше мегабайта каждый) незачем.
 describe('тяжёлые снимки подключены через уменьшенные копии', () => {
   test.each([
-    '06_processing_thumb.png',
-    '13_export_completed_thumb.png',
-    '07_review_metadata_showcase.png',
+    '06_processing_640.png',
+    '13_export_completed_640.png',
+    '07_review_metadata_1200.png',
   ])('%s существует', (name) => {
     expect(
       fs.existsSync(path.resolve(__dirname, '../../docs/screenshots', name)),
@@ -86,6 +86,15 @@ describe('тяжёлые снимки подключены через умень
     expect(html).not.toContain('<img src="../screenshots/06_processing.png"');
     expect(html).not.toContain('<img src="../screenshots/13_export_completed.png"');
     expect(html).not.toContain('<img src="../screenshots/07_review_metadata_preview.png"');
+  });
+
+  // Карточка 07 тянула оригинал в 1,6 МБ: «preview» в его имени — часть названия
+  // экрана «Metadata Preview», а не суффикс размера, и копию легко не заметить.
+  test('сетка экранов не грузит оригинал 07 в карточку', () => {
+    const html = readPage('screens.html');
+
+    expect(html).not.toContain('<img src="../screenshots/07_review_metadata_preview.png"');
+    expect(html).toContain('<img src="../screenshots/07_review_metadata_1200.png"');
   });
 
   test('страница скриншотов открывает в лайтбоксе полноразмерные оригиналы', () => {
