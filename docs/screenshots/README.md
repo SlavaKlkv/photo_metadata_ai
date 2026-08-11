@@ -52,9 +52,13 @@
 sips --resampleWidth 640 06_processing.png --out 06_processing_640.png
 ```
 
+Суффикс дописывается к полному имени оригинала, ничего из него не выбрасывая.
+
 > [!NOTE]
-> У `07_review_metadata_preview.png` слово «preview» — часть названия экрана
-> («Metadata Preview»), а не суффикс размера: это оригинал в 3424 px.
+> У 07 в самом имени есть слово «preview» — это часть названия экрана
+> («Metadata Preview»), а не суффикс размера. Поэтому оригинал называется
+> `07_review_metadata_preview.png` (3424 px), а его копия —
+> `07_review_metadata_preview_1200.png`.
 
 ### Почему после уменьшения надо проверять рамки
 
