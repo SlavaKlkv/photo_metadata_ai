@@ -13,24 +13,20 @@ const {
 
 const buildScript = fs.readFileSync(path.resolve(__dirname, '../scripts/build-mac.sh'), 'utf8');
 
-// Неподписанный DMG под карантином Gatekeeper не монтирует вовсе: по
-// клику из панели загрузок не происходит ничего. Ad-hoc подпись образа —
-// единственное, что возвращает штатный диалог без учётных данных Apple.
-describe('сборка подписывает DMG', () => {
-  it('подписывает образ ad-hoc и падает, если подпись не легла', () => {
-    expect(buildScript).toMatch(/codesign --force --sign - "\$dmg"/);
-    expect(buildScript).toMatch(/Signature=adhoc/);
-    expect(buildScript).toMatch(/ОШИБКА: ad-hoc подпись не легла/);
+// Ad-hoc подпись образа ломает открытие скачанного файла: Gatekeeper
+// проверяет подпись DMG, не находит Developer ID и блокирует
+// монтирование — двойной клик из браузера даёт ошибку -128, без диалога
+// и без кнопки «Открыть всё равно». Неподписанный образ монтируется
+// штатно. Проверено на одном и том же содержимом.
+describe('сборка не подписывает DMG', () => {
+  it('не вызывает codesign для образа', () => {
+    expect(buildScript).not.toMatch(/codesign --force --sign - "\$dmg"/);
+    expect(buildScript).not.toMatch(/sign_dmg/);
   });
 
-  // `codesign -dv | grep -q` под pipefail давал ложное «подпись не легла»
-  // на заведомо подписанном образе: код конвейера складывается из обеих
-  // команд. Вывод забираем в переменную и печатаем его при сбое.
-  it('проверяет подпись без конвейера и показывает вывод codesign при сбое', () => {
-    expect(buildScript).toMatch(/signature="\$\(codesign -dv "\$dmg" 2>&1 \|\| true\)"/);
-    expect(buildScript).toMatch(/\[\[ "\$signature" != \*"Signature=adhoc"\* \]\]/);
-    expect(buildScript).toMatch(/echo "\$signature" >&2/);
-    expect(buildScript).not.toMatch(/codesign -dv "\$dmg" 2>&1 \| grep/);
+  it('падает, если образ всё же оказался подписан', () => {
+    expect(buildScript).toMatch(/\[\[ "\$signature" == \*"Signature="\* \]\]/);
+    expect(buildScript).toMatch(/подписан — скачанный образ не смонтируется/);
   });
 
   it('не выпускает сборку, когда DMG не собрался', () => {
@@ -45,17 +41,16 @@ describe('сборка подписывает DMG', () => {
     expect(buildScript).not.toMatch(/for dmg in "\$DESKTOP_DIR"\/out\/\*\.dmg/);
   });
 
-  it('пересчитывает манифест обновления после подписи', () => {
-    const signIndex = buildScript.indexOf('codesign --force --sign -');
-    const updateIndex = buildScript.indexOf('update-latest-mac.js');
-
-    expect(updateIndex).toBeGreaterThan(signIndex);
+  // Страховка на случай, если содержимое образа изменится после упаковки:
+  // иначе electron-updater отвергнет скачанный файл по несовпадению суммы.
+  it('сверяет манифест обновления с артефактами', () => {
+    expect(buildScript).toMatch(/update-latest-mac\.js/);
   });
 });
 
-// electron-builder публикует результат упаковки, то есть неподписанный
-// образ. Именно так в релиз v1.1.0 уехал DMG, который не открывался из
-// браузера. Публикацию делаем сами — строго после подписи.
+// electron-builder публикует результат упаковки до того, как сборка
+// успевает проверить образ и сверить манифест обновления. Публикацию
+// делаем сами — последним шагом.
 describe('публикация артефактов', () => {
   it('не даёт electron-builder публиковать самому', () => {
     expect(buildScript).toMatch(/npx electron-builder --mac --publish never/);
@@ -66,10 +61,8 @@ describe('публикация артефактов', () => {
     expect(buildScript).toMatch(/PUBLISH="\$\{arg#--publish=\}"/);
   });
 
-  it('грузит артефакты после подписи и пересчёта манифеста', () => {
-    const signIndex = buildScript.indexOf('sign_dmg\n  publish_artifacts');
-
-    expect(signIndex).toBeGreaterThan(-1);
+  it('грузит артефакты после проверки образа и сверки манифеста', () => {
+    expect(buildScript).toMatch(/check_dmg\n  publish_artifacts/);
     expect(buildScript.indexOf('gh release upload')).toBeGreaterThan(
       buildScript.indexOf('update-latest-mac.js'),
     );
