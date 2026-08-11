@@ -47,7 +47,7 @@ test('uses built development binary when available', () => {
   spawnBackend();
 
   expect(childProcess.spawn).toHaveBeenCalledWith(
-    expect.stringMatching(/backend\/dist\/photo-metadata-backend$/),
+    expect.stringMatching(/backend\/dist\/photo-metadata-backend\/photo-metadata-backend$/),
     [],
     expect.objectContaining({
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -146,7 +146,7 @@ test('kills orphaned development binary by its path', () => {
   expect(childProcess.execFileSync).toHaveBeenCalledWith('/usr/bin/pkill', [
     '-f',
     '-x',
-    expect.stringMatching(/backend\/dist\/photo-metadata-backend$/),
+    expect.stringMatching(/backend\/dist\/photo-metadata-backend\/photo-metadata-backend$/),
   ]);
 });
 

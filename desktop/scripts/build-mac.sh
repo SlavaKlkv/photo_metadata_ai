@@ -100,8 +100,9 @@ build_frontend() {
 }
 
 # Собирает backend нативно для архитектуры текущего хоста.
-# dist/photo-metadata-backend остаётся под нативным именем: на него
-# опирается dev-режим в desktop/src/backend-process.js.
+# Режим onedir: в dist/photo-metadata-backend/ лежит исполняемый файл и
+# распакованные библиотеки. Onefile распаковывал ~26 МБ во временный
+# каталог при каждом запуске — приложение стартовало около 7,5 секунды.
 build_backend_native() {
   echo "==> Backend PyInstaller: $(uname -m) (нативно)"
   cd "$BACKEND_DIR"
@@ -117,15 +118,26 @@ build_backend_native() {
 # Путь бинарника в бандле важен: killOrphanedBackends() в
 # desktop/src/backend-process.js ищет процесс по полному пути запуска,
 # а переименование сломало бы совпадение с бинарником в бандле.
+#
+# PyInstaller в режиме onedir кладёт в dist/ каталог, поэтому копируется
+# его содержимое, а не один файл: исполняемый остаётся по прежнему пути
+# resources/backend/<arch>/photo-metadata-backend, рядом ложится _internal.
 layout_backend() {
-  local arch="$1" dist_dir="$2"
-  check_arch "$dist_dir/photo-metadata-backend" "$arch"
+  local arch="$1" dist_dir="$2" target
+  target="$DESKTOP_DIR/resources/backend/$arch"
+
+  check_arch "$dist_dir/photo-metadata-backend/photo-metadata-backend" "$arch"
+
   # Остаток старой плоской раскладки: extraResources копирует
   # resources/backend/ целиком, и файл из прежних сборок иначе доехал бы
   # до бандла лишней копией.
   rm -f "$DESKTOP_DIR/resources/backend/photo-metadata-backend"
-  mkdir -p "$DESKTOP_DIR/resources/backend/$arch"
-  cp "$dist_dir/photo-metadata-backend" "$DESKTOP_DIR/resources/backend/$arch/"
+
+  # Каталог пересоздаётся: от прежней сборки в нём могли остаться файлы,
+  # которых больше нет, и они уехали бы в бандл мёртвым грузом.
+  rm -rf "$target"
+  mkdir -p "$target"
+  cp -R "$dist_dir/photo-metadata-backend/." "$target/"
 }
 
 # Единственная проверка, которая ловит нерабочий бинарник до релиза:
@@ -336,7 +348,7 @@ if [[ -n "$BACKEND_ONLY" ]]; then
   build_frontend
   build_backend_native
   layout_backend "$BACKEND_ONLY" dist
-  run_smoke "$BACKEND_DIR/dist/photo-metadata-backend"
+  run_smoke "$BACKEND_DIR/dist/photo-metadata-backend/photo-metadata-backend"
   echo "==> Готово: resources/backend/$BACKEND_ONLY/photo-metadata-backend"
   exit 0
 fi
@@ -347,7 +359,7 @@ build_frontend
 echo "==> [2/3] Backend"
 build_backend_native
 layout_backend arm64 dist
-run_smoke "$BACKEND_DIR/dist/photo-metadata-backend"
+run_smoke "$BACKEND_DIR/dist/photo-metadata-backend/photo-metadata-backend"
 
 echo "==> [3/3] Приложение"
 build_app

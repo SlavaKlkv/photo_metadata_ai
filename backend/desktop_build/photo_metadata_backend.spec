@@ -4,7 +4,13 @@
 Сборка (из каталога backend/):
     uv run pyinstaller desktop_build/photo_metadata_backend.spec
 
-Результат: backend/dist/photo-metadata-backend (onefile).
+Результат: backend/dist/photo-metadata-backend/ (onedir) с исполняемым
+файлом photo-metadata-backend внутри.
+
+Режим onedir выбран ради времени старта: onefile при каждом запуске
+распаковывал ~26 МБ Python и библиотек во временный каталог, из-за чего
+приложение открывалось около 7,5 секунды — и это на каждом запуске, а не
+только на первом.
 Фронтенд-сборка (frontend/build) встраивается в бандл как frontend_build
 и раздаётся FastAPI StaticFiles из app/main.py во frozen-режиме.
 """
@@ -69,9 +75,9 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
-    [],
+    # Бинарники и данные едут в COLLECT, а не внутрь исполняемого файла:
+    # это и отличает onedir от onefile.
+    exclude_binaries=True,
     name='photo-metadata-backend',
     debug=False,
     bootloader_ignore_signals=False,
@@ -84,4 +90,14 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    name='photo-metadata-backend',
 )

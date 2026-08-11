@@ -6,10 +6,13 @@ const path = require('path');
 const { app } = require('electron');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
+// PyInstaller собирает бэкенд в режиме onedir, поэтому dist/ содержит
+// каталог, а исполняемый файл лежит внутри него под тем же именем.
 const DEV_BINARY = path.join(
   PROJECT_ROOT,
   'backend',
   'dist',
+  'photo-metadata-backend',
   'photo-metadata-backend'
 );
 const BACKEND_CWD = path.join(PROJECT_ROOT, 'backend');
