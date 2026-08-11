@@ -1,7 +1,7 @@
 # Photo Metadata AI — macOS Desktop
 
-Electron-оболочка, упаковывающая FastAPI-бэкенд (PyInstaller, срезы arm64 и x86_64)
-и React-фронтенд в одно universal macOS-приложение (`.app`/`.dmg`).
+Electron-оболочка, упаковывающая FastAPI-бэкенд (PyInstaller, arm64)
+и React-фронтенд в macOS-приложение для Apple Silicon (`.app`/`.dmg`).
 
 Общее описание проекта и команды разработки — в [корневом README](../README.md).
 
@@ -11,16 +11,16 @@ Electron-оболочка, упаковывающая FastAPI-бэкенд (PyIn
   (FastAPI `StaticFiles` на `/`), Electron просто открывает `http://localhost:8000`.
 - **Electron управляет только жизненным циклом:** запуск бэкенда, ожидание health,
   окно, завершение процесса при выходе.
-- **Срезы backend лежат раздельно** (`resources/backend/{arm64,x86_64}/`) — нужный
-  выбирается в рантайме по `process.arch`.
+- **Бинарник backend лежит в `resources/backend/arm64/`** — путь с архитектурой
+  сохранён: по нему бинарник ищет `src/backend-process.js`.
 - **Данные пользователя живут вне бандла** и переживают обновления:
   `~/Library/Application Support/Photo Metadata AI` (задачи, настройки, SQLite)
   и `~/Documents/Photo Metadata AI/results`.
 
 > [!NOTE]
-> Склейка срезов через `lipo` невозможна: PyInstaller onefile хранит Python/dylib
-> overlay в конце файла, а `lipo` сохраняет только один overlay. Отсюда и раздельные
-> каталоги вместо одного универсального бинарника.
+> Приложение собирается только под Apple Silicon. Intel-срез убран вместе с
+> поддержкой архитектуры: macOS 26 Tahoe — последняя версия macOS для Intel-маков,
+> а x86_64-раннеры GitHub Actions доступны лишь до 2027 года.
 
 ## Требования
 
@@ -28,8 +28,7 @@ Electron-оболочка, упаковывающая FastAPI-бэкенд (PyIn
 | --- | --- |
 | Node.js 20 LTS | та же версия используется в release workflow |
 | [uv](https://docs.astral.sh/uv/) | окружения и запуск бэкенда |
-| Xcode Command Line Tools | `lipo` для проверки срезов, `codesign` |
-| Rosetta 2 | локальная x86_64-сборка бэкенда на Apple Silicon:<br>`softwareupdate --install-rosetta --agree-to-license` |
+| Xcode Command Line Tools | `lipo` для проверки архитектуры, `codesign` |
 
 ## Запуск в разработке
 
@@ -41,7 +40,7 @@ cd desktop && npm install && npm run dev
 
 | # | Когда | Что запускается |
 | --- | --- | --- |
-| 1 | Упакованное приложение | бинарник из `resources/backend/<arch>/` |
+| 1 | Упакованное приложение | бинарник из `resources/backend/arm64/` |
 | 2 | Dev с собранным бинарником | `backend/dist/photo-metadata-backend`, если он существует |
 | 3 | Dev из исходников | `uv run python -m app.desktop_main` — самый быстрый цикл, PyInstaller не нужен |
 
@@ -54,29 +53,27 @@ cd desktop && npm install && npm run dev
 desktop/scripts/build-mac.sh
 ```
 
-Артефакты появляются в `desktop/out/` (`.dmg`, `.zip`, `mac-universal/Photo Metadata AI.app`).
+Артефакты появляются в `desktop/out/` (`.dmg`, `.zip`, `mac-arm64/Photo Metadata AI.app`).
 
 Что делает скрипт по шагам:
 
 ```mermaid
 flowchart LR
   F["сборка<br/>фронтенда"] --> A["PyInstaller<br/>arm64"]
-  A --> X["PyInstaller<br/>x86_64<br/>Rosetta"]
-  X --> S["дымовой тест<br/>срезов"]
+  A --> S["дымовой тест<br/>бинарника"]
   S --> C["копирование<br/>в resources/"]
-  C --> B["electron-builder<br/>universal"]
+  C --> B["electron-builder<br/>arm64"]
 ```
 
-Срез x86_64 собирается в отдельном окружении `.venv-x86_64`, готовые бинарники
-раскладываются по `resources/backend/{arm64,x86_64}/`. Исходный `build/icon.png`
+Готовый бинарник раскладывается в `resources/backend/arm64/`. Исходный `build/icon.png`
 1024×1024 конвертируется в ICNS средствами electron-builder.
 
 Частичный запуск (как в release workflow):
 
 | Флаг | Что делает |
 | --- | --- |
-| `--backend-only=arm64\|x86_64` | только фронтенд + backend этого среза (нативно, хост должен совпадать с целевой архитектурой) |
-| `--app-only` | только electron-builder; ожидает готовые оба среза в `resources/backend/` |
+| `--backend-only=arm64` | только фронтенд + backend (нативно, хост обязан быть Apple Silicon) |
+| `--app-only` | только electron-builder; ожидает готовый бинарник в `resources/backend/arm64/` |
 
 ## Дымовой тест бэкенд-бинарника
 
@@ -103,12 +100,16 @@ process → results → export.
 
 > [!IMPORTANT]
 > При первом открытии скачанного приложения Gatekeeper покажет предупреждение.
-> Обойти можно тремя способами:
+> На macOS 15 и новее обход через правый клик убран, порядок такой:
 >
-> 1. Правый клик на `.app` → **Открыть** → в диалоге снова **Открыть**.
-> 2. Системные настройки → **Конфиденциальность и безопасность** → **Всё равно открыть**.
-> 3. Снять карантин-атрибут в терминале:
+> 1. Нажать «Готово», затем Системные настройки → **Конфиденциальность и безопасность**
+>    → раздел «Безопасность» → **Открыть всё равно** (кнопка живёт около часа).
+> 2. На macOS 14 и старше достаточно правого клика на `.app` → **Открыть**.
+> 3. Либо снять карантин-атрибут в терминале:
 >    `xattr -dr com.apple.quarantine "/Applications/Photo Metadata AI.app"`
+>
+> То же касается самого `.dmg`: образ подписывается ad-hoc в `build-mac.sh`, иначе
+> под карантином он не монтируется вовсе — по клику из браузера не происходит ничего.
 
 ### Обновление (ручной flow)
 
@@ -128,7 +129,7 @@ process → results → export.
 
 1. Изменить `version` в `desktop/package.json` и закоммитить изменение.
 2. Создать совпадающий тег и отправить его: `git tag vX.Y.Z && git push origin vX.Y.Z`.
-3. GitHub Actions соберёт universal `.dmg` и `.zip` и загрузит их в draft-релиз.
+3. GitHub Actions соберёт arm64 `.dmg` и `.zip` и загрузит их в draft-релиз.
 4. Проверить draft-релиз и опубликовать его вручную.
 
 > [!NOTE]

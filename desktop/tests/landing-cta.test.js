@@ -5,7 +5,7 @@ const path = require('path');
 
 const landingPath = path.resolve(__dirname, '../../docs/landing/index.html');
 const dmgUrl =
-  'https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.1.0/Photo-Metadata-AI-1.1.0-universal.dmg';
+  'https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.2.0/Photo-Metadata-AI-1.2.0-arm64.dmg';
 
 function readLanding() {
   return fs.readFileSync(landingPath, 'utf8');
@@ -13,7 +13,7 @@ function readLanding() {
 
 // Все CTA скачивания обязаны указывать на один и тот же релиз: иначе
 // шапка, hero и финальный блок разъедутся по версиям.
-test('кнопки скачивания DMG сходятся на один релиз 1.1.0-universal', () => {
+test('кнопки скачивания DMG сходятся на один релиз 1.2.0-arm64', () => {
   const html = readLanding();
   const dmgHrefs = [...html.matchAll(/href="(https:\/\/github\.com\/SlavaKlkv\/photo_metadata_ai\/releases\/download\/[^"]+\.dmg)"/g)].map(
     (m) => m[1],

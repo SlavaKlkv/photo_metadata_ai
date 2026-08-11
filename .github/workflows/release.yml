@@ -9,21 +9,11 @@ permissions:
   contents: write
 
 jobs:
-  # Каждый срез собирается на своей архитектуре нативно. Сборка x86_64
-  # под Rosetta на ARM-раннере — то самое слепое пятно, из-за которого
-  # нерабочий Intel-бинарник доехал до релиза: Rosetta подтверждает лишь
-  # факт запуска, транслируя x86_64 на ARM, и не проверяет SIMD-пути
-  # numpy/Pillow, порядок байт в EXIF и выравнивание структур.
+  # Бэкенд собирается нативно на Apple Silicon. Intel-срез убран вместе
+  # с поддержкой архитектуры: macOS 26 Tahoe — последняя версия macOS
+  # для Intel, а x86_64-раннеры GitHub Actions доступны лишь до 2027-го.
   build-backend:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-13 # Intel
-            arch: x86_64
-          - os: macos-14 # Apple Silicon
-            arch: arm64
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-14 # Apple Silicon
     timeout-minutes: 45
 
     steps:
@@ -44,14 +34,14 @@ jobs:
 
       # Скрипт сам проверяет, что uname -m совпадает с целевым срезом, и
       # прогоняет дымовой тест собранного бинарника.
-      - name: Build backend (${{ matrix.arch }})
-        run: desktop/scripts/build-mac.sh --backend-only=${{ matrix.arch }}
+      - name: Build backend (arm64)
+        run: desktop/scripts/build-mac.sh --backend-only=arm64
 
       - name: Upload backend binary
         uses: actions/upload-artifact@v4
         with:
-          name: backend-${{ matrix.arch }}
-          path: desktop/resources/backend/${{ matrix.arch }}/photo-metadata-backend
+          name: backend-arm64
+          path: desktop/resources/backend/arm64/photo-metadata-backend
           retention-days: 1
 
   build-app:
@@ -80,25 +70,24 @@ jobs:
           cache: npm
           cache-dependency-path: desktop/package-lock.json
 
-      - name: Download backend binaries
+      - name: Download backend binary
         uses: actions/download-artifact@v4
         with:
-          pattern: backend-*
+          name: backend-arm64
           path: artifacts
 
-      # upload-artifact не сохраняет executable-бит, а раскладка по
-      # подкаталогам {arm64,x86_64} обязательна: имя файла в них
-      # одинаковое, по нему x64ArchFiles разводит срезы при universal-мерже.
-      - name: Lay out backend binaries
+      # upload-artifact не сохраняет executable-бит, а подкаталог с
+      # архитектурой обязателен: по этому пути бинарник ищет
+      # desktop/src/backend-process.js. lipo подтверждает, что срез
+      # действительно arm64, а не случайно приехавший x86_64.
+      - name: Lay out backend binary
         shell: bash
         run: |
-          for arch in arm64 x86_64; do
-            mkdir -p "desktop/resources/backend/$arch"
-            cp "artifacts/backend-$arch/photo-metadata-backend" \
-               "desktop/resources/backend/$arch/photo-metadata-backend"
-            chmod +x "desktop/resources/backend/$arch/photo-metadata-backend"
-            lipo -archs "desktop/resources/backend/$arch/photo-metadata-backend"
-          done
+          mkdir -p desktop/resources/backend/arm64
+          cp artifacts/photo-metadata-backend \
+             desktop/resources/backend/arm64/photo-metadata-backend
+          chmod +x desktop/resources/backend/arm64/photo-metadata-backend
+          lipo -archs desktop/resources/backend/arm64/photo-metadata-backend | grep -qw arm64
 
       - name: Build and upload macOS artifacts
         env:
