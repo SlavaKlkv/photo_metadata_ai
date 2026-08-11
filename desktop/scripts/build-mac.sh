@@ -3,25 +3,22 @@
 #
 # Этапы:
 #   1. Сборка фронтенда (frontend/build) — встраивается в бинарник backend.
-#   2. Backend PyInstaller: arm64 нативно + x86_64 через Rosetta 2.
-#      Бинарники намеренно НЕ склеиваются через lipo: spec собирает
-#      onefile, где Python и .dylib приклеены overlay'ем в конец файла,
-#      а lipo сохраняет только один overlay (arm64, т.к. сортирует срезы
-#      по CPU type). Оба среза тогда распаковывают arm64-библиотеки, и на
-#      Intel backend падает с "have 'arm64', need 'x86_64'". Поэтому оба
-#      бинарника кладутся раздельно, а нужный выбирается в рантайме
-#      (desktop/src/backend-process.js по process.arch).
-#   3. electron-builder --mac (universal) -> desktop/out/.
+#   2. Backend PyInstaller: arm64 нативно.
+#   3. electron-builder --mac (arm64) -> desktop/out/.
 #      Иконка build/icon.png конвертируется штатными средствами electron-builder.
 #
-# Частичный запуск (используется матрицей в .github/workflows/release.yml,
-# чтобы каждый срез собирался на своей архитектуре нативно, без Rosetta):
-#   --backend-only=<arm64|x86_64>  только фронтенд + backend этого среза.
-#                                  Собирает нативно и требует, чтобы хост
-#                                  был той же архитектуры.
-#   --app-only                     только electron-builder; ожидает готовые
-#                                  resources/backend/{arm64,x86_64}/.
-# Без этих флагов сборка идёт целиком, как раньше (x86_64 через Rosetta).
+# Приложение собирается только под Apple Silicon. Intel-срез убран
+# осознанно: macOS 26 Tahoe — последняя версия macOS для Intel-маков,
+# новых Intel-машин нет с 2020 года, а GitHub Actions сворачивает
+# x86_64-раннеры в 2027-м. Поддерживать вторую архитектуру ради
+# уходящей платформы дороже, чем она стоит: universal2 удваивал вес
+# бэкенда в бандле и требовал отдельного нативного раннера.
+#
+# Частичный запуск (используется .github/workflows/release.yml):
+#   --backend-only=arm64  только фронтенд + backend. Собирает нативно и
+#                         требует, чтобы хост был Apple Silicon.
+#   --app-only            только electron-builder; ожидает готовый
+#                         resources/backend/arm64/.
 #
 # Подпись — ad-hoc (identity: '-' в electron-builder.yml). Учётных
 # данных Apple Developer нет; Developer ID / нотаризация не включаются
@@ -39,13 +36,32 @@ SMOKE_TEST="$PROJECT_ROOT/desktop/scripts/smoke-test.py"
 
 BACKEND_ONLY=""
 APP_ONLY=""
+PUBLISH=""
 BUILDER_ARGS=()
 for arg in "$@"; do
   case "$arg" in
+    # Публикацию electron-builder не выполняет: он заливает артефакты
+    # прямо из упаковки, то есть до ad-hoc подписи DMG и до пересчёта
+    # latest-mac.yml. Так в релиз v1.1.0 и уехал неподписанный образ,
+    # который не открывался из браузера. Флаг перехватываем и грузим
+    # артефакты сами — после подписи.
+    --publish=*)
+      PUBLISH="${arg#--publish=}"
+      ;;
+    --publish)
+      PUBLISH="pending-value"
+      ;;
+    always | onTag | onTagOrDraft | never)
+      if [[ "$PUBLISH" == "pending-value" ]]; then
+        PUBLISH="$arg"
+      else
+        BUILDER_ARGS+=("$arg")
+      fi
+      ;;
     --backend-only=*)
       BACKEND_ONLY="${arg#--backend-only=}"
-      if [[ "$BACKEND_ONLY" != "arm64" && "$BACKEND_ONLY" != "x86_64" ]]; then
-        echo "ОШИБКА: --backend-only ожидает arm64 или x86_64, получено '$BACKEND_ONLY'" >&2
+      if [[ "$BACKEND_ONLY" != "arm64" ]]; then
+        echo "ОШИБКА: --backend-only ожидает arm64, получено '$BACKEND_ONLY'" >&2
         exit 1
       fi
       ;;
@@ -98,41 +114,23 @@ build_backend_native() {
     --distpath dist --workpath desktop_build/build
 }
 
-# Собирает x86_64-срез на ARM-хосте через Rosetta 2.
-build_backend_rosetta_x86_64() {
-  echo "==> Backend PyInstaller: x86_64 (Rosetta 2)"
-  cd "$BACKEND_DIR"
-  if ! arch -x86_64 /usr/bin/true 2>/dev/null; then
-    echo "Rosetta 2 не установлена. Выполните:" >&2
-    echo "  softwareupdate --install-rosetta --agree-to-license" >&2
-    exit 1
-  fi
-  UV_PROJECT_ENVIRONMENT=.venv-x86_64 uv sync --dev \
-    --python cpython-3.13-macos-x86_64-none
-  .venv-x86_64/bin/pyinstaller "$SPEC" --noconfirm \
-    --distpath dist-x86_64 --workpath desktop_build/build-x86_64
-}
-
-# Имя файла одинаковое в обоих подкаталогах: killOrphanedBackends()
-# в desktop/src/backend-process.js ищет процесс по полному пути
-# запуска, а переименование сломало бы совпадение с бинарником в бандле.
+# Путь бинарника в бандле важен: killOrphanedBackends() в
+# desktop/src/backend-process.js ищет процесс по полному пути запуска,
+# а переименование сломало бы совпадение с бинарником в бандле.
 layout_backend() {
   local arch="$1" dist_dir="$2"
   check_arch "$dist_dir/photo-metadata-backend" "$arch"
-  # Остаток старой плоской раскладки. extraResources копирует
-  # resources/backend/ целиком, а x64ArchFiles его не покрывает (glob
-  # требует подкаталог), поэтому файл едет в бандл идентичным в обеих
-  # ветках сборки и роняет universal-merge у всех, кто раньше собирал
-  # старую версию.
+  # Остаток старой плоской раскладки: extraResources копирует
+  # resources/backend/ целиком, и файл из прежних сборок иначе доехал бы
+  # до бандла лишней копией.
   rm -f "$DESKTOP_DIR/resources/backend/photo-metadata-backend"
   mkdir -p "$DESKTOP_DIR/resources/backend/$arch"
   cp "$dist_dir/photo-metadata-backend" "$DESKTOP_DIR/resources/backend/$arch/"
 }
 
-# Единственная проверка, которая ловит нерабочий срез до релиза:
-# юнит-тесты бинарник не запускают. Обёртка `arch` не нужна — на ARM-хосте
-# macOS сама поднимает чистый x86_64-бинарник под Rosetta. Нештатный порт —
-# чтобы сборка не конфликтовала с уже запущенным приложением на 8000.
+# Единственная проверка, которая ловит нерабочий бинарник до релиза:
+# юнит-тесты его не запускают. Нештатный порт — чтобы сборка не
+# конфликтовала с уже запущенным приложением на 8000.
 run_smoke() {
   local binary="$1"
   echo "==> Дымовой тест: $binary"
@@ -172,14 +170,24 @@ ensure_dmgbuild() {
 
 build_app() {
   echo "==> electron-builder --mac"
-  local arch
-  for arch in arm64 x86_64; do
-    if [[ ! -f "$DESKTOP_DIR/resources/backend/$arch/photo-metadata-backend" ]]; then
-      echo "ОШИБКА: нет resources/backend/$arch/photo-metadata-backend." >&2
-      echo "Соберите его: desktop/scripts/build-mac.sh --backend-only=$arch" >&2
-      exit 1
+
+  # extraResources копирует resources/backend/ целиком, поэтому срез
+  # чужой архитектуры от прежних сборок молча уехал бы в бандл и удвоил
+  # его вес. Каталог в .gitignore, так что чистой копией это не лечится.
+  local stale
+  for stale in "$DESKTOP_DIR"/resources/backend/*/; do
+    [[ -d "$stale" ]] || continue
+    if [[ "$(basename "$stale")" != "arm64" ]]; then
+      echo "  удаляю срез прежней сборки: $(basename "$stale")"
+      rm -rf "$stale"
     fi
   done
+
+  if [[ ! -f "$DESKTOP_DIR/resources/backend/arm64/photo-metadata-backend" ]]; then
+    echo "ОШИБКА: нет resources/backend/arm64/photo-metadata-backend." >&2
+    echo "Соберите его: desktop/scripts/build-mac.sh --backend-only=arm64" >&2
+    exit 1
+  fi
 
   cd "$DESKTOP_DIR"
   npm ci
@@ -201,9 +209,13 @@ build_app() {
   export REAL_DMGBUILD
   export CUSTOM_DMGBUILD_PATH="$DESKTOP_DIR/scripts/dmgbuild-wrapper.sh"
 
-  npx electron-builder --mac "${BUILDER_ARGS[@]+"${BUILDER_ARGS[@]}"}"
+  # --publish never жёстко: даже если флаг не передали, electron-builder
+  # умеет публиковать сам по наличию тега, а публиковать он может только
+  # неподписанное.
+  npx electron-builder --mac --publish never "${BUILDER_ARGS[@]+"${BUILDER_ARGS[@]}"}"
 
   sign_dmg
+  publish_artifacts
 }
 
 # Ad-hoc подпись самого образа.
@@ -259,6 +271,37 @@ sign_dmg() {
   node "$DESKTOP_DIR/scripts/update-latest-mac.js" "$DESKTOP_DIR/out"
 }
 
+# Загрузка артефактов в релиз — уже подписанных.
+#
+# Релиз создаётся черновиком: проверка обновлений видит его только после
+# ручной публикации, и это единственный гейт между сборкой и
+# пользователями — до публикации артефакт можно скачать и проверить.
+publish_artifacts() {
+  local version tag staging file target
+
+  [[ -n "$PUBLISH" && "$PUBLISH" != "never" ]] || return 0
+
+  version="$(node -p "require('$DESKTOP_DIR/package.json').version")"
+  tag="v$version"
+
+  # Имена артефактов приводятся к url-safe виду: GitHub всё равно заменит
+  # пробелы в ссылке на скачивание, а лендинг и latest-mac.yml ссылаются
+  # именно на дефисный вариант. Без переименования ссылки бьются в 404.
+  staging="$(mktemp -d)"
+  for file in "$DESKTOP_DIR"/out/*-"$version"-*.{dmg,zip,blockmap} "$DESKTOP_DIR/out/latest-mac.yml"; do
+    [[ -e "$file" ]] || continue
+    target="$(basename "$file" | tr ' ' '-')"
+    cp "$file" "$staging/$target"
+  done
+
+  if ! gh release view "$tag" >/dev/null 2>&1; then
+    gh release create "$tag" --draft --title "$tag" --notes 'Черновик: заметки заполняются вручную перед публикацией.'
+  fi
+
+  gh release upload "$tag" "$staging"/* --clobber
+  echo "==> Артефакты загружены в релиз $tag"
+}
+
 if [[ -n "$APP_ONLY" ]]; then
   build_app
   echo "==> Готово: артефакты в $DESKTOP_DIR/out/"
@@ -288,10 +331,7 @@ build_frontend
 echo "==> [2/3] Backend"
 build_backend_native
 layout_backend arm64 dist
-build_backend_rosetta_x86_64
-layout_backend x86_64 dist-x86_64
 run_smoke "$BACKEND_DIR/dist/photo-metadata-backend"
-run_smoke "$BACKEND_DIR/dist-x86_64/photo-metadata-backend"
 
 echo "==> [3/3] Приложение"
 build_app

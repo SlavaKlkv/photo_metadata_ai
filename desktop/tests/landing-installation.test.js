@@ -23,7 +23,8 @@ test('строка совместимости называет минималь�
   expect(compat).not.toBeNull();
   expect(compat[1]).toContain('macOS 11 или новее');
   expect(compat[1]).toContain('Apple Silicon');
-  expect(compat[1]).toContain('Intel');
+  // Intel больше не поддерживается — обещать совместимость нельзя.
+  expect(compat[1]).not.toContain('Intel');
 });
 
 test('технические детали доступны нативно и свёрнуты по умолчанию', () => {
