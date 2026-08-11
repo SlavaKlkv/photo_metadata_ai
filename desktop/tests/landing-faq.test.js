@@ -35,12 +35,15 @@ test('ответы фиксируют Gatekeeper, AI-вариант, JPEG и р�
   const html = readLanding();
   const faq = faqSection(html)[1];
 
-  // На macOS 15+ ни один GUI-обход не работает: проверено на скачанном из
-  // релиза образе. Обещать «Открыть всё равно» как рабочий путь нельзя —
-  // остаётся только снятие карантина в терминале.
+  // Основной путь — через настройки безопасности; терминальная команда
+  // остаётся запасной. Порядок обязателен к упоминанию: разрешение
+  // Gatekeeper выдаётся конкретной копии, и приложение, разрешённое в
+  // папке загрузок, после переноса в «Программы» блокируется снова.
   expect(faq).toContain('карантин');
+  expect(faq).toContain('Открыть всё равно');
+  expect(faq).toContain('Конфиденциальность');
+  expect(faq).toMatch(/до<\/b> первого запуска|до\s*<b>первого запуска/);
   expect(faq).toContain('xattr -dr com.apple.quarantine');
-  expect(faq).not.toMatch(/нажмите «Открыть всё равно»/);
   expect(faq).toMatch(/Ollama|Qwen2\.5-VL|Gemini|OpenRouter/);
   expect(faq).toContain('JPEG');
   expect(faq).toContain('оригиналы остаются нетронутыми');
