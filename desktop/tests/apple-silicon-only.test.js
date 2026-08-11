@@ -72,3 +72,32 @@ describe('версия', () => {
     expect(lock.packages[''].version).toBe(packageJson.version);
   });
 });
+
+// Onefile распаковывал ~26 МБ Python и библиотек во временный каталог при
+// КАЖДОМ запуске: до готовности бэкенда проходило ~7,5 секунды. В режиме
+// onedir файлы лежат распакованными в бандле, и старт занимает ~0,35 с.
+describe('режим сборки бэкенда', () => {
+  const spec = fs.readFileSync(
+    path.resolve(__dirname, '../../backend/desktop_build/photo_metadata_backend.spec'),
+    'utf8',
+  );
+
+  it('собирается в onedir, а не в onefile', () => {
+    expect(spec).toMatch(/exclude_binaries=True/);
+    expect(spec).toMatch(/coll = COLLECT\(/);
+  });
+
+  it('не кладёт бинарники и данные внутрь исполняемого файла', () => {
+    const exeBlock = spec.match(/exe = EXE\([\s\S]*?\n\)/)[0];
+
+    expect(exeBlock).not.toMatch(/a\.binaries/);
+    expect(exeBlock).not.toMatch(/a\.datas/);
+  });
+
+  // Исполняемый файл обязан остаться по прежнему пути внутри каталога:
+  // по нему его ищет backend-process.js и killOrphanedBackends().
+  it('раскладывает содержимое каталога, сохраняя путь к бинарнику', () => {
+    expect(buildScript).toMatch(/cp -R "\$dist_dir\/photo-metadata-backend\/\." "\$target\/"/);
+    expect(buildScript).toMatch(/check_arch "\$dist_dir\/photo-metadata-backend\/photo-metadata-backend"/);
+  });
+});
