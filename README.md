@@ -264,13 +264,7 @@ desktop/scripts/build-mac.sh     # полная сборка macOS: .app и .dmg
 > ```bash
 > xattr -dr com.apple.quarantine "/Applications/Photo Metadata AI.app"
 > ```
->
-> Сам `.dmg` под карантином может не открываться вовсе: образ не монтируется и диалога
-> не показывает. Тогда карантин снимается с него так же:
->
-> ```bash
-> xattr -dr com.apple.quarantine ~/Downloads/Photo-Metadata-AI-*.dmg
-> ```
+
 
 <details>
 <summary>Почему ad-hoc, а не совсем без подписи</summary>
