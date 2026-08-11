@@ -90,6 +90,17 @@ describe('публикация артефактов', () => {
   });
 });
 
+// На чистом раннере кэша electron-builder нет: find возвращает 1,
+// pipefail пробрасывает код через head, и под set -e сборка падала на
+// присваивании — молча, без единого сообщения. Пустой кэш это норма.
+describe('поиск dmgbuild в кэше', () => {
+  it('переживает отсутствие кэша, а не роняет сборку', () => {
+    const fn = buildScript.match(/find_cached_dmgbuild\(\) \{[\s\S]*?\n\}/)[0];
+
+    expect(fn).toMatch(/\|\| true/);
+  });
+});
+
 // Workflow не должен возвращаться к публикации силами electron-builder.
 describe('release.yml', () => {
   const workflow = fs.readFileSync(
