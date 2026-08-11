@@ -100,8 +100,9 @@ build_frontend() {
 }
 
 # Собирает backend нативно для архитектуры текущего хоста.
-# dist/photo-metadata-backend остаётся под нативным именем: на него
-# опирается dev-режим в desktop/src/backend-process.js.
+# Режим onedir: в dist/photo-metadata-backend/ лежит исполняемый файл и
+# распакованные библиотеки. Onefile распаковывал ~26 МБ во временный
+# каталог при каждом запуске — приложение стартовало около 7,5 секунды.
 build_backend_native() {
   echo "==> Backend PyInstaller: $(uname -m) (нативно)"
   cd "$BACKEND_DIR"
@@ -117,15 +118,26 @@ build_backend_native() {
 # Путь бинарника в бандле важен: killOrphanedBackends() в
 # desktop/src/backend-process.js ищет процесс по полному пути запуска,
 # а переименование сломало бы совпадение с бинарником в бандле.
+#
+# PyInstaller в режиме onedir кладёт в dist/ каталог, поэтому копируется
+# его содержимое, а не один файл: исполняемый остаётся по прежнему пути
+# resources/backend/<arch>/photo-metadata-backend, рядом ложится _internal.
 layout_backend() {
-  local arch="$1" dist_dir="$2"
-  check_arch "$dist_dir/photo-metadata-backend" "$arch"
+  local arch="$1" dist_dir="$2" target
+  target="$DESKTOP_DIR/resources/backend/$arch"
+
+  check_arch "$dist_dir/photo-metadata-backend/photo-metadata-backend" "$arch"
+
   # Остаток старой плоской раскладки: extraResources копирует
   # resources/backend/ целиком, и файл из прежних сборок иначе доехал бы
   # до бандла лишней копией.
   rm -f "$DESKTOP_DIR/resources/backend/photo-metadata-backend"
-  mkdir -p "$DESKTOP_DIR/resources/backend/$arch"
-  cp "$dist_dir/photo-metadata-backend" "$DESKTOP_DIR/resources/backend/$arch/"
+
+  # Каталог пересоздаётся: от прежней сборки в нём могли остаться файлы,
+  # которых больше нет, и они уехали бы в бандл мёртвым грузом.
+  rm -rf "$target"
+  mkdir -p "$target"
+  cp -R "$dist_dir/photo-metadata-backend/." "$target/"
 }
 
 # Единственная проверка, которая ловит нерабочий бинарник до релиза:
@@ -230,51 +242,43 @@ build_app() {
   # неподписанное.
   npx electron-builder --mac --publish never "${BUILDER_ARGS[@]+"${BUILDER_ARGS[@]}"}"
 
-  sign_dmg
+  check_dmg
   publish_artifacts
 }
 
-# Ad-hoc подпись самого образа.
+# Проверка образа перед публикацией.
 #
-# `identity: '-'` в electron-builder.yml подписывает только бандл
-# приложения, DMG выходит из сборки вовсе без подписи. Локально это
-# незаметно, но браузер вешает на скачанный файл com.apple.quarantine, и
-# тогда Gatekeeper проверяет образ раньше приложения: без подписи он
-# получает "no usable signature" и блокирует монтирование — по клику в
-# панели загрузок не происходит ничего. Ad-hoc подпись возвращает
-# штатный сценарий «неизвестный разработчик» с обходом через настройки
-# безопасности. Полностью диалог убирает только нотаризация, для которой
-# нужны учётные данные Apple Developer.
-sign_dmg() {
-  local dmg found=0 version
+# Образ намеренно НЕ подписывается. Ad-hoc подпись DMG ломает открытие
+# скачанного файла: Gatekeeper проверяет подпись образа, не находит
+# Developer ID и блокирует монтирование — двойной клик из браузера
+# завершается ошибкой -128, без диалога и без кнопки «Открыть всё равно».
+# Неподписанный образ проверять нечего, и он монтируется штатно.
+#
+# Проверено на одном и том же содержимом: подписанный образ не
+# открывается, он же после `hdiutil convert` (подпись не переносится) —
+# открывается. Бандла приложения это не касается: `identity: '-'` в
+# electron-builder.yml остаётся, без подписи macOS считает его
+# повреждённым.
+check_dmg() {
+  local dmg found=0 version signature
 
-  # Только образы текущей версии: в out/ рядом лежат артефакты прошлых
-  # релизов, и переподписывать их сборка не имеет права — однажды это
-  # уже уронило её на чужом DMG, так и не дойдя до собранного.
   version="$(node -p "require('$DESKTOP_DIR/package.json').version")"
 
   for dmg in "$DESKTOP_DIR"/out/*-"$version"-*.dmg; do
     [[ -e "$dmg" ]] || continue
     found=1
 
-    codesign --force --sign - "$dmg"
-
-    # Подпись обязана быть на месте: молча выпустить неподписанный образ
-    # нельзя — ровно так и уехал релиз, который не открывался из браузера.
-    #
     # Вывод забирается в переменную, а не через `| grep -q`: под pipefail
-    # код конвейера складывается из обеих команд, и ранний выход grep
-    # давал ложное «подпись не легла» на заведомо подписанном образе.
-    local signature
+    # код конвейера складывается из обеих команд и даёт ложный результат.
     signature="$(codesign -dv "$dmg" 2>&1 || true)"
 
-    if [[ "$signature" != *"Signature=adhoc"* ]]; then
-      echo "ОШИБКА: ad-hoc подпись не легла на $dmg" >&2
+    if [[ "$signature" == *"Signature="* ]]; then
+      echo "ОШИБКА: $(basename "$dmg") подписан — скачанный образ не смонтируется." >&2
       echo "$signature" >&2
       exit 1
     fi
 
-    echo "==> Подписан ad-hoc: $(basename "$dmg")"
+    echo "==> Образ без подписи, как и требуется: $(basename "$dmg")"
   done
 
   if [[ "$found" -eq 0 ]]; then
@@ -282,8 +286,9 @@ sign_dmg() {
     exit 1
   fi
 
-  # codesign меняет содержимое образа, поэтому суммы в манифесте
-  # обновления надо пересчитать — иначе автообновление отвергнет DMG.
+  # Страховка: если содержимое образа когда-нибудь изменится после
+  # упаковки, манифест обновления обязан догнать, иначе electron-updater
+  # отвергнет скачанный файл по несовпадению суммы.
   node "$DESKTOP_DIR/scripts/update-latest-mac.js" "$DESKTOP_DIR/out"
 }
 
@@ -336,7 +341,7 @@ if [[ -n "$BACKEND_ONLY" ]]; then
   build_frontend
   build_backend_native
   layout_backend "$BACKEND_ONLY" dist
-  run_smoke "$BACKEND_DIR/dist/photo-metadata-backend"
+  run_smoke "$BACKEND_DIR/dist/photo-metadata-backend/photo-metadata-backend"
   echo "==> Готово: resources/backend/$BACKEND_ONLY/photo-metadata-backend"
   exit 0
 fi
@@ -347,7 +352,7 @@ build_frontend
 echo "==> [2/3] Backend"
 build_backend_native
 layout_backend arm64 dist
-run_smoke "$BACKEND_DIR/dist/photo-metadata-backend"
+run_smoke "$BACKEND_DIR/dist/photo-metadata-backend/photo-metadata-backend"
 
 echo "==> [3/3] Приложение"
 build_app
