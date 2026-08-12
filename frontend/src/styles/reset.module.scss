@@ -16,8 +16,14 @@
 html,
 body {
   width: 100%;
-  height: 100%;
+  /* height: 100% запирал документ в высоту окна — контент не мог
+     вырасти и вместо скролла обрезался. min-height позволяет расти. */
+  min-height: 100%;
   overflow-x: hidden;
+}
+
+#root {
+  min-height: 100%;
 }
 
 body {

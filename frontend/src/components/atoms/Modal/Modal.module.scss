@@ -11,6 +11,10 @@
   justify-content: center;
   z-index: var(--z-modal-backdrop);
   animation: fadeIn var(--transition-fast);
+  /* в низком окне модалка не должна уезжать за край — оверлей
+     прокручивается, отступы гарантируют видимые границы */
+  padding: var(--spacing-lg);
+  overflow-y: auto;
 }
 
 .modal {
@@ -21,6 +25,8 @@
   width: 100%;
   z-index: var(--z-modal);
   animation: slideUp var(--transition-normal);
+  max-height: 100%;
+  overflow-y: auto;
 }
 
   .md {
@@ -29,6 +35,17 @@
 
 .lg {
   max-width: 640px;
+}
+
+@media (max-width: 620px), (max-height: 620px) {
+  .overlay {
+    padding: var(--spacing-sm);
+    align-items: flex-start;
+  }
+
+  .modal {
+    padding: var(--spacing-lg);
+  }
 }
 
 @keyframes fadeIn {

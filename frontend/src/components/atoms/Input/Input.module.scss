@@ -46,16 +46,18 @@
 
 .inputWrapper.fillHeight {
   height: 100%;
-  min-height: 0;
+  min-height: 100px;
 }
 
 .input.hasCounter {
   padding-right: 80px;
 }
 
+/* min-height: 0 здесь перебивал .context по специфичности и позволял
+   textarea схлопнуться в ноль при нехватке высоты */
 .input.fillHeight {
   height: 100%;
-  min-height: 0;
+  min-height: 100px;
   max-height: none;
 }
 

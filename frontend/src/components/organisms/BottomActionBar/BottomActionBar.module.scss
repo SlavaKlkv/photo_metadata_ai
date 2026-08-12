@@ -9,10 +9,15 @@
   flex-wrap: wrap;
 }
 
+/* Перенос давал висящую линию и одинокий шаг на второй строке.
+   Вместо этого степпер всегда одна строка, а место освобождается
+   скрытием подписей пройденных/будущих шагов. */
 .stepper {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 0;
+  min-width: 0;
 
   @media (max-width: 768px) {
     justify-content: center;
@@ -26,6 +31,9 @@
   color: var(--text-secondary);
   font-size: var(--font-size-sm);
   transition: color var(--transition-normal);
+  /* шаг переносится целиком, а не сплющивается вместе с подписью */
+  flex-shrink: 0;
+  white-space: nowrap;
 
   &.active {
     color: var(--accent-main);
@@ -36,11 +44,23 @@
     }
   }
 
-  @media (max-width: 480px) {
+  /* Сначала прячем подписи всех шагов, кроме текущего — строка
+     остаётся целой и читаемой вместо переноса. */
+  @media (max-width: 1080px) {
+    &:not(.current) .stepLabel {
+      display: none;
+    }
+  }
+
+  @media (max-width: 560px) {
     .stepLabel {
       display: none;
     }
   }
+}
+
+.current .stepLabel {
+  font-weight: var(--font-weight-medium);
 }
 
 .stepNumber {
@@ -62,6 +82,9 @@
 
 .line {
   width: 32px;
+  /* соединитель отдаёт ширину первым, чтобы шаги влезли без переноса */
+  min-width: 8px;
+  flex-shrink: 1;
   height: 1px;
   background: var(--border-default);
   margin: 0 var(--spacing-xs);

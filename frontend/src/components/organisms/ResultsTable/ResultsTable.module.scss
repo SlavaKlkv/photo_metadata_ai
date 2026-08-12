@@ -69,3 +69,25 @@
     text-decoration: underline;
   }
 }
+
+/* Таблица не сжимается ниже читаемой ширины — вместо этого панель
+   получает горизонтальный скролл. */
+.tableHeader {
+  min-width: 520px;
+}
+
+.rows {
+  overflow-x: auto;
+}
+
+@media (max-width: 1024px), (max-height: 700px) {
+  .panel,
+  .settingsPanel {
+    height: auto;
+  }
+
+  .rows {
+    min-height: 240px;
+    max-height: 60vh;
+  }
+}

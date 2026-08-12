@@ -1,8 +1,18 @@
 //frontend/src/App.module.scss
 @import './styles/variables.module.scss';
 
+/* ------------------------------------------------------------------
+   Две раскладки:
+   1) «Просторная» — окно достаточно большое: оболочка фиксирована по
+      высоте вьюпорта, скроллится только .bodyContent, шапка и футер
+      всегда на виду.
+   2) «Тесная» — окно узкое ИЛИ низкое: переходим на обычный поток
+      документа, скроллит страница целиком. Иначе контент пришлось бы
+      сжимать ниже читаемого размера.
+   ------------------------------------------------------------------ */
+
 .app {
-  height: 100vh; /* было min-height */
+  min-height: 100vh;
   background: var(--bg-primary);
   color: var(--text-primary);
   display: flex;
@@ -10,7 +20,9 @@
 }
 
 .container {
-  height: 100%; /* занимает всю высоту app */
+  flex: 1;
+  min-height: 0;
+  width: 100%;
   max-width: 1440px;
   margin: 0 auto;
   padding: var(--spacing-lg);
@@ -22,7 +34,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
-  height: 100%;
+  flex: 1;
   min-height: 0;
 }
 
@@ -35,6 +47,8 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-md);
+  flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .aiSetupButton {
@@ -46,9 +60,12 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
+  min-width: 0;
 }
 
 .titleText {
+  min-width: 0;
+
   h1 {
     margin: 0;
     font-size: var(--font-size-2xl);
@@ -72,22 +89,26 @@
 .bodyContent {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
   display: flex;
 }
 
+/* Колонки не должны ужиматься ниже своего содержимого — иначе текст
+   переносится по одному слову вместо появления скролла. */
 .grid {
   width: 100%;
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
   gap: var(--spacing-lg);
   align-items: stretch;
+  min-height: min-content;
 }
 
 .sidebar {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
+  min-width: 0;
 }
 
 .content {
@@ -104,36 +125,12 @@
     minmax(0, 566fr)
     minmax(0, 448fr);
   gap: var(--spacing-lg);
-  min-height: 0;
+  min-height: min-content;
   height: 100%;
-  overflow: hidden;
 }
 
 .reviewGrid > * {
   min-width: 0;
-}
-
-/* При 1180px уже переходим на flex, не grid с одной колонкой */
-@media (max-width: 1180px) {
-  .bodyContent {
-    overflow: auto; /* разрешить скролл */
-    min-height: auto;
-  }
-
-  .reviewGrid {
-    display: flex;
-    flex-direction: column;
-    height: auto;
-    overflow: visible; /* скролл будет на родителе .bodyContent */
-    gap: var(--spacing-lg);
-  }
-
-  /* дочерние Panel займут естественный размер */
-  .reviewGrid > div {
-    height: auto;
-    min-height: auto;
-    overflow: visible;
-  }
 }
 
 .bodyFooter {
@@ -141,15 +138,41 @@
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   background: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
+/* Три колонки Review перестают быть читаемыми раньше, чем ломается
+   основная сетка — им нужен свой порог. */
+@media (max-width: 1280px) {
+  .reviewGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---------- Тесный режим: скроллит страница, а не .bodyContent ---------- */
+@media (max-width: 1024px), (max-height: 700px) {
+  .app {
+    height: auto;
+  }
+
+  .bodyContent {
+    overflow: visible;
+    min-height: auto;
+    flex: 0 0 auto;
+  }
+
+  .bodyShell {
+    flex: 0 0 auto;
+  }
 }
 
 @media (max-width: 1024px) {
   .container {
-    padding: 20px;
+    padding: var(--spacing-md);
   }
 
   .grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .sidebar {
@@ -160,12 +183,33 @@
     order: 1;
   }
 
-  /* ← ДОБАВИТЬ этот блок */
   .reviewGrid {
-    display: flex;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Совсем узкие окна — шапка в колонку, кнопка на всю ширину */
+@media (max-width: 620px) {
+  .container {
+    padding: var(--spacing-sm);
+  }
+
+  .bodyHeader {
     flex-direction: column;
-    height: auto;
-    overflow: visible;
-    gap: var(--spacing-lg);
+    align-items: stretch;
+    gap: var(--spacing-sm);
+  }
+
+  .aiSetupButton {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .titleText h1 {
+    font-size: var(--font-size-xl);
+  }
+
+  .bodyFooter {
+    padding: var(--spacing-sm) var(--spacing-md);
   }
 }
