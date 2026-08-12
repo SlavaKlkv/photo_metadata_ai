@@ -76,11 +76,13 @@ test('shows the installed version is current', async () => {
 test('offers and opens the DMG for an available version', async () => {
   const showMessageBox = jest.fn().mockResolvedValue({ response: 0 });
   const openExternal = jest.fn().mockResolvedValue(undefined);
+  const quit = jest.fn();
 
   await checkForUpdatesFromMenu({
     requestUpdate: jest.fn().mockResolvedValue(availableUpdate),
     showMessageBox,
     openExternal,
+    quit,
   });
 
   expect(showMessageBox).toHaveBeenCalledWith(
@@ -90,22 +92,27 @@ test('offers and opens the DMG for an available version', async () => {
     })
   );
   expect(openExternal).toHaveBeenCalledWith(availableUpdate.download_url);
+  expect(quit).toHaveBeenCalledTimes(1);
 });
 
 test('does not download when the user chooses Later', async () => {
   const openExternal = jest.fn();
+  const quit = jest.fn();
 
   await checkForUpdatesFromMenu({
     requestUpdate: jest.fn().mockResolvedValue(availableUpdate),
     showMessageBox: jest.fn().mockResolvedValue({ response: 1 }),
     openExternal,
+    quit,
   });
 
   expect(openExternal).not.toHaveBeenCalled();
+  expect(quit).not.toHaveBeenCalled();
 });
 
 test('falls back to the release page when a DMG is absent', async () => {
   const openExternal = jest.fn().mockResolvedValue(undefined);
+  const quit = jest.fn();
 
   await checkForUpdatesFromMenu({
     requestUpdate: jest.fn().mockResolvedValue({
@@ -114,14 +121,17 @@ test('falls back to the release page when a DMG is absent', async () => {
     }),
     showMessageBox: jest.fn().mockResolvedValue({ response: 0 }),
     openExternal,
+    quit,
   });
 
   expect(openExternal).toHaveBeenCalledWith(availableUpdate.release_url);
+  expect(quit).toHaveBeenCalledTimes(1);
 });
 
 test('shows an informational result when no download link exists', async () => {
   const showMessageBox = jest.fn().mockResolvedValue({ response: 0 });
   const openExternal = jest.fn();
+  const quit = jest.fn();
 
   await checkForUpdatesFromMenu({
     requestUpdate: jest.fn().mockResolvedValue({
@@ -131,12 +141,14 @@ test('shows an informational result when no download link exists', async () => {
     }),
     showMessageBox,
     openExternal,
+    quit,
   });
 
   expect(showMessageBox).toHaveBeenCalledWith(
     expect.objectContaining({ buttons: ['OK'], cancelId: 0 })
   );
   expect(openExternal).not.toHaveBeenCalled();
+  expect(quit).not.toHaveBeenCalled();
 });
 
 test.each([

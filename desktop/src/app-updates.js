@@ -23,6 +23,7 @@ async function checkForUpdatesFromMenu({
   requestUpdate,
   showMessageBox,
   openExternal,
+  quit,
 }) {
   let updateInfo;
   try {
@@ -87,6 +88,11 @@ async function checkForUpdatesFromMenu({
 
   if (downloadUrl && result.response === 0) {
     await openExternal(downloadUrl);
+    // Закрываем приложение после Download: установщик — ручная
+    // замена бандла из DMG, пока процесс жив файл занят.
+    if (typeof quit === 'function') {
+      quit();
+    }
   }
 }
 
