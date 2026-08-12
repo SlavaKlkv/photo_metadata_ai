@@ -12,7 +12,7 @@
   flex-direction: column;
   gap: 20px;
   flex: 1;
-  min-height: 0;
+  min-height: min-content;
 }
 
 .inputGroup {
@@ -20,7 +20,7 @@
   flex-direction: column;
   gap: var(--spacing-sm);
   flex: 1;
-  min-height: 0;
+  min-height: min-content;
 }
 
 .label {

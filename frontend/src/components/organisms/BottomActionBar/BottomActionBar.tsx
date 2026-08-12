@@ -125,7 +125,7 @@ export const BottomActionBar: React.FC = () => {
         {STEPS.map((step, index) => (
           <React.Fragment key={step}>
             <div
-              className={`${styles.step} ${index <= currentStep ? styles.active : ""}`}
+              className={`${styles.step} ${index <= currentStep ? styles.active : ""} ${index === currentStep ? styles.current : ""}`}
             >
               <span className={styles.stepNumber}>{index + 1}</span>
               <span className={styles.stepLabel}>{step}</span>

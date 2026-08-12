@@ -7,6 +7,12 @@
   padding: 16px;
   background: var(--bg-tretiary);
   border-radius: var(--radius-md);
+  position: relative;
+  transition: background var(--transition-fast);
+}
+
+.text {
+  min-width: 0;
 }
 
 .icon {
@@ -34,4 +40,113 @@
   font-size: var(--font-size-sm);
   color: var(--text-placeholder);
   line-height: var(--line-height-normal);
+}
+
+.card:focus {
+  outline: none;
+}
+
+/* ------------------------------------------------------------------
+   Узкое окно: четыре карточки со сплошным текстом занимают почти весь
+   экран по вертикали. Схлопываем каждую до иконки, а текст показываем
+   всплывающей подсказкой — по одной за раз, по наведению или фокусу.
+   ------------------------------------------------------------------ */
+@media (max-width: 720px) {
+  .card {
+    padding: 8px;
+    justify-content: center;
+    cursor: default;
+  }
+
+  .card:hover,
+  .card:focus-visible {
+    background: var(--bg-foreground);
+  }
+
+  .text {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translate(-50%, 4px);
+    /* достаточно перекрыть соседний контент, но не модалки */
+    z-index: 5;
+
+    width: max-content;
+    max-width: min(260px, 70vw);
+    padding: 12px 14px;
+    background: var(--bg-foreground);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    text-align: left;
+
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      opacity var(--transition-fast),
+      transform var(--transition-fast),
+      visibility var(--transition-fast);
+  }
+
+  /* Хвостик подсказки, указывающий на иконку */
+  .text::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: var(--border-color);
+  }
+
+  .card:hover .text,
+  .card:focus-visible .text {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, 0);
+  }
+
+  .card p {
+    margin-top: 4px;
+  }
+
+  /* Крайние карточки прижимают подсказку к краю окна, чтобы она не
+     уезжала за границу экрана. */
+  .card:first-child .text {
+    left: 0;
+    transform: translate(0, 4px);
+  }
+
+  .card:first-child:hover .text,
+  .card:first-child:focus-visible .text {
+    transform: translate(0, 0);
+  }
+
+  .card:first-child .text::after {
+    left: 28px;
+  }
+
+  .card:last-child .text {
+    left: auto;
+    right: 0;
+    transform: translate(0, 4px);
+  }
+
+  .card:last-child:hover .text,
+  .card:last-child:focus-visible .text {
+    transform: translate(0, 0);
+  }
+
+  .card:last-child .text::after {
+    left: auto;
+    right: 28px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .text {
+    transition: none;
+  }
 }
