@@ -115,6 +115,7 @@ function installApplicationMenu() {
             ? dialog.showMessageBox(mainWindow, options)
             : dialog.showMessageBox(options),
         openExternal: (url) => shell.openExternal(url),
+        quit: () => app.quit(),
       }),
     onResetWindowSize: () => {
       if (mainWindow) {
