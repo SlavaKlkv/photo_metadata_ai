@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import apiClient from 'services/api/api';
@@ -112,4 +114,35 @@ test('resets the input value before opening the dialog', async () => {
 
   expect(input.value).toBe('');
   expect(clickSpy).toHaveBeenCalled();
+});
+
+// Регрессия: карточки всегда четырьмя в ряд на всю ширину — ни 2×2, ни пустот
+// по краям и между колонками. Перестраивается сама карточка (см. InfoCard),
+// а не сетка, поэтому у сетки нет промежуточных состояний.
+test('info cards always fill the row in four columns', () => {
+  const scss = fs.readFileSync(
+    path.join(__dirname, 'FileUploadSection.module.scss'),
+    'utf8',
+  );
+
+  const grid = scss.match(/\.cardsGrid\s*\{([^}]*)\}/);
+  expect(grid).not.toBeNull();
+  const base = grid![1];
+
+  expect(base).toMatch(/grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/);
+  expect(base).toMatch(/gap:\s*16px/);
+  expect(base).toMatch(/width:\s*100%/);
+  // Ни фиксированных колонок, ни раскладки в два ряда.
+  expect(base).not.toMatch(/repeat\(2,/);
+  expect(base).not.toMatch(/justify-content/);
+  // Растягиваться ряд перестаёт только там, где карточка стала бы низкой
+  // и длинной, — дальше он центрируется.
+  expect(base).toMatch(/max-width:\s*calc\(4 \* 340px \+ 3 \* 16px\)/);
+  expect(base).toMatch(/margin-inline:\s*auto/);
+
+  // Единственная правка сетки — плотный ряд, когда остались только иконки.
+  expect(scss).toMatch(
+    /@container upload \(max-width: 527px\)\s*\{\s*\.cardsGrid\s*\{\s*gap:\s*8px/,
+  );
+  expect(scss).not.toMatch(/@container upload \(min-width/);
 });

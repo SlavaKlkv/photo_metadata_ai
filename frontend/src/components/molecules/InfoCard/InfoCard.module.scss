@@ -1,14 +1,41 @@
 /* InfoCard molecule styles */
 @import '../../../styles/variables.module.scss';
 
+/* Карточка всегда стоит в ряду из четырёх и занимает всю ширину своей
+   колонки (см. FileUploadSection). Текст обрезается только тогда, когда
+   иначе карточка вытянулась бы в узкий высокий столбик; полный текст в этом
+   случае показывается подсказкой по наведению или фокусу. Состояния по
+   ширине колонки:
+   ≥232px — иконка слева от текста, описание до четырёх строк;
+   ≥160px — иконка над текстом (тексту достаётся вся ширина карточки);
+   ≥120px — описание сокращается до двух строк;
+   уже    — остаётся одна иконка. */
 .card {
+  position: relative;
   display: flex;
+  align-items: center;
   gap: 16px;
   padding: 16px;
   background: var(--bg-tretiary);
   border-radius: var(--radius-md);
-  position: relative;
   transition: background var(--transition-fast);
+  /* Ширину задаёт колонка сетки: своей фиксированной ширины у карточки
+     нет, иначе между колонками появляются пустоты. */
+  width: 100%;
+  box-sizing: border-box;
+  /* Когда весь текст помещается в две строки, высоты содержимого не хватает,
+     и карточка расплывается в низкую длинную полосу. Нижняя граница держит
+     соотношение; min() не даёт ей разъехаться на очень широком окне. */
+  min-height: min(11cqw, 160px);
+}
+
+.card:hover,
+.card:focus-visible {
+  background: var(--bg-foreground);
+}
+
+.card:focus {
+  outline: none;
 }
 
 .text {
@@ -28,125 +55,167 @@
   font-size: var(--font-size-3xl);
 }
 
-.card h4 {
+.text h4,
+.tooltip h4 {
   margin: 0 0 4px 0;
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-semibold);
   color: var(--text-secondary);
 }
 
-.card p {
+.text p,
+.tooltip p {
   margin: 0;
   font-size: var(--font-size-sm);
   color: var(--text-placeholder);
   line-height: var(--line-height-normal);
 }
 
-.card:focus {
-  outline: none;
+/* Ограничение по строкам — только страховка от слишком высокой карточки:
+   в широкой колонке текст помещается целиком и не обрезается вовсе.
+   Длинные слова переносим по буквам, иначе они вылезают за пределы узкой
+   колонки. */
+.text h4,
+.text p {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.text h4 {
+  -webkit-line-clamp: 3;
+}
+
+.text p {
+  -webkit-line-clamp: 4;
 }
 
 /* ------------------------------------------------------------------
-   Узкое окно: четыре карточки со сплошным текстом занимают почти весь
-   экран по вертикали. Схлопываем каждую до иконки, а текст показываем
-   всплывающей подсказкой — по одной за раз, по наведению или фокусу.
+   Подсказка с полным текстом. Отдельный узел, а не всплывающий видимый
+   текст: тогда раскрытие не вынимает текст из потока и не двигает сетку.
    ------------------------------------------------------------------ */
-@container upload (max-width: 495px) {
+.tooltip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translate(-50%, 4px);
+  /* достаточно перекрыть соседний контент, но не модалки */
+  z-index: 5;
+
+  width: max-content;
+  max-width: min(260px, 70vw);
+  padding: 12px 14px;
+  background: var(--bg-foreground);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  text-align: left;
+
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  /* Скрытие — мгновенное. С transition на базовом правиле подсказки
+     мигали при смене раскладки карточек. */
+  transition: none;
+}
+
+/* Хвостик подсказки, указывающий на карточку */
+.tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: var(--border-color);
+}
+
+.card:hover .tooltip,
+.card:focus-visible .tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+  transition:
+    opacity var(--transition-fast),
+    transform var(--transition-fast),
+    visibility var(--transition-fast);
+}
+
+/* Крайние карточки прижимают подсказку к своему краю, чтобы она не
+   уезжала за границу окна. */
+.card:first-child .tooltip {
+  left: 0;
+  transform: translate(0, 4px);
+}
+
+.card:first-child:hover .tooltip,
+.card:first-child:focus-visible .tooltip {
+  transform: translate(0, 0);
+}
+
+.card:first-child .tooltip::after {
+  left: 28px;
+}
+
+.card:last-child .tooltip {
+  left: auto;
+  right: 0;
+  transform: translate(0, 4px);
+}
+
+.card:last-child:hover .tooltip,
+.card:last-child:focus-visible .tooltip {
+  transform: translate(0, 0);
+}
+
+.card:last-child .tooltip::after {
+  left: auto;
+  right: 28px;
+}
+
+/* ------------------------------------------------------------------
+   Колонка уже 232px: иконка встаёт над текстом — тексту достаётся вся
+   ширина карточки, а не остаток после иконки.
+   ------------------------------------------------------------------ */
+@container upload (max-width: 975px) {
+  .card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+}
+
+/* Колонка уже 160px: строк на описание нужно столько, что карточка вытянулась
+   бы в узкий высокий столбик — оставляем две строки, остальное в подсказке. */
+@container upload (max-width: 687px) {
+  .text p {
+    -webkit-line-clamp: 2;
+  }
+}
+
+/* Колонка уже 120px: текст нечитаем при любой обрезке — остаётся иконка. */
+@container upload (max-width: 527px) {
   .card {
     padding: 8px;
-    justify-content: center;
+    align-items: center;
     cursor: default;
   }
 
-  .card:hover,
-  .card:focus-visible {
-    background: var(--bg-foreground);
-  }
-
+  /* Визуально скрыт, но остаётся доступен экранному диктору. */
   .text {
     position: absolute;
-    bottom: calc(100% + 10px);
-    left: 50%;
-    transform: translate(-50%, 4px);
-    /* достаточно перекрыть соседний контент, но не модалки */
-    z-index: 5;
-
-    width: max-content;
-    max-width: min(260px, 70vw);
-    padding: 12px 14px;
-    background: var(--bg-foreground);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-    text-align: left;
-
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-    transition:
-      opacity var(--transition-fast),
-      transform var(--transition-fast),
-      visibility var(--transition-fast);
-  }
-
-  /* Хвостик подсказки, указывающий на иконку */
-  .text::after {
-    content: '';
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    border: 6px solid transparent;
-    border-top-color: var(--border-color);
-  }
-
-  .card:hover .text,
-  .card:focus-visible .text {
-    opacity: 1;
-    visibility: visible;
-    transform: translate(-50%, 0);
-  }
-
-  .card p {
-    margin-top: 4px;
-  }
-
-  /* Крайние карточки прижимают подсказку к краю окна, чтобы она не
-     уезжала за границу экрана. */
-  .card:first-child .text {
-    left: 0;
-    transform: translate(0, 4px);
-  }
-
-  .card:first-child:hover .text,
-  .card:first-child:focus-visible .text {
-    transform: translate(0, 0);
-  }
-
-  .card:first-child .text::after {
-    left: 28px;
-  }
-
-  .card:last-child .text {
-    left: auto;
-    right: 0;
-    transform: translate(0, 4px);
-  }
-
-  .card:last-child:hover .text,
-  .card:last-child:focus-visible .text {
-    transform: translate(0, 0);
-  }
-
-  .card:last-child .text::after {
-    left: auto;
-    right: 28px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .card,
-  .text {
+  .tooltip {
     transition: none;
   }
 }
