@@ -48,6 +48,20 @@ test('брендовый якорь и hero-ссылка «Как это раб�
   expect(html).toMatch(/id="how"/);
 });
 
+// Повторный клик по логотипу при hash=#top: браузер якорь не крутит,
+// mousedown только закрывает ирис — нужен явный scrollTo(0).
+test('клик по логотипу всегда принудительно крутит наверх', () => {
+  const html = fs.readFileSync(indexPath, 'utf8');
+
+  expect(html).toContain('a.brand[href="#top"]');
+  expect(html).toMatch(/brand\.addEventListener\('click'/);
+  expect(html).toMatch(
+    /scrollTo\(\{\s*top:\s*0,\s*behavior:\s*reduced \? ['"]auto['"] : ['"]smooth['"]\s*\}\)/
+  );
+  // Hash обновляем сами после preventDefault, иначе URL останется на разделе.
+  expect(html).toMatch(/history\.pushState\(null,\s*['"]['"],\s*['"]#top['"]\)/);
+});
+
 // В шапке — голая метка как в приложении, без тёмной плитки icon.svg.
 // Ход лепестков рисуют модули brand-iris/ (d у path), не CSS-трансформ svg.
 test.each(['index.html', 'screens.html'])(
@@ -103,7 +117,9 @@ test.each(['index.html', 'screens.html'])(
     expect(html).toMatch(/<path class="brand-blades" d="M8\.32812/);
     // Ирис разнесён по модулям: геометрия, ход, handoff, присутствие, сборка.
     ['geometry', 'motion', 'handoff', 'presence', 'init'].forEach((name) => {
-      expect(html).toContain(`<script src="brand-iris/${name}.js"></script>`);
+      expect(html).toMatch(
+        new RegExp(`<script src="brand-iris/${name}\\.js(?:\\?[^"]*)?"></script>`)
+      );
     });
     // Заливкой центр не закрывают: диафрагма всегда остаётся контурной.
     expect(html).not.toMatch(/brand-mark-iris/);

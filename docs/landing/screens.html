@@ -84,7 +84,14 @@
 
   /* Тёмный canvas задан до первой отрисовки; межстраничный View Transition не
      используется (вспышка в Chrome). Вместо — opacity-swap шапки (header-swap.js). */
-  html { background: var(--bg); color-scheme: dark; }
+  html {
+    background: var(--bg);
+    color-scheme: dark;
+    /* Без горизонтального пана: ширина = viewport, сдвиг только по вертикали.
+       overscroll-behavior гасит «резиновый» увод в пустоту на таче. */
+    overflow-x: clip;
+    overscroll-behavior-x: none;
+  }
 
   body {
     margin: 0;
@@ -92,7 +99,8 @@
     color: var(--text);
     font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
-    overflow-x: hidden;
+    overflow-x: clip;
+    overscroll-behavior-x: none;
   }
 
   a { color: var(--accent-2); text-decoration: none; }
@@ -252,15 +260,16 @@
   /* Логотип Apple — сплошная заливка, а не обводка. */
   .btn svg.apple { width: 13px; height: 16px; fill: currentColor; stroke: none; margin-top: -2px; }
 
-  /* Сверху свечение обрезается, а справа может естественно уйти за край. */
+  /* Свечение обрезаем по краям intro: раньше clip-path: inset(0 -100vw) +
+     overflow: visible раздували scrollWidth (~135px на телефоне) — страницу
+     можно было утащить влево в пустоту. Горизонтальный пан страницы не нужен. */
   .intro {
     position: relative;
     padding: 56px 0 28px;
-    overflow: visible;
-    clip-path: inset(0 -100vw);
+    overflow: hidden;
   }
   /* Правый край остаётся на прежнем месте, а увеличенная ширина растягивает
-     подсветку влево примерно на две трети блока. */
+     подсветку влево примерно на две трети блока; хвост за intro режет overflow. */
   .intro::before {
     content: "";
     position: absolute;
@@ -495,7 +504,7 @@
   }
   /* Колонка: картинка отдаёт высоту подписи, а не выдавливает её
      за границу диалога — иначе при подписи в две строки низ обрезается. */
-  dialog.lightbox[open] { display: flex; flex-direction: column; }
+  dialog.lightbox[open] { display: flex; flex-direction: column; touch-action: none; }
   dialog.lightbox::backdrop { background: rgba(6, 6, 9, 0.86); }
 
   /* Появление и закрытие: диалог всплывает, подложка проявляется.
@@ -576,6 +585,24 @@
        (онбординг/AI Setup) раздувала body и подпись «залазила» на кадр. */
     background: #0a0a0e;
     overflow: hidden;
+    /* Жесты (свайп / pinch / двойной тап) берём сами — не отдаём браузеру. */
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: grab;
+  }
+  .lb-body:active { cursor: grabbing; }
+  /* Zoom/pan на stage, а не на img: иначе scale спорит с translateX слайда. */
+  .lb-stage {
+    position: absolute;
+    inset: 0;
+    transform-origin: center center;
+    touch-action: none;
+    will-change: transform;
+  }
+  /* Двойной тап: плавный зум к точке; pinch/pan класс снимают. */
+  .lb-stage.is-tap-zoom {
+    transition: transform .28s cubic-bezier(.22, .61, .36, 1);
   }
   .lb-body img {
     position: absolute;
@@ -592,6 +619,10 @@
       transform .46s cubic-bezier(.32, .72, 0, 1),
       opacity .46s cubic-bezier(.32, .72, 0, 1);
     will-change: transform;
+    -webkit-user-drag: none;
+    user-select: none;
+    /* Клики/тачи идут в .lb-body — иначе img перехватывает жест. */
+    pointer-events: none;
   }
   /* Оба кадра едут одновременно и с одинаковой скоростью: уходящий за край,
      входящий с противоположной стороны — это и есть сдвиг ленты. */
@@ -605,6 +636,12 @@
   .lb-body img.is-leaving.to-right { transform: translateX(var(--lb-shift, 100vw)); }
   /* Стартовое положение входящего кадра выставляется без анимации. */
   .lb-body img.no-anim { transition: none; }
+
+  /* Свайп вниз закрывает: на время жеста глушим transition открытия. */
+  dialog.lightbox.is-dismissing,
+  dialog.lightbox.is-dismissing::backdrop {
+    transition: none !important;
+  }
 
   .lb-title,
   .lb-caption {
@@ -625,9 +662,52 @@
     line-height: 1.45;
   }
 
+  /* Узкий экран: DMG только для macOS — «Скачать» прячем; галерея не задаёт
+     min 320px (иначе при padding 24×2 контент уже 272px и появляется
+     горизонтальный скролл). */
   @media (max-width: 720px) {
-    .intro { padding-top: 40px; }
+    .wrap { padding: 0 16px; }
+    .brand {
+      min-width: 0;
+      margin-right: 0;
+    }
+    .brand-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    a[href*="/releases/download/"] { display: none; }
+    .intro { padding: 36px 0 22px; }
+    .lede { font-size: 15.5px; }
+    .gallery {
+      grid-template-columns: 1fr;
+      gap: 14px;
+      padding-bottom: 64px;
+    }
+    .gallery .meta { padding: 13px 14px 15px; }
+    .to-top { right: 14px; bottom: 14px; }
+    dialog.lightbox {
+      /* 100% вместо 100vw: vw включает ширину scrollbar/chrome и снова
+         даёт горизонтальный сдвиг на узком экране. */
+      width: 100%;
+      max-width: 100%;
+      height: 100dvh;
+      max-height: 100dvh;
+      margin: 0;
+      border-radius: 0;
+      border-width: 0;
+    }
+    .lb-bar { gap: 8px; padding: 10px 10px 10px 14px; }
     .lb-title { font-size: 14px; }
+    .lb-caption { padding: 12px 14px 16px; font-size: 13.5px; }
+    .lb-body img { inset: 10px; width: calc(100% - 20px); height: calc(100% - 20px); }
+  }
+  /* На таче нет hover: подсказка «Открыть» видна сразу, иначе плитка молчит. */
+  @media (hover: none) {
+    .gallery .zoom {
+      opacity: .92;
+      transform: none;
+    }
   }
   @media (prefers-reduced-motion: reduce) {
     html.header-swap .nav > :not(.brand),
@@ -667,6 +747,7 @@
     dialog.lightbox { opacity: 1; transform: none; }
     .lb-body img { transition: none; }
     .lb-body img.is-active { transform: none; }
+    .lb-stage.is-tap-zoom { transition: none; }
     .lb-title, .lb-caption { transition: none; }
   }
 </style>
@@ -699,7 +780,7 @@
     <p class="lede">
       Полный путь от установки до готового CSV. Снято 11 августа 2026 года на macOS,
       сборка Photo Metadata AI 1.2.0-arm64. Нажмите на любой экран, чтобы открыть
-      в полном размере — листать можно стрелками.
+      в полном размере — листать можно стрелками и свайпом.
     </p>
   </div>
 
@@ -792,18 +873,20 @@
     </button>
   </div>
   <div class="lb-body" id="lb-body">
-    <img class="lb-layer" src="" alt="">
-    <img class="lb-layer" src="" alt="" aria-hidden="true">
+    <div class="lb-stage" id="lb-stage">
+      <img class="lb-layer" src="" alt="">
+      <img class="lb-layer" src="" alt="" aria-hidden="true">
+    </div>
   </div>
   <p class="lb-caption" id="lb-caption"></p>
 </dialog>
 
 <script src="ambient-particle-flags.js"></script>
-<script src="brand-iris/geometry.js"></script>
-<script src="brand-iris/motion.js"></script>
-<script src="brand-iris/handoff.js"></script>
-<script src="brand-iris/presence.js"></script>
-<script src="brand-iris/init.js"></script>
+<script src="brand-iris/geometry.js?v=tap4"></script>
+<script src="brand-iris/motion.js?v=tap4"></script>
+<script src="brand-iris/handoff.js?v=tap4"></script>
+<script src="brand-iris/presence.js?v=tap4"></script>
+<script src="brand-iris/init.js?v=tap4"></script>
 <script src="header-swap.js"></script>
 <script>
   (function () {
@@ -819,10 +902,124 @@
     var prev = document.getElementById('lb-prev');
     var next = document.getElementById('lb-next');
     var body = document.getElementById('lb-body');
+    var stage = document.getElementById('lb-stage');
     var current = 0;
     var active = 0;
     var token = 0;
     var reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    // Zoom/pan на .lb-stage (не на img — там translateX слайда).
+    var zoom = 1;
+    var panX = 0;
+    var panY = 0;
+    var MIN_ZOOM = 1;
+    var MAX_ZOOM = 4;
+    var TAP_ZOOM = 2;
+    var TAP_MS = 350;
+    var TAP_SLACK = 40;
+    var lastTapAt = 0;
+    var lastTapX = 0;
+    var lastTapY = 0;
+    var tapZoomTimer = 0;
+    var skipTap = false;
+
+    function applyStage() {
+      stage.style.transform =
+        'translate(' + panX.toFixed(1) + 'px,' + panY.toFixed(1) + 'px) scale(' + zoom.toFixed(3) + ')';
+    }
+
+    function clampPan() {
+      var maxX = Math.max(0, (body.clientWidth * (zoom - 1)) / 2);
+      var maxY = Math.max(0, (body.clientHeight * (zoom - 1)) / 2);
+      panX = Math.max(-maxX, Math.min(maxX, panX));
+      panY = Math.max(-maxY, Math.min(maxY, panY));
+    }
+
+    function stopTapZoomAnim() {
+      window.clearTimeout(tapZoomTimer);
+      stage.classList.remove('is-tap-zoom');
+      stage.style.transition = 'none';
+    }
+
+    function resetZoom() {
+      lastTapAt = 0;
+      skipTap = false;
+      stopTapZoomAnim();
+      zoom = 1;
+      panX = 0;
+      panY = 0;
+      applyStage();
+      clearDismiss();
+    }
+
+    function clearDismiss() {
+      dialog.classList.remove('is-dismissing');
+      dialog.style.transform = '';
+      dialog.style.opacity = '';
+    }
+
+    function setZoom(next) {
+      zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, next));
+      if (zoom <= 1.01) {
+        zoom = 1;
+        panX = 0;
+        panY = 0;
+      } else {
+        clampPan();
+      }
+      applyStage();
+    }
+
+    // Зум так, чтобы точка (x, y) в координатах окна осталась под пальцем.
+    function zoomToward(next, x, y) {
+      var rect = body.getBoundingClientRect();
+      var sx = x - (rect.left + rect.width / 2);
+      var sy = y - (rect.top + rect.height / 2);
+      var contentX = (sx - panX) / zoom;
+      var contentY = (sy - panY) / zoom;
+      zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, next));
+      if (zoom <= 1.01) {
+        zoom = 1;
+        panX = 0;
+        panY = 0;
+      } else {
+        panX = sx - contentX * zoom;
+        panY = sy - contentY * zoom;
+        clampPan();
+      }
+      applyStage();
+    }
+
+    function toggleTapZoom(x, y) {
+      if (!reduced.matches) {
+        stage.style.transition = '';
+        stage.classList.add('is-tap-zoom');
+        window.clearTimeout(tapZoomTimer);
+        tapZoomTimer = window.setTimeout(function () {
+          stage.classList.remove('is-tap-zoom');
+        }, 320);
+      }
+      if (zoom > 1.05) zoomToward(1, x, y);
+      else zoomToward(TAP_ZOOM, x, y);
+    }
+
+    function onPossibleTap(x, y) {
+      if (skipTap) {
+        skipTap = false;
+        return;
+      }
+      var now = Date.now();
+      var dt = now - lastTapAt;
+      var dist = Math.sqrt((x - lastTapX) * (x - lastTapX) + (y - lastTapY) * (y - lastTapY));
+      if (lastTapAt && dt < TAP_MS && dist < TAP_SLACK) {
+        lastTapAt = 0;
+        toggleTapZoom(x, y);
+        return;
+      }
+      lastTapAt = now;
+      lastTapX = x;
+      lastTapY = y;
+    }
 
     // Дистанция сдвига — ширина области просмотра: кадр уезжает ровно за край.
     function updateShift() {
@@ -866,6 +1063,7 @@
       var outgoing = layers[active];
       var mine = ++token;
       current = index;
+      resetZoom();
 
       if (!direction || reduced.matches) {
         // Первое открытие: показываем сразу в активном слое, без перехода.
@@ -961,6 +1159,261 @@
       if (event.key === 'ArrowLeft') { event.preventDefault(); go(-1); }
     });
 
+    // Колесо / трекпад: горизонталь — кадры, вниз — закрыть, ctrl — pinch-zoom.
+    // Пауза ~длина анимации, иначе один жест трекпада пролистывает пачку.
+    var wheelLockUntil = 0;
+    dialog.addEventListener('wheel', function (event) {
+      if (!dialog.open) return;
+      event.preventDefault();
+
+      // Pinch на трекпаде приходит как wheel + ctrlKey.
+      if (event.ctrlKey) {
+        setZoom(zoom * Math.exp(-event.deltaY * 0.01));
+        return;
+      }
+
+      // Уже увеличено — колесо панорамирует, не листает и не закрывает.
+      if (zoom > 1.05) {
+        panX -= event.deltaX;
+        panY -= event.deltaY;
+        clampPan();
+        applyStage();
+        return;
+      }
+
+      var dx = event.deltaX;
+      var dy = event.deltaY;
+      if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return;
+      var now = Date.now();
+      if (now < wheelLockUntil) return;
+      wheelLockUntil = now + 480;
+
+      if (Math.abs(dx) > Math.abs(dy)) {
+        go(dx > 0 ? 1 : -1);
+      } else if (dy > 0) {
+        dialog.close();
+      } else {
+        go(-1);
+      }
+    }, { passive: false });
+
+    // Жесты на кадре.
+    // Тач — через Touch Events: на iOS Pointer Events + setPointerCapture
+    // ломают второй палец (pinch не начинается). Мышь — pointer events.
+    var gesture = null; // 'nav' | 'dismiss' | 'pan' | 'pinch'
+    var startX = 0;
+    var startY = 0;
+    var startPanX = 0;
+    var startPanY = 0;
+    var pinchStartDist = 0;
+    var pinchStartZoom = 1;
+    var dismissDy = 0;
+    var mouseDrag = false;
+
+    function distOf(a, b) {
+      var dx = a.clientX - b.clientX;
+      var dy = a.clientY - b.clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    function beginOneFinger(x, y) {
+      stopTapZoomAnim();
+      startX = x;
+      startY = y;
+      startPanX = panX;
+      startPanY = panY;
+      dismissDy = 0;
+      gesture = zoom > 1.05 ? 'pan' : null;
+    }
+
+    function moveOneFinger(x, y) {
+      var dx = x - startX;
+      var dy = y - startY;
+
+      if (gesture === 'pan' || (zoom > 1.05 && gesture !== 'dismiss' && gesture !== 'nav')) {
+        gesture = 'pan';
+        if (Math.abs(dx) >= 10 || Math.abs(dy) >= 10) {
+          lastTapAt = 0;
+          skipTap = false;
+        }
+        panX = startPanX + dx;
+        panY = startPanY + dy;
+        clampPan();
+        applyStage();
+        return;
+      }
+
+      if (!gesture) {
+        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+        lastTapAt = 0;
+        if (dy > 0 && dy >= Math.abs(dx) * 1.1) gesture = 'dismiss';
+        else if (Math.abs(dx) >= Math.abs(dy) * 1.1) gesture = 'nav';
+        else if (dy > 0) gesture = 'dismiss';
+        else gesture = 'nav';
+      }
+
+      if (gesture === 'dismiss') {
+        dismissDy = Math.max(0, dy);
+        dialog.classList.add('is-dismissing');
+        dialog.style.transform = 'translateY(' + dismissDy.toFixed(1) + 'px)';
+        dialog.style.opacity = String(Math.max(0.35, 1 - dismissDy / 420));
+      }
+    }
+
+    function endOneFinger(x, y) {
+      var dx = x - startX;
+      var dy = y - startY;
+      var mode = gesture;
+      var isTap = Math.abs(dx) < 10 && Math.abs(dy) < 10;
+      gesture = null;
+
+      if (mode === 'pinch') return;
+
+      // Пан с почти нулевым сдвигом — это тап (иначе при зуме > 1
+      // beginOneFinger ставит 'pan' и двойной тап никогда не срабатывает).
+      if (mode === 'pan') {
+        if (isTap) onPossibleTap(x, y);
+        return;
+      }
+
+      if (mode === 'dismiss') {
+        var shouldClose = dismissDy > 110 || (dismissDy > 56 && dy > 0);
+        dismissDy = 0;
+        dialog.classList.remove('is-dismissing');
+        if (shouldClose) {
+          dialog.style.transform = '';
+          dialog.style.opacity = '';
+          dialog.close();
+          return;
+        }
+        if (reduced.matches) {
+          dialog.style.transform = '';
+          dialog.style.opacity = '';
+        } else {
+          dialog.style.transition = 'transform .28s ease, opacity .28s ease';
+          dialog.style.transform = 'translateY(0)';
+          dialog.style.opacity = '1';
+          window.setTimeout(function () {
+            dialog.style.transition = '';
+            dialog.style.transform = '';
+            dialog.style.opacity = '';
+          }, 300);
+        }
+        return;
+      }
+
+      if (mode === 'nav') {
+        if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+        go(dx < 0 ? 1 : -1);
+        return;
+      }
+
+      if (isTap) onPossibleTap(x, y);
+    }
+
+    // —— Touch (iOS / Android): надёжный мультитач ——
+    // capture: true — до того, как кто-то ещё съест событие.
+    body.addEventListener('touchstart', function (event) {
+      if (!dialog.open) return;
+      var touches = event.touches;
+      if (touches.length >= 2) {
+        event.preventDefault();
+        lastTapAt = 0;
+        stopTapZoomAnim();
+        gesture = 'pinch';
+        clearDismiss();
+        pinchStartDist = Math.max(1, distOf(touches[0], touches[1]));
+        pinchStartZoom = zoom;
+        return;
+      }
+      if (touches.length === 1) {
+        beginOneFinger(touches[0].clientX, touches[0].clientY);
+      }
+    }, { passive: false, capture: true });
+
+    body.addEventListener('touchmove', function (event) {
+      if (!dialog.open) return;
+      event.preventDefault(); // иначе Safari зумит всю страницу
+      var touches = event.touches;
+
+      if (touches.length >= 2) {
+        if (gesture !== 'pinch') {
+          lastTapAt = 0;
+          stopTapZoomAnim();
+          gesture = 'pinch';
+          clearDismiss();
+          pinchStartDist = Math.max(1, distOf(touches[0], touches[1]));
+          pinchStartZoom = zoom;
+        }
+        var dist = Math.max(1, distOf(touches[0], touches[1]));
+        setZoom(pinchStartZoom * (dist / pinchStartDist));
+        return;
+      }
+
+      if (touches.length === 1 && gesture !== 'pinch') {
+        moveOneFinger(touches[0].clientX, touches[0].clientY);
+      }
+    }, { passive: false, capture: true });
+
+    body.addEventListener('touchend', function (event) {
+      if (!dialog.open) return;
+      var touches = event.touches;
+
+      if (gesture === 'pinch') {
+        if (touches.length >= 2) return;
+        lastTapAt = 0;
+        // Остался один палец — дальше пан; его подъём не считать тапом.
+        if (touches.length === 1) {
+          skipTap = true;
+          beginOneFinger(touches[0].clientX, touches[0].clientY);
+          gesture = zoom > 1.05 ? 'pan' : null;
+        } else {
+          gesture = null;
+        }
+        return;
+      }
+
+      if (touches.length > 0) return;
+      var ended = event.changedTouches[0];
+      if (ended) endOneFinger(ended.clientX, ended.clientY);
+    }, { passive: false, capture: true });
+
+    body.addEventListener('touchcancel', function () {
+      gesture = null;
+      dismissDy = 0;
+      lastTapAt = 0;
+      skipTap = false;
+      clearDismiss();
+    }, { passive: true, capture: true });
+
+    // Старый Safari: нативный gesture* зумит документ поверх нашего pinch.
+    ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (name) {
+      dialog.addEventListener(name, function (event) {
+        if (dialog.open) event.preventDefault();
+      });
+    });
+
+    // —— Мышь (десктоп без тача): drag для nav/dismiss/pan ——
+    body.addEventListener('pointerdown', function (event) {
+      if (!dialog.open || event.pointerType !== 'mouse' || event.button !== 0) return;
+      mouseDrag = true;
+      beginOneFinger(event.clientX, event.clientY);
+      try { body.setPointerCapture(event.pointerId); } catch (err) { /* ignore */ }
+    });
+
+    body.addEventListener('pointermove', function (event) {
+      if (!mouseDrag || event.pointerType !== 'mouse') return;
+      moveOneFinger(event.clientX, event.clientY);
+    });
+
+    function endMouse(event) {
+      if (!mouseDrag || event.pointerType !== 'mouse') return;
+      mouseDrag = false;
+      endOneFinger(event.clientX, event.clientY);
+    }
+    body.addEventListener('pointerup', endMouse);
+    body.addEventListener('pointercancel', endMouse);
+
     // Клик по подложке вокруг картинки закрывает окно.
     dialog.addEventListener('click', function (event) {
       if (event.target === dialog) dialog.close();
@@ -970,6 +1423,9 @@
     // Раз закрытие с клавиатуры, :focus-visible оставляет обводку и «Открыть».
     // Снимаем фокус после restore (он может быть чуть позже close).
     dialog.addEventListener('close', function () {
+      mouseDrag = false;
+      gesture = null;
+      resetZoom();
       queueMicrotask(function () {
         var el = document.activeElement;
         if (el && items.indexOf(el) !== -1) el.blur();
@@ -1105,6 +1561,11 @@
       return;
     }
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    // На телефоне частица только грузит main thread во время скролла.
+    if (window.matchMedia('(hover: none), (pointer: coarse)').matches) {
+      if (particle) particle.remove();
+      return;
+    }
     if (!particle) return;
 
     // pageX/pageY — логическая позиция в документе. viewX/viewY — client-координаты

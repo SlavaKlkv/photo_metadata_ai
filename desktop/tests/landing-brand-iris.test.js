@@ -183,6 +183,8 @@ describe('характер хода', () => {
 // сводится к querySelector, слушателям, setAttribute('d') и sessionStorage.
 function fakeStage({
   reduced = false,
+  coarse = false,
+  scrollY = 0,
   rect = { left: 24, top: 17, width: 180, height: 30 },
   hover = false,
   stored,
@@ -232,13 +234,15 @@ function fakeStage({
       return false;
     },
   };
-  const media = { matches: reduced, addEventListener: () => {} };
+  const reducedMedia = { matches: reduced, addEventListener: () => {} };
+  const tapMedia = { matches: coarse, addEventListener: () => {} };
   const store = new Map();
   if (stored !== undefined) store.set(BRAND_IRIS.HANDOFF_KEY, JSON.stringify(stored));
   let nextFrame = 1;
   let queue = [];
   let nextTimer = 1;
   let timers = [];
+  let currentScrollY = scrollY;
   const rootClasses = new Set(headerSwap ? ['header-swap'] : []);
   const moCallbacks = [];
   const docStyle = { cursor: '' };
@@ -260,7 +264,14 @@ function fakeStage({
     },
     now: 0,
     performance: { now: () => win.now },
-    matchMedia: () => media,
+    get scrollY() {
+      return currentScrollY;
+    },
+    matchMedia: (query) => {
+      const q = String(query || '');
+      if (q.includes('hover: none') || q.includes('pointer: coarse')) return tapMedia;
+      return reducedMedia;
+    },
     requestAnimationFrame(cb) {
       const id = nextFrame++;
       queue.push({ id, cb });
@@ -356,6 +367,9 @@ function fakeStage({
     },
     setBlind: (value) => {
       blind = value;
+    },
+    setScrollY: (value) => {
+      currentScrollY = value;
     },
     fire: (type, event) => (listeners[type] || []).forEach((handler) => handler(event)),
     fireDoc: (type, event) => (docListeners[type] || []).forEach((handler) => handler(event)),
@@ -505,6 +519,90 @@ describe('поведение метки в шапке', () => {
 
     stage.fire('mouseleave');
     expect(stage.pathEl.d).toBe(brandIrisPath(0));
+  });
+
+  // Тач: нет наведения, mouseleave после тапа не приходит — старый latch
+  // оставлял затвор закрытым. Импульс: раскрыть → закрыть → конец подъёма → покой.
+  test('на мобиле тап: открыть, сразу закрыть, после скролла — покой', () => {
+    const stage = fakeStage({ coarse: true, scrollY: 400 });
+
+    stage.fire('mousedown');
+    stage.advance(BRAND_IRIS.OPEN_MS / 2);
+    expect(stage.pathEl.d).toBe(brandIrisPath(-brandIrisEaseOpen(0.5)));
+    expect(stage.pathEl.d).not.toBe(brandIrisPath(-1));
+    expect(stage.pathEl.d).not.toBe(brandIrisPath(1));
+
+    stage.advance(BRAND_IRIS.OPEN_MS / 2);
+    expect(stage.pathEl.d).toBe(brandIrisPath(-1));
+
+    stage.advance(BRAND_IRIS.TAP_HOLD_MS);
+    stage.advance(BRAND_IRIS.SHUT_MS);
+    expect(stage.pathEl.d).toBe(brandIrisPath(1));
+
+    // Sticky :hover / mouseenter во время импульса покой не сбивают.
+    stage.setHover(true);
+    stage.fire('mouseenter');
+    stage.advance(BRAND_IRIS.OPEN_MS);
+    expect(stage.pathEl.d).toBe(brandIrisPath(1));
+
+    // Пока страница не наверху — затвор держим закрытым.
+    stage.advance(200);
+    expect(stage.pathEl.d).toBe(brandIrisPath(1));
+
+    // Подъём закончился — возвращаемся в покой.
+    stage.setScrollY(0);
+    stage.advance(50);
+    stage.advance(50);
+    stage.advance(BRAND_IRIS.REST_MS);
+    expect(stage.pathEl.d).toBe(brandIrisPath(0));
+  });
+
+  test('на мобиле тап у вершины страницы всё равно доигрывает импульс до покоя', () => {
+    const stage = fakeStage({ coarse: true, scrollY: 0 });
+
+    stage.fire('mousedown');
+    stage.advance(BRAND_IRIS.OPEN_MS / 2);
+    expect(stage.pathEl.d).toBe(brandIrisPath(-brandIrisEaseOpen(0.5)));
+    stage.advance(BRAND_IRIS.OPEN_MS / 2);
+    expect(stage.pathEl.d).toBe(brandIrisPath(-1));
+    stage.advance(BRAND_IRIS.TAP_HOLD_MS);
+    stage.advance(BRAND_IRIS.SHUT_MS);
+    expect(stage.pathEl.d).toBe(brandIrisPath(1));
+
+    stage.advance(50);
+    stage.advance(50);
+    stage.advance(BRAND_IRIS.REST_MS);
+    expect(stage.pathEl.d).toBe(brandIrisPath(0));
+  });
+
+  // iOS «сайт для компьютера» / DevTools: hover: hover, но pointerType=touch.
+  test('тап по pointerType=touch запускает импульс даже без hover: none', () => {
+    const stage = fakeStage({ coarse: false, scrollY: 0 });
+
+    stage.fire('mousedown', { pointerType: 'touch', button: 0 });
+    stage.advance(BRAND_IRIS.OPEN_MS / 2);
+    expect(stage.pathEl.d).toBe(brandIrisPath(-brandIrisEaseOpen(0.5)));
+    stage.advance(BRAND_IRIS.OPEN_MS / 2);
+    expect(stage.pathEl.d).toBe(brandIrisPath(-1));
+    stage.advance(BRAND_IRIS.TAP_HOLD_MS);
+    stage.advance(BRAND_IRIS.SHUT_MS);
+    expect(stage.pathEl.d).toBe(brandIrisPath(1));
+    stage.advance(50);
+    stage.advance(50);
+    stage.advance(BRAND_IRIS.REST_MS);
+    expect(stage.pathEl.d).toBe(brandIrisPath(0));
+  });
+
+  test('мобильный тап при peer-leave уносит закрытый затвор на соседнюю страницу', () => {
+    const stage = fakeStage({ coarse: true, rect: { left: 24, top: 17 } });
+
+    stage.fire('mousedown');
+    stage.advance(BRAND_IRIS.OPEN_MS);
+    stage.markLeaving();
+    stage.fireWindow('pagehide');
+
+    const saved = stage.stored();
+    expect(saved.to).toBe(1);
   });
 });
 

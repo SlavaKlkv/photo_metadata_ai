@@ -82,6 +82,51 @@ describe('галерея экранов', () => {
     expect(html).not.toMatch(/next\.disabled\s*=/);
   });
 
+  test('лайтбокс листается колесом и свайпом', () => {
+    const html = readScreens();
+
+    // Трекпад/колесо на dialog; тач — Touch Events (iOS), мышь — pointer.
+    expect(html).toContain("dialog.addEventListener('wheel'");
+    expect(html).toContain('wheelLockUntil');
+    expect(html).toContain("body.addEventListener('touchstart'");
+    expect(html).toContain("body.addEventListener('touchmove'");
+    expect(html).toContain("body.addEventListener('pointerdown'");
+    expect(html).toContain('function endOneFinger');
+    expect(html).toMatch(/\.lb-body\s*\{[^}]*touch-action:\s*none/s);
+    // Свайп влево → следующий кадр (как в галереях).
+    expect(html).toContain('go(dx < 0 ? 1 : -1)');
+    expect(html).toContain('листать можно стрелками и свайпом');
+  });
+
+  test('лайтбокс: свайп вниз закрывает, pinch и двойной тап меняют масштаб', () => {
+    const html = readScreens();
+
+    expect(html).toContain('id="lb-stage"');
+    expect(html).toContain('function setZoom');
+    expect(html).toContain('function resetZoom');
+    expect(html).toContain("gesture = 'dismiss'");
+    expect(html).toContain("gesture = 'pinch'");
+    expect(html).toContain('MAX_ZOOM');
+    expect(html).toContain('function toggleTapZoom');
+    expect(html).toContain('function onPossibleTap');
+    expect(html).toContain('function zoomToward');
+    expect(html).toContain('TAP_ZOOM');
+    expect(html).toContain('onPossibleTap(x, y)');
+    expect(html).toContain('is-tap-zoom');
+    expect(html).toContain('zoomToward(TAP_ZOOM');
+    expect(html).toContain('zoomToward(1');
+    // При зуме beginOneFinger ставит pan — тап всё равно должен переключать масштаб.
+    expect(html).toContain("if (mode === 'pan')");
+    expect(html).toContain('skipTap');
+    // iOS: Touch Events + preventDefault; gesture* глушим, иначе зумится страница.
+    expect(html).toContain("body.addEventListener('touchmove'");
+    expect(html).toContain('passive: false');
+    expect(html).toContain('gesturestart');
+    expect(html).toContain('event.ctrlKey');
+    expect(html).toMatch(/dy > 0\) \{\s*dialog\.close\(\)/);
+    expect(html).toContain('is-dismissing');
+  });
+
   test('после закрытия лайтбокса снимается фокус с плитки (без липкой обводки)', () => {
     const html = readScreens();
 
