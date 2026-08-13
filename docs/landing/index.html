@@ -97,7 +97,15 @@
   /* Тёмный canvas задан до первой отрисовки. Межстраничный View Transition намеренно
      не используется: в Chrome он давал вспышку при возврате из screens.html.
      Вместо него — opacity-swap шапки (header-swap.js + класс на <html>). */
-  html { scroll-behavior: smooth; background: var(--bg); color-scheme: dark; }
+  html {
+    scroll-behavior: smooth;
+    background: var(--bg);
+    color-scheme: dark;
+    /* Как на screens.html: clip, не hidden. Safari при горизонтальном
+       overflow зумит visualViewport (микромасштаб на всём скролле). */
+    overflow-x: clip;
+    overscroll-behavior-x: none;
+  }
 
   body {
     margin: 0;
@@ -105,7 +113,8 @@
     color: var(--text);
     font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
-    overflow-x: hidden;
+    overflow-x: clip;
+    overscroll-behavior-x: none;
   }
 
   a { color: var(--accent-2); text-decoration: none; }
@@ -228,6 +237,48 @@
   .nav-links a:hover { color: var(--text); text-decoration: none; }
   .nav-links a.active { color: var(--text); }
   .nav-links a.active::after { transform: scaleX(1); }
+
+  /* Бургер только на узкой ширине; на desktop кнопка не в потоке. */
+  .nav-toggle {
+    display: none;
+    place-items: center;
+    flex: none;
+    width: 42px;
+    height: 42px;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--line-strong);
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .nav-toggle:hover { background: rgba(255, 255, 255, 0.07); }
+  .nav-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .nav-toggle-bars {
+    display: block;
+    position: relative;
+    width: 16px;
+    height: 12px;
+  }
+  .nav-toggle-bars::before,
+  .nav-toggle-bars::after,
+  .nav-toggle-bars span {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1.5px;
+    border-radius: 1px;
+    background: currentColor;
+    transition: transform .22s ease, top .22s ease, opacity .16s ease;
+  }
+  .nav-toggle-bars span { top: 5px; }
+  .nav-toggle-bars::before { top: 0; }
+  .nav-toggle-bars::after { top: 10px; }
+  header.nav-open .nav-toggle-bars span { opacity: 0; }
+  header.nav-open .nav-toggle-bars::before { top: 5px; transform: rotate(45deg); }
+  header.nav-open .nav-toggle-bars::after { top: 5px; transform: rotate(-45deg); }
 
   /* Кнопка «Скачать» в шапке — только когда hero/final CTA не в кадре.
      По умолчанию (и в HTML) header уже с .hero-cta-visible: иначе при refresh
@@ -543,7 +594,10 @@
       rotateX(var(--tilt-x))
       rotateY(var(--tilt-y));
     transform-style: preserve-3d;
-    transition: transform .42s cubic-bezier(.2, .75, .25, 1);
+    /* Без transition на transform: --py пишется на каждом кадре скролла.
+       Иначе браузер стартует 0.42s ease к каждому промежуточному значению —
+       на таче страница «резинит» и дёргается. Плавный возврат tilt —
+       только на pointerleave (см. скрипт). */
     will-change: transform;
   }
   .mock-depth {
@@ -844,6 +898,24 @@
     /* Отбивка до итоговой строки: иначе линия mock-foot прилипает к последней
        строке списка, хотя между остальными строками есть просвет. */
     margin-bottom: calc(5 * var(--u));
+    /* Страховка: недомеренные строки не наезжают на mock-foot / шаги. */
+    overflow: hidden;
+  }
+  /* После подгонки: только целые строки своей высоты, равномерно по высоте. */
+  .mock.mock-fitted .mock-rows {
+    grid-auto-rows: minmax(calc(22 * var(--u)), auto);
+    align-content: space-evenly;
+  }
+  .mock.mock-foot-hidden .mock-foot { display: none; }
+  .mock.mock-foot-hidden .mock-rows { margin-bottom: 0; }
+  /* Не хватает ширины шкале — остаются кружки шагов, подписи Upload/… скрыты.
+     Кнопка действия (.mock-action) сохраняет текст. */
+  .mock.mock-steps-compact .mock-steps > span:not(.mock-action) {
+    font-size: 0;
+    gap: 0;
+  }
+  .mock.mock-steps-compact .mock-steps > span:not(.mock-action) i {
+    font-size: calc(7 * var(--u));
   }
   /* Последняя колонка фиксированной ширины, а не auto: у auto её размер задаёт
      самый длинный провайдер *в своей строке*, поэтому у каждой строки колонки
@@ -1016,6 +1088,7 @@
   .mock-foot {
     flex: 0 0 auto;
     display: flex;
+    flex-wrap: wrap;
     gap: calc(9 * var(--u));
     margin-top: auto;
     padding-top: calc(8 * var(--u));
@@ -1215,6 +1288,8 @@
     display: flex;
     align-items: center;
     justify-content: flex-start;
+    flex-wrap: nowrap;
+    min-width: 0;
     gap: calc(6 * var(--u));
     margin-top: calc(10 * var(--u));
     padding: calc(9.5 * var(--u)) calc(12 * var(--u));
@@ -1223,6 +1298,7 @@
     background: linear-gradient(145deg, rgba(29, 29, 37, .98), rgba(22, 22, 29, .98));
     color: var(--dim);
     font-size: calc(7 * var(--u));
+    overflow: hidden;
   }
   .mock-steps span { display: inline-flex; align-items: center; gap: calc(4 * var(--u)); }
   .mock-steps i {
@@ -2729,36 +2805,77 @@
     .step:nth-child(even):hover .step-copy { transform: translateY(-3px); }
   }
 
-  /* Ссылки на разделы не прячем, а переносим на вторую строку шапки
-     горизонтальной лентой: страница длинная, и без них по разделам не пройти. */
+  /* Узкий экран: вместо обрезанной ленты — бургер и выезжающая панель.
+     Те же 5 ссылок в #nav-links; desktop-ряд не меняется.
+     DMG только для macOS — кнопки скачивания на телефоне/планшете прячем. */
   @media (max-width: 860px) {
-    :root { --header-h: 84px; }
+    :root { --header-h: 64px; }
     .nav {
-      height: auto;
-      flex-wrap: wrap;
-      gap: 0 16px;
-      padding-top: 9px;
+      position: relative;
+      height: var(--header-h);
+      flex-wrap: nowrap;
+      align-items: center;
+      gap: 10px;
     }
-    .brand { height: 42px; }
+    .brand {
+      min-width: 0;
+      flex: 1 1 auto;
+      /* Место под бургер справа. */
+      max-width: calc(100% - 52px);
+    }
+    .brand-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .nav-toggle {
+      display: grid;
+      position: relative;
+      z-index: 2;
+      margin-left: auto;
+    }
+    a[href*="/releases/download/"] { display: none; }
+    .cta-note { display: none; }
+
     .nav-links {
-      order: 3;
-      width: 100%;
-      margin: 0 -24px;
-      padding: 0 24px 10px;
-      gap: 20px;
-      overflow-x: auto;
-      overscroll-behavior-x: contain;
-      scroll-snap-type: x proximity;
-      scrollbar-width: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      z-index: 1;
+      display: none;
+      flex-direction: column;
+      gap: 0;
+      width: auto;
+      margin: 0;
+      padding: 8px 24px 14px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(11, 11, 15, 0.96);
+      backdrop-filter: saturate(160%) blur(14px);
+      box-shadow: 0 18px 40px -28px rgba(0, 0, 0, 1);
     }
-    .nav-links::-webkit-scrollbar { display: none; }
+    header.nav-open .nav-links { display: flex; }
     .nav-links a {
-      flex: 0 0 auto;
-      scroll-snap-align: start;
+      flex: none;
+      padding: 12px 0;
+      font-size: 15.5px;
+      border-bottom: 1px solid var(--line);
+    }
+    .nav-links a:last-child { border-bottom: 0; }
+    .nav-links a::after {
+      left: 0;
+      right: auto;
+      width: 18px;
+      bottom: 10px;
     }
   }
   @media (max-width: 720px) {
-    .hero { padding: 56px 0 66px; }
+    .wrap { padding: 0 16px; }
+    .nav-links { padding-left: 16px; padding-right: 16px; }
+    .hero { padding: 48px 0 56px; }
+    h1 { font-size: clamp(32px, 8.4vw, 40px); max-width: none; }
+    .cta .btn { justify-content: center; }
+    .final .cta .btn { flex: 1 1 auto; }
     section { padding: 62px 0; }
     .install-shell { margin-top: 32px; }
     .install-steps { grid-template-columns: 1fr; gap: 22px; }
@@ -2809,11 +2926,14 @@
     /* Узкий hero: только Results; Metadata Preview прячем. */
     .mock-cols { grid-template-columns: 1fr; }
     .mock-preview { display: none; }
-    /* На узком экране окно ниже, а строка списка меньше 22u не становится:
-       восемь строк перестают помещаться и наезжают на полосу шагов. Показываем
-       пять — выбранная строка (четвёртая) остаётся на виду. */
-    .mock-row:nth-child(n+6) { display: none; }
-    .thumbs { grid-template-columns: repeat(2, 1fr); }
+    /* Число видимых строк и компактность шкалы подбирает fitMock (см. скрипт):
+       CSS больше не режет список фиксированным nth-child. */
+    /* Мобильный фон и так тёмный: aurora/ореол за мокапом шумят. Тени у
+       большого снимка оставляем. Четыре мелких превью на узком экране
+       дублируют крупный кадр и CTA «все 15» — прячем. */
+    .hero::before,
+    .hero-visual::after { display: none; }
+    .thumbs { display: none; }
     .platforms { gap: 14px 26px; }
     .platforms b { font-size: 15px; }
   }
@@ -2824,6 +2944,11 @@
     100% { opacity: 0; transform: translateY(500%); }
   }
   @media (max-width: 420px) {
+    .cta {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .cta .btn { width: 100%; }
     .install-step { gap: 12px; }
     #install pre { padding: 16px; font-size: 13px; }
     .mock-row {
@@ -2972,6 +3097,9 @@
       <a href="#screens">Скриншоты</a>
       <a href="#install">Установка</a>
     </nav>
+    <button type="button" class="nav-toggle" id="nav-toggle" aria-controls="nav-links" aria-expanded="false" aria-label="Открыть меню">
+      <span class="nav-toggle-bars" aria-hidden="true"><span></span></span>
+    </button>
     <a class="btn btn-ghost btn-sm nav-cta" href="https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.2.1/Photo-Metadata-AI-1.2.1-arm64.dmg"><svg class="apple" viewBox="0 0 384 512" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>Скачать</a>
   </div>
 </header>
@@ -3633,12 +3761,48 @@ ollama pull qwen2.5vl</code></pre>
 </footer>
 
 <script src="ambient-particle-flags.js"></script>
-<script src="brand-iris/geometry.js"></script>
-<script src="brand-iris/motion.js"></script>
-<script src="brand-iris/handoff.js"></script>
-<script src="brand-iris/presence.js"></script>
-<script src="brand-iris/init.js"></script>
+<script src="brand-iris/geometry.js?v=tap4"></script>
+<script src="brand-iris/motion.js?v=tap4"></script>
+<script src="brand-iris/handoff.js?v=tap4"></script>
+<script src="brand-iris/presence.js?v=tap4"></script>
+<script src="brand-iris/init.js?v=tap4"></script>
 <script src="header-swap.js"></script>
+<script>
+  // Мобильное меню: бургер открывает ту же #nav-links панелью под шапкой.
+  (function () {
+    var header = document.querySelector('header');
+    var toggle = document.getElementById('nav-toggle');
+    var nav = document.getElementById('nav-links');
+    if (!header || !toggle || !nav) return;
+
+    var mq = window.matchMedia('(max-width: 860px)');
+
+    function setOpen(open) {
+      if (!mq.matches) open = false;
+      header.classList.toggle('nav-open', open);
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      toggle.setAttribute('aria-label', open ? 'Закрыть меню' : 'Открыть меню');
+    }
+
+    toggle.addEventListener('click', function () {
+      setOpen(!header.classList.contains('nav-open'));
+    });
+    nav.addEventListener('click', function (event) {
+      if (event.target.closest('a')) setOpen(false);
+    });
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') setOpen(false);
+    });
+    window.addEventListener('scroll', function () {
+      if (header.classList.contains('nav-open')) setOpen(false);
+    }, { passive: true });
+    if (mq.addEventListener) {
+      mq.addEventListener('change', function () { setOpen(false); });
+    } else if (mq.addListener) {
+      mq.addListener(function () { setOpen(false); });
+    }
+  })();
+</script>
 <script>
   // Подсветка активного пункта меню: берём самую верхнюю секцию,
   // которая уже пересекла нижнюю границу шапки.
@@ -3741,6 +3905,34 @@ ollama pull qwen2.5vl</code></pre>
     items.forEach(function (el) { io.observe(el); });
   })();
 
+  // Логотип → самый верх (выше hero). Нативный переход по #top молчит,
+  // если hash уже #top: после первого клика пользователь снова проскроллил —
+  // остаётся только захлопывание ириса от mousedown. Крутим сами всегда.
+  (function () {
+    var brand = document.querySelector('a.brand[href="#top"]');
+    if (!brand) return;
+
+    brand.addEventListener('click', function (event) {
+      if (event.defaultPrevented || event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+      event.preventDefault();
+      var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' });
+      if (window.location.hash !== '#top') {
+        if (window.history && typeof window.history.pushState === 'function') {
+          try {
+            window.history.pushState(null, '', '#top');
+          } catch (err) {
+            window.location.hash = 'top';
+          }
+        } else {
+          window.location.hash = 'top';
+        }
+      }
+    });
+  })();
+
   // Тень у шапки и кнопка «наверх» зависят от одной величины,
   // поэтому считаем их в одном обработчике.
   (function () {
@@ -3841,10 +4033,16 @@ ollama pull qwen2.5vl</code></pre>
     if (!scene || !stage) return;
 
     var ticking = false;
+    var TILT_EASE = 'transform .42s cubic-bezier(.2, .75, .25, 1)';
+
+    function clearTiltTransition() {
+      stage.style.transition = '';
+    }
 
     function update() {
       // Считаем только пока hero на экране: ниже сдвиг всё равно не виден,
       // а фиксация значения не даёт картинке «прыгнуть» при возврате.
+      clearTiltTransition();
       var progress = Math.min(Math.max(window.scrollY / window.innerHeight, 0), 1);
       stage.style.setProperty('--py', (progress * -38).toFixed(1) + 'px');
     }
@@ -3865,17 +4063,183 @@ ollama pull qwen2.5vl</code></pre>
         var x = Math.max(-1, Math.min(1, ((event.clientX - rect.left) / rect.width - .5) * 2));
         var y = Math.max(-1, Math.min(1, ((event.clientY - rect.top) / rect.height - .5) * 2));
 
+        clearTiltTransition();
         stage.style.setProperty('--tilt-x', (y * -1.15).toFixed(2) + 'deg');
         stage.style.setProperty('--tilt-y', (x * 1.8).toFixed(2) + 'deg');
       }, { passive: true });
 
       scene.addEventListener('pointerleave', function () {
+        stage.style.transition = TILT_EASE;
         stage.style.setProperty('--tilt-x', '0deg');
         stage.style.setProperty('--tilt-y', '0deg');
       });
     }
 
     update();
+  })();
+
+  // Подгонка начинки hero-мокапа под кадр окна: шкале шагов — без подписей,
+  // блоку «N selected» — скрытие целиком, списку — только целые строки
+  // равномерно по высоте. Иначе при нехватке места строки наезжают на футер,
+  // а Start processing обрезается overflow'ом рамки.
+  (function () {
+    var mock = document.querySelector('.hero-visual .mock');
+    if (!mock) return;
+
+    var steps = mock.querySelector('.mock-steps');
+    var foot = mock.querySelector('.mock-foot');
+    var rowsBox = mock.querySelector('.mock-rows');
+    if (!steps || !foot || !rowsBox) return;
+
+    var rowEls = Array.prototype.slice.call(rowsBox.querySelectorAll('.mock-row'));
+    if (!rowEls.length) return;
+
+    var selectedIdx = Math.max(0, rowEls.findIndex(function (row) {
+      return row.classList.contains('on');
+    }));
+    var fitting = false;
+    var scheduled = false;
+    var ro = null;
+    var visual = mock.closest('.hero-visual');
+    // Высота блока выбранных + отбивка списка: чтобы оценить «с футером»
+    // не включая его обратно в DOM (иначе мигание и цикл ResizeObserver).
+    var footBlock = 0;
+
+    function observeFrame() {
+      if (!ro) return;
+      ro.observe(mock);
+      if (visual) ro.observe(visual);
+    }
+
+    function setVisibleRows(count) {
+      var n = Math.max(1, Math.min(rowEls.length, count));
+      var start = 0;
+      // Выбранная строка должна остаться в кадре: если она дальше окна —
+      // сдвигаем окно так, чтобы она была последней видимой.
+      if (selectedIdx >= n) start = selectedIdx - n + 1;
+      if (start + n > rowEls.length) start = Math.max(0, rowEls.length - n);
+      rowEls.forEach(function (row, index) {
+        row.hidden = index < start || index >= start + n;
+      });
+    }
+
+    function cacheFootBlock() {
+      if (mock.classList.contains('mock-foot-hidden')) return;
+      var mb = parseFloat(getComputedStyle(rowsBox).marginBottom) || 0;
+      footBlock = foot.offsetHeight + mb;
+    }
+
+    function rowHeightAndGap() {
+      var gap = parseFloat(getComputedStyle(rowsBox).rowGap) || 0;
+      var was = rowEls.map(function (row) { return row.hidden; });
+      rowEls.forEach(function (row, index) { row.hidden = index > 0; });
+      var height = rowEls[0].getBoundingClientRect().height;
+      rowEls.forEach(function (row, index) { row.hidden = was[index]; });
+      return { height: height, gap: gap };
+    }
+
+    function rowsForAvail(avail) {
+      var metrics = rowHeightAndGap();
+      if (metrics.height <= 0 || avail <= 0) return 0;
+      return Math.max(
+        0,
+        Math.min(
+          rowEls.length,
+          Math.floor((avail + metrics.gap) / (metrics.height + metrics.gap))
+        )
+      );
+    }
+
+    function footFitsInFrame() {
+      if (mock.classList.contains('mock-foot-hidden')) return false;
+      var footRect = foot.getBoundingClientRect();
+      var mockRect = mock.getBoundingClientRect();
+      var stepsRect = steps.getBoundingClientRect();
+      var limit = Math.min(mockRect.bottom, stepsRect.top) + .5;
+      return footRect.top >= mockRect.top - .5 && footRect.bottom <= limit;
+    }
+
+    function fit() {
+      if (fitting) return;
+      fitting = true;
+      if (ro) ro.disconnect();
+
+      mock.classList.add('mock-fitted');
+
+      // 1) Шкала: подписи → только кружки, если ряд не сходится по ширине.
+      mock.classList.remove('mock-steps-compact');
+      void steps.offsetWidth;
+      if (steps.scrollWidth > steps.clientWidth + 1) {
+        mock.classList.add('mock-steps-compact');
+      }
+
+      // 2–3) Футер выбранных и число целых строк. Высоту футера кэшируем,
+      // чтобы не включать его обратно только ради замера (мигание / цикл RO).
+      cacheFootBlock();
+      var footHidden = mock.classList.contains('mock-foot-hidden');
+      var avail = rowsBox.clientHeight;
+      var availWithFoot = footHidden ? avail - footBlock : avail;
+      var availWithoutFoot = footHidden ? avail : avail + footBlock;
+      var withCount = rowsForAvail(availWithFoot);
+      var hideFoot = withCount === 0 || footBlock <= 0;
+
+      if (!footHidden && !hideFoot && !footFitsInFrame()) {
+        hideFoot = true;
+      }
+
+      var visible = hideFoot ? rowsForAvail(availWithoutFoot) : withCount;
+      mock.classList.toggle('mock-foot-hidden', hideFoot);
+      setVisibleRows(Math.max(1, visible));
+
+      // Вернули футер в поток — если всё же режется рамкой, снимаем сразу
+      // в том же кадре, до paint.
+      if (!hideFoot && !footFitsInFrame()) {
+        mock.classList.add('mock-foot-hidden');
+        setVisibleRows(Math.max(1, rowsForAvail(rowsBox.clientHeight)));
+      }
+
+      if (!mock.classList.contains('mock-steps-compact') &&
+          steps.scrollWidth > steps.clientWidth + 1) {
+        mock.classList.add('mock-steps-compact');
+      }
+
+      fitting = false;
+      // Рамка и hero-visual (cqi): внутренние hidden сами по себе RO не кормят.
+      observeFrame();
+    }
+
+    function scheduleFit() {
+      if (scheduled || fitting) return;
+      scheduled = true;
+      requestAnimationFrame(function () {
+        scheduled = false;
+        fit();
+      });
+    }
+
+    mock.classList.add('mock-fitted');
+    fit();
+    // Первый кадр часто ещё без итоговых cqi/--u: повторяем после layout и шрифтов.
+    scheduleFit();
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(scheduleFit);
+    }
+    window.addEventListener('load', scheduleFit);
+
+    if (typeof ResizeObserver === 'function') {
+      ro = new ResizeObserver(scheduleFit);
+      observeFrame();
+    } else {
+      window.addEventListener('resize', scheduleFit);
+    }
+
+    if (typeof matchMedia === 'function') {
+      ['(max-width: 720px)', '(max-width: 420px)'].forEach(function (query) {
+        var mql = matchMedia(query);
+        if (mql.addEventListener) mql.addEventListener('change', scheduleFit);
+        else if (mql.addListener) mql.addListener(scheduleFit);
+      });
+    }
   })();
 
   // Частица движется по плавной неповторяющейся кривой поверх всей страницы.
@@ -3892,6 +4256,11 @@ ollama pull qwen2.5vl</code></pre>
       return;
     }
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    // На телефоне частица только грузит main thread во время скролла.
+    if (window.matchMedia('(hover: none), (pointer: coarse)').matches) {
+      if (particle) particle.remove();
+      return;
+    }
     if (!particle) return;
 
     // pageX/pageY — логическая позиция в документе. viewX/viewY — client-координаты
