@@ -6,7 +6,7 @@
   "main": "src/main.js",
   "private": true,
   "author": "Slava Kulikov",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "scripts": {
     "dev": "electron .",
     "build:mac": "electron-builder --mac",
