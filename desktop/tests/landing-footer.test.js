@@ -30,7 +30,7 @@ test('футер отделяет галерею от Условий и Исхо
   expect(terms[0]).toMatch(/rel="noopener"/);
   expect(foot).toMatch(/Условия/);
   expect(foot).toContain(
-    'href="https://github.com/SlavaKlkv/photo_metadata_ai/blob/develop/LICENSE"',
+    'href="https://github.com/SlavaKlkv/photo_metadata_ai"',
   );
   expect(foot).toMatch(/Исходный код/);
   expect(foot).toContain('class="foot-docs"');
