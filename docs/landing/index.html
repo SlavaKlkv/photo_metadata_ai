@@ -2663,6 +2663,35 @@
     align-items: center;
     justify-content: space-between;
   }
+  .foot-nav {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+  .foot-gallery {
+    display: inline-flex;
+    gap: 7px;
+    align-items: center;
+    color: var(--muted);
+    transition: color .18s ease;
+  }
+  .foot-gallery::after {
+    content: "→";
+    color: var(--dim);
+    transition: transform .18s ease, color .18s ease;
+  }
+  .foot-gallery:hover {
+    color: var(--text);
+    text-decoration: none;
+  }
+  .foot-gallery:hover::after {
+    color: var(--accent-2);
+    transform: translateX(3px);
+  }
+  .foot-docs {
+    padding-left: 24px;
+    border-left: 1px solid var(--line);
+  }
   /* Обычная надпись, а не кнопка: подсветка текста при наведении
      вместо подчёркивания. */
   .foot-link { color: var(--muted); transition: color .18s ease; }
@@ -2872,6 +2901,8 @@
   @media (max-width: 720px) {
     .wrap { padding: 0 16px; }
     .nav-links { padding-left: 16px; padding-right: 16px; }
+    .foot { align-items: flex-start; }
+    .foot-nav { width: 100%; justify-content: space-between; }
     .hero { padding: 48px 0 56px; }
     h1 { font-size: clamp(32px, 8.4vw, 40px); max-width: none; }
     .cta .btn { justify-content: center; }
@@ -3745,7 +3776,6 @@ ollama pull qwen2.5vl</code></pre>
             <svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7.5 11l4.5 4.5 4.5-4.5"/><path d="M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17"/></svg>
             Скачать для macOS
           </a>
-          <a class="btn btn-ghost" href="https://github.com/SlavaKlkv/photo_metadata_ai" target="_blank" rel="noopener">Смотреть на GitHub</a>
         </div>
       </div>
     </div>
@@ -3755,8 +3785,15 @@ ollama pull qwen2.5vl</code></pre>
 
 <footer>
   <div class="wrap foot">
-    <span>© 2026 Photo Metadata AI</span>
-    <a class="foot-link" href="screens.html" target="_blank" rel="noopener">Все экраны</a>
+    <span>© 2026 Photo Metadata AI · All rights reserved</span>
+    <nav class="foot-nav" aria-label="Ссылки в подвале">
+      <a class="foot-gallery" href="screens.html" target="_blank" rel="noopener">Все экраны</a>
+      <span class="foot-docs">
+        <a class="foot-link" href="terms.html" target="_blank" rel="noopener">Условия</a>
+        ·
+        <a class="foot-link" href="https://github.com/SlavaKlkv/photo_metadata_ai/blob/develop/LICENSE" target="_blank" rel="noopener">Исходный код</a>
+      </span>
+    </nav>
   </div>
 </footer>
 
