@@ -617,6 +617,53 @@ test('scroll-parallax мокапа не анимирует transform через 
   expect(html).toContain("stage.style.setProperty('--py'");
 });
 
+// На телефоне прокрутка идёт вне main-потока, поэтому сдвиг сцены считает
+// не JS на каждый скролл, а scroll-таймлайн на compositor'е.
+test('scroll-parallax мокапа едет на compositor-таймлайне, а не из JS', () => {
+  const html = fs.readFileSync(landingPath, 'utf8');
+  const supports = html.match(
+    /@supports \(animation-timeline: scroll\(\)\)\s*\{([\s\S]*?)\n {2}\}/,
+  );
+
+  expect(supports).not.toBeNull();
+  expect(supports[1]).toMatch(/\.mock-stage\s*\{[\s\S]*?animation:\s*mock-scroll-rise linear both/);
+  expect(supports[1]).toMatch(/animation-timeline:\s*scroll\(root block\)/);
+  // Тот же участок, что считал JS: первый экран прокрутки.
+  expect(supports[1]).toMatch(/animation-range:\s*0 100vh/);
+
+  // Отдельное свойство translate: transform на этом слое занят tilt от курсора.
+  const keyframes = html.match(/@keyframes mock-scroll-rise\s*\{([\s\S]*?)\n {2}\}/);
+
+  expect(keyframes).not.toBeNull();
+  expect(keyframes[1]).toMatch(/from\s*\{\s*translate:\s*0 0/);
+  expect(keyframes[1]).toMatch(/to\s*\{\s*translate:\s*0 -38px/);
+});
+
+test('JS-фолбэк параллакса догоняет цель, а не прыгает по кадрам скролла', () => {
+  const html = fs.readFileSync(landingPath, 'utf8');
+  const parallax = html.slice(
+    html.indexOf('// Скролл двигает всю 3D-сцену'),
+    html.indexOf('// Подгонка начинки hero-мокапа'),
+  );
+
+  // JS вступает только там, где scroll-таймлайнов нет: иначе два источника
+  // одного движения спорят друг с другом.
+  expect(parallax).toContain("CSS.supports('animation-timeline', 'scroll(root block)')");
+  expect(parallax).toContain('if (!cssParallax) {');
+  expect(parallax.indexOf('if (!cssParallax) {')).toBeLessThan(
+    parallax.indexOf("window.addEventListener('scroll'"),
+  );
+
+  // Сглаживание: доля пути к цели за кадр вместо мгновенной записи scrollY.
+  expect(parallax).toContain('current += (target - current) * .18');
+  expect(parallax).toContain('raf = current === target ? 0 : requestAnimationFrame(frame)');
+  expect(parallax).not.toMatch(/setProperty\('--py', \(progress \* -38\)/);
+
+  // База прогресса не пересчитывается на каждый resize от адресной строки.
+  expect(parallax).toContain('if (window.innerWidth === baseW) return;');
+  expect(parallax).toContain('target = Math.min(Math.max(window.scrollY / baseH, 0), 1) * SHIFT');
+});
+
 test('reduced motion отключает движение, но сохраняет боковую перспективу', () => {
   const html = fs.readFileSync(landingPath, 'utf8');
 
@@ -625,5 +672,9 @@ test('reduced motion отключает движение, но сохраняе�
   );
   expect(html).toMatch(
     /\.mock-float,\s*\.mock-row\.on::after,\s*\.mock-photo::before,\s*\.mock-lightning,[\s\S]*?animation:\s*none;/,
+  );
+  // Scroll-таймлайн — тоже движение: при reduced motion сцена стоит на месте.
+  expect(html).toMatch(
+    /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.mock-stage\s*\{[\s\S]*?animation:\s*none;[\s\S]*?translate:\s*none;/,
   );
 });
