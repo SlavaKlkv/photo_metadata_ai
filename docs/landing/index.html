@@ -3079,6 +3079,13 @@
     transform: translateX(3px);
   }
   .foot-docs {
+    display: inline-flex;
+    align-items: center;
+    gap: 24px;
+    padding-left: 24px;
+    border-left: 1px solid var(--line);
+  }
+  .foot-docs .foot-link + .foot-link {
     padding-left: 24px;
     border-left: 1px solid var(--line);
   }
@@ -4200,7 +4207,6 @@ ollama pull qwen2.5vl</code></pre>
       <a class="foot-gallery" href="screens.html" target="_blank" rel="noopener">Все экраны</a>
       <span class="foot-docs">
         <a class="foot-link" href="terms.html" target="_blank" rel="noopener">Условия</a>
-        ·
         <a class="foot-link" href="https://github.com/SlavaKlkv/photo_metadata_ai" target="_blank" rel="noopener">Исходный код</a>
       </span>
     </nav>
