@@ -18,7 +18,7 @@ AI анализирует каждый кадр, генерирует полны
 
 [**Страница проекта**](https://slavaklkv.github.io/photo_metadata_ai/landing/) ·
 [Все экраны](https://slavaklkv.github.io/photo_metadata_ai/landing/screens.html) ·
-[Скачать `.dmg`](https://github.com/SlavaKlkv/photo_metadata_ai/releases) ·
+[Скачать `.dmg`](https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.2.2/Photo-Metadata-AI-1.2.2-arm64.dmg) ·
 [Установка](#установка) ·
 [Как это устроено](#как-это-устроено) ·
 [Разработка](#разработка) ·
