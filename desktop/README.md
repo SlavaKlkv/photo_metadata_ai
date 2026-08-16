@@ -4,6 +4,7 @@ Electron-оболочка, упаковывающая FastAPI-бэкенд (PyIn
 и React-фронтенд в macOS-приложение для Apple Silicon (`.app`/`.dmg`).
 
 Общее описание проекта и команды разработки — в [корневом README](../README.md).
+Лендинг, OG-картинка и pre-commit хук — в [docs/landing/README.md](../docs/landing/README.md).
 
 ## Архитектура
 
@@ -147,7 +148,7 @@ process → results → export.
 
 Вывод бэкенда: `~/Library/Logs/Photo Metadata AI/backend.log`.
 
-## Известные ограничения v1
+## Известные ограничения
 
 - **Ad-hoc подпись, без нотаризации.** При первом открытии нужен обход Gatekeeper
   (см. «Дистрибуция»), автоматическая установка обновлений невозможна.

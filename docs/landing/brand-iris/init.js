@@ -92,6 +92,66 @@ function initBrandIris(doc, win) {
     var tapping = false;
     var tapTimers = [];
 
+    // На таче CSS-transition не играет: iOS ставит :hover/:focus-visible
+    // без перехода, надпись щёлкает. Слой .brand-name-lit ведём сами —
+    // тем же rAF и easing, что раскрытие затвора.
+    if (isTapDevice() && brand.classList) brand.classList.add('is-tap');
+
+    var litEl = brand.querySelector('.brand-name-lit');
+    var litFrame = 0;
+    var litValue = 0;
+
+    function paintLit(value) {
+      litValue = value;
+      if (litEl && litEl.style) litEl.style.opacity = String(value);
+    }
+
+    function stopLitFrame() {
+      if (litFrame && win.cancelAnimationFrame) win.cancelAnimationFrame(litFrame);
+      litFrame = 0;
+    }
+
+    function animateLit(target) {
+      if (!litEl || !litEl.style) return;
+      if (reduced.matches) {
+        stopLitFrame();
+        paintLit(0);
+        return;
+      }
+      stopLitFrame();
+      var from = litValue;
+      var to = target ? 1 : 0;
+      if (from === to) {
+        paintLit(to);
+        return;
+      }
+      var duration = target ? BRAND_IRIS.OPEN_MS : BRAND_IRIS.REST_MS;
+      var startedAt = win.performance && win.performance.now ? win.performance.now() : Date.now();
+      function step(now) {
+        var p = duration > 0 ? Math.min(1, (now - startedAt) / duration) : 1;
+        paintLit(from + (to - from) * brandIrisEaseOpen(p));
+        if (p < 1) {
+          litFrame = win.requestAnimationFrame(step);
+          return;
+        }
+        litFrame = 0;
+      }
+      litFrame = win.requestAnimationFrame(step);
+    }
+
+    function setLit(on, instant) {
+      if (brand.classList) {
+        if (on) brand.classList.add('is-lit');
+        else brand.classList.remove('is-lit');
+      }
+      if (instant || reduced.matches) {
+        stopLitFrame();
+        paintLit(on && !reduced.matches ? 1 : 0);
+        return;
+      }
+      animateLit(on);
+    }
+
     function clearTapTimers() {
       if (!win.clearTimeout) {
         tapTimers = [];
@@ -184,6 +244,7 @@ function initBrandIris(doc, win) {
     function finishTapPulse() {
       if (leaving || reduced.matches) {
         tapping = false;
+        setLit(false);
         return;
       }
       tapping = false;
@@ -191,11 +252,14 @@ function initBrandIris(doc, win) {
       pointerOn = false;
       focused = false;
       pose = 0;
+      setLit(false);
       iris.animate(0);
     }
 
     // Тап: то же плавное раскрытие, что на десктопе (OPEN_MS), затем спуск
     // и держим закрытым до конца скролла/ухода → покой.
+    // Надпись загорается вместе с раскрытием и гаснет только в покое —
+    // не от sticky :hover, который на таче вспыхивает и сразу тухнет.
     function startTapPulse() {
       if (reduced.matches || leaving) return;
       clearTapTimers();
@@ -204,6 +268,8 @@ function initBrandIris(doc, win) {
       focused = false;
       latched = false;
       pose = -1;
+      if (brand.classList) brand.classList.add('is-tap');
+      setLit(true);
       iris.animate(-1);
 
       tapLater(BRAND_IRIS.OPEN_MS, function () {
@@ -349,6 +415,7 @@ function initBrandIris(doc, win) {
           clearTapTimers();
           tapping = false;
           pose = 0;
+          setLit(false);
           iris.reset();
         }
       });
@@ -366,6 +433,7 @@ function initBrandIris(doc, win) {
           freezeForLeave();
         } else if (leaving) {
           leaving = false;
+          setLit(false);
           applyPose();
         }
       });
@@ -430,6 +498,7 @@ function initBrandIris(doc, win) {
       // после окна прибытия (скролла на новой странице уже нет).
       if (target > 0) {
         tapping = true;
+        setLit(true, true);
         tapLater(brandIrisArriveMs(), function () {
           if (leaving) return;
           presence.closeArrival();

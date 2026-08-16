@@ -54,15 +54,15 @@ describe('навигация по разделам доступна на узк�
     expect((nav[0].match(/<a /g) || []).length).toBe(5);
   });
 
-  test('на узкой ширине бренд уступает место бургеру, «Скачать» скрыт', () => {
+  test('на узкой ширине бренд уступает место бургеру', () => {
     const html = readLanding();
     const narrow = mediaBlock(html, '(max-width: 860px)');
 
     expect(narrow).toMatch(/\.brand\s*\{[^}]*min-width:\s*0/s);
     expect(narrow).toMatch(/\.brand-name\s*\{[^}]*text-overflow:\s*ellipsis/s);
-    // DMG только для macOS — на телефоне кнопки скачивания не показываем.
-    expect(narrow).toMatch(/a\[href\*=["']\/releases\/download\/["']\]\s*\{[^}]*display:\s*none/s);
-    expect(narrow).toMatch(/\.cta-note\s*\{[^}]*display:\s*none/s);
+    // .dmg прячет html.not-mac (mac-desktop.js), не этот media query.
+    expect(narrow).not.toMatch(/releases\/download/);
+    expect(narrow).not.toMatch(/\.cta-note/);
     expect(narrow).not.toMatch(/margin-right:\s*118px/);
   });
 
@@ -76,12 +76,15 @@ describe('навигация по разделам доступна на узк�
 });
 
 describe('галерея screens не ломается на телефоне', () => {
-  test('на узкой ширине «Скачать» скрыт, шапка остаётся в одну строку', () => {
+  test('на узкой ширине шапка остаётся в одну строку', () => {
     const html = readScreens();
     const narrow = mediaBlock(html, '(max-width: 720px)');
 
     expect(narrow).not.toBeNull();
-    expect(narrow).toMatch(/a\[href\*=["']\/releases\/download\/["']\]\s*\{[^}]*display:\s*none/s);
+    // .dmg больше не завязан на 860px — см. landing-mac-desktop.test.js.
+    expect(html).not.toMatch(
+      /@media \(max-width: 860px\)[\s\S]*?releases\/download/s,
+    );
     expect(narrow).not.toMatch(/\.nav\s*\{[^}]*flex-wrap:\s*wrap/s);
     expect(narrow).not.toMatch(/--header-h:\s*108px/);
   });
@@ -111,9 +114,42 @@ describe('галерея screens не ломается на телефоне', (
 
     // clip-path: inset(0 -100vw) + overflow: visible давали ~135px лишней ширины.
     expect(css).not.toMatch(/\.intro\s*\{[^}]*clip-path:\s*inset\(0\s+-100vw\)/s);
-    expect(css).toMatch(/\.intro\s*\{[^}]*overflow:\s*hidden/s);
     expect(css).toMatch(/html\s*\{[^}]*overflow-x:\s*clip/s);
     expect(css).toMatch(/overscroll-behavior-x:\s*none/);
+
+    // Пятно движется вместе с контентной колонкой, а не прижимается к viewport.
+    const glow = css.match(/\.intro::before\s*\{([^}]*)\}/s);
+    expect(glow).not.toBeNull();
+    expect(glow[1]).toMatch(/right:\s*-18%/);
+    expect(glow[1]).toMatch(/width:\s*min\(100%,\s*var\(--maxw\)\)/);
+
+    // width:100% + right:-18% => центр = 100% + 18% - 50% = 68%.
+    const rightPercent = Number(glow[1].match(/right:\s*(-?\d+)%/)[1]);
+    expect(1 - rightPercent / 100 - 0.5).toBeCloseTo(0.68);
+  });
+
+  test('подсветка intro уходит в поля страницы, а не режется по краю колонки', () => {
+    const html = readScreens();
+    const css = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
+    const intro = css.match(/\n  \.intro\s*\{([^}]*)\}/s);
+    expect(intro).not.toBeNull();
+
+    // overflow: hidden резал пятно по яркому месту — под шапкой была видна
+    // вертикальная граница. Сверху и снизу хвост по-прежнему обрезан.
+    expect(intro[1]).not.toMatch(/overflow:\s*hidden/);
+    const clip = intro[1].match(/clip-path:\s*inset\(0\s+-(\d+)px\)/);
+    expect(clip).not.toBeNull();
+    // Пик aurora scale(1.16): вылет = 0.26×1120 ≈ 291px.
+    // Оставляем запас, чтобы мягкий край не резался в правом поле.
+    expect(Number(clip[1])).toBeGreaterThanOrEqual(320);
+  });
+
+  test('на телефоне подсветка intro скрыта', () => {
+    const html = readScreens();
+    const narrow = mediaBlock(html, '(max-width: 720px)');
+
+    // Как .hero::before на главной: на узком экране aurora только шумит.
+    expect(narrow).toMatch(/\.intro::before\s*\{\s*display:\s*none/);
   });
 });
 
@@ -131,6 +167,36 @@ describe('Safari не зумит страницу из-за горизонтал
     expect(css).toMatch(/body\s*\{[^}]*overscroll-behavior-x:\s*none/s);
     expect(css).not.toMatch(/body\s*\{[^}]*overflow-x:\s*hidden/s);
   });
+
+  test('index: ореолы metadata-orbit не раздувают scrollWidth', () => {
+    const css = readLanding().slice(
+      readLanding().indexOf('<style>'),
+      readLanding().indexOf('</style>'),
+    );
+    expect(css).toMatch(/\.metadata-orbit\s*\{[^}]*overflow-x:\s*clip/s);
+  });
+});
+
+describe('на таче работает отдельная редкая искра', () => {
+  test.each([
+    ['index.html', readLanding],
+    ['screens.html', readScreens],
+  ])('%s: старая россыпь скрыта, мобильная вспышка одноразовая', (_name, read) => {
+    const css = read().slice(read().indexOf('<style>'), read().indexOf('</style>'));
+
+    expect(css).toMatch(
+      /@media \(hover: none\), \(pointer: coarse\)[\s\S]*?\.is-mobile-twinkle > \.brand-sparkle:not\(\.brand-sparkle-mobile\)\s*\{[^}]*display:\s*none/s,
+    );
+    expect(css).toMatch(
+      /\.brand-sparkle-mobile\.is-flashing\s*\{[^}]*animation:\s*brand-sparkle-mobile-twinkle 900ms ease-out 1 both/s,
+    );
+    expect(css).toMatch(/@keyframes brand-sparkle-mobile-twinkle/);
+    // Зона — та же, что у рабочего режима: слой не растягиваем на всю шапку.
+    expect(css).not.toMatch(/\.brand-sparkles\.is-mobile-twinkle\s*\{[^}]*position:\s*fixed/s);
+    expect(css).not.toMatch(
+      /\.brand-sparkle-mobile\.is-flashing\s*\{[^}]*infinite/s,
+    );
+  });
 });
 
 describe('на телефоне убираем aurora героя и мелкие превью', () => {
@@ -145,6 +211,15 @@ describe('на телефоне убираем aurora героя и мелкие
     // Тени большого снимка не сбрасываем на мобиле.
     expect(narrow).not.toMatch(/\.showcase \.shot[\s\S]*?box-shadow:\s*none/);
     expect(css).toMatch(/\.shot\s*\{[^}]*box-shadow:/s);
+  });
+
+  test('на узком экране «Готово для» занимает первую строку целиком', () => {
+    const html = readLanding();
+    const narrow = mediaBlock(html, '(max-width: 720px)');
+
+    expect(narrow).not.toBeNull();
+    // Иначе лейбл остаётся в одной flex-строке с Adobe Stock / Shutterstock.
+    expect(narrow).toMatch(/\.platforms \.label\s*\{[^}]*flex-basis:\s*100%/s);
   });
 });
 
