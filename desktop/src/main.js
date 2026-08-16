@@ -1,6 +1,7 @@
 'use strict';
 
-const { app, BrowserWindow, Menu, dialog, shell } = require('electron');
+const path = require('path');
+const { app, BrowserWindow, Menu, dialog, ipcMain, shell } = require('electron');
 
 const {
   spawnBackend,
@@ -13,6 +14,10 @@ const {
 const {
   buildApplicationMenuTemplate,
 } = require('./application-menu');
+const {
+  buildQuitConfirmOptions,
+  createCloseGuard,
+} = require('./close-guard');
 const { installExternalLinkHandler } = require('./external-links');
 const { waitForBackend } = require('./health-check');
 const { pipeBackendLogs } = require('./logging');
@@ -38,6 +43,23 @@ let backendProcess = null;
 let backendExited = false;
 let mainWindow = null;
 let quitting = false;
+// Флаг длительного процесса из рендерера (processing / export / regenerate).
+let appBusy = false;
+
+ipcMain.on('app:set-busy', (_event, busy) => {
+  appBusy = Boolean(busy);
+});
+
+const closeGuard = createCloseGuard({
+  isBusy: () => appBusy,
+  showConfirm: () => {
+    const options = buildQuitConfirmOptions();
+    return mainWindow && !mainWindow.isDestroyed()
+      ? dialog.showMessageBox(mainWindow, options)
+      : dialog.showMessageBox(options);
+  },
+  requestQuit: () => app.quit(),
+});
 
 // Вторая копия приложения не запускается: у обеих был бы один порт 8000
 // и одно хранилище. Вместо этого фокусируем окно первой копии.
@@ -85,7 +107,8 @@ function createMainWindow() {
     minHeight: 640,
     show: false,
     webPreferences: {
-      // Рендерер общается с backend только по HTTP — Node API не нужен
+      // HTTP к backend + preload для флага busy при закрытии.
+      preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -94,7 +117,12 @@ function createMainWindow() {
   if (state.isMaximized) {
     mainWindow.maximize();
   }
-  mainWindow.on('close', () => saveWindowState(mainWindow));
+  mainWindow.on('close', (event) => {
+    closeGuard.handleWindowClose(event);
+    if (!event.defaultPrevented) {
+      saveWindowState(mainWindow);
+    }
+  });
   mainWindow.loadURL(APP_URL);
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
@@ -172,7 +200,11 @@ app.whenReady().then(async () => {
   createMainWindow();
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  closeGuard.handleBeforeQuit(event);
+  if (event.defaultPrevented) {
+    return;
+  }
   quitting = true;
   if (backendProcess) {
     backendProcess.kill('SIGTERM');

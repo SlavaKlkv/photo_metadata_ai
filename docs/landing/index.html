@@ -987,6 +987,26 @@
        только на pointerleave (см. скрипт). */
     will-change: transform;
   }
+  /* Скролл-параллакс отдаём compositor'у: на телефоне прокрутка живёт не в
+     main-потоке, и transform из JS приходил кадрами позже пальца — сцена
+     дёргалась. Отдельное свойство translate (не transform) не спорит с tilt
+     и разворотом слоёв ниже. JS-путь остаётся фолбэком для движков без
+     scroll-таймлайнов (см. скрипт). */
+  @supports (animation-timeline: scroll()) {
+    .mock-stage {
+      animation: mock-scroll-rise linear both;
+      animation-timeline: scroll(root block);
+      will-change: translate, transform;
+      /* Тот же участок, что считал JS: первый экран прокрутки. Единица vh
+         берёт «большой» viewport, поэтому свёрнутая адресная строка на
+         телефоне не сдвигает базу посреди жеста. */
+      animation-range: 0 100vh;
+    }
+  }
+  @keyframes mock-scroll-rise {
+    from { translate: 0 0; }
+    to { translate: 0 -38px; }
+  }
   .mock-depth {
     --mock-rx: 1.6deg;
     --mock-ry: -9deg;
@@ -3412,7 +3432,12 @@
     .reveal.steps::before, .reveal.steps.in::before { transform: none; transition: none; }
     .reveal.steps.in::after, .reveal.steps.in .step .n { animation: none; }
     /* Перспективу оставляем статичной; отключаем вход, плавание и микроэффекты. */
-    .mock-stage { transform: none; transition: none; }
+    .mock-stage {
+      transform: none;
+      transition: none;
+      animation: none;
+      translate: none;
+    }
     .mock-depth {
       animation: none;
       transform:
@@ -4535,30 +4560,57 @@ ollama pull qwen2.5vl</code></pre>
     var stage = document.querySelector('.hero-visual .mock-stage');
     if (!scene || !stage) return;
 
-    var ticking = false;
     var TILT_EASE = 'transform .42s cubic-bezier(.2, .75, .25, 1)';
+    // Где есть scroll-таймлайны, сдвиг делает CSS на compositor'е (см. стили):
+    // второй источник того же движения только конфликтовал бы с ним.
+    var cssParallax = window.CSS && CSS.supports &&
+      CSS.supports('animation-timeline', 'scroll(root block)');
 
     function clearTiltTransition() {
       stage.style.transition = '';
     }
 
-    function update() {
-      // Считаем только пока hero на экране: ниже сдвиг всё равно не виден,
-      // а фиксация значения не даёт картинке «прыгнуть» при возврате.
-      clearTiltTransition();
-      var progress = Math.min(Math.max(window.scrollY / window.innerHeight, 0), 1);
-      stage.style.setProperty('--py', (progress * -38).toFixed(1) + 'px');
-    }
+    if (!cssParallax) {
+      var SHIFT = -38;
+      var current = 0;
+      var target = 0;
+      var raf = 0;
+      // Свёрнутая адресная строка меняет innerHeight на каждом скролле: базу
+      // берём на смене ширины и ориентации, иначе прогресс скачет посреди жеста.
+      var baseW = window.innerWidth;
+      var baseH = window.innerHeight;
 
-    window.addEventListener('scroll', function () {
-      if (ticking) return;
-      ticking = true;
-      requestAnimationFrame(function () {
-        update();
-        ticking = false;
+      function measure() {
+        target = Math.min(Math.max(window.scrollY / baseH, 0), 1) * SHIFT;
+      }
+
+      // Догоняем цель долями кадра: там, где скролл и main-поток разошлись,
+      // остаток читается как инерция сцены, а не как рывок.
+      function frame() {
+        current += (target - current) * .18;
+        if (Math.abs(target - current) < .05) current = target;
+        clearTiltTransition();
+        stage.style.setProperty('--py', current.toFixed(1) + 'px');
+        raf = current === target ? 0 : requestAnimationFrame(frame);
+      }
+
+      var schedule = function () {
+        measure();
+        if (!raf) raf = requestAnimationFrame(frame);
+      };
+
+      window.addEventListener('scroll', schedule, { passive: true });
+      window.addEventListener('resize', function () {
+        if (window.innerWidth === baseW) return;
+        baseW = window.innerWidth;
+        baseH = window.innerHeight;
+        schedule();
       });
-    }, { passive: true });
-    window.addEventListener('resize', update);
+
+      measure();
+      current = target;
+      stage.style.setProperty('--py', current.toFixed(1) + 'px');
+    }
 
     if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
       scene.addEventListener('pointermove', function (event) {
@@ -4577,8 +4629,6 @@ ollama pull qwen2.5vl</code></pre>
         stage.style.setProperty('--tilt-y', '0deg');
       });
     }
-
-    update();
   })();
 
   // Подгонка начинки hero-мокапа под кадр окна: шкале шагов — без подписей,

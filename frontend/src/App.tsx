@@ -2,6 +2,7 @@
 import React, { useEffect } from 'react';
 import { useUIStore } from './store/useUIStore';
 import { usePolling } from './hooks/usePolling';
+import { useDesktopAppBusySync } from './hooks/useDesktopAppBusySync';
 import styles from './App.module.scss';
 import { FileUploadSection } from './components/organisms/FileUploadSection/FileUploadSection';
 import { SettingsPanel } from './components/organisms/SettingsPanel/SettingsPanel';
@@ -34,6 +35,8 @@ function App() {
   const isExporting = useUIStore((state) => state.isExporting);
   // AI Setup доступен только на шагах Upload/Context — до старта обработки
   const isAiSetupAvailable = !isProcessing && !isExportReady && !isExporting;
+
+  useDesktopAppBusySync();
 
   useEffect(() => {
     const initializeApp = async () => {

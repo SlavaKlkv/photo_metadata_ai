@@ -4,6 +4,9 @@ import { useUIStore } from 'store/useUIStore';
 import App from './App';
 
 jest.mock('./hooks/usePolling', () => ({ usePolling: jest.fn() }));
+jest.mock('./hooks/useDesktopAppBusySync', () => ({
+  useDesktopAppBusySync: jest.fn(),
+}));
 jest.mock('./components/organisms/FileUploadSection/FileUploadSection', () => ({
   FileUploadSection: () => null,
 }));
