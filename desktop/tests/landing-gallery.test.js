@@ -139,7 +139,7 @@ describe('галерея экранов', () => {
 
   test('каскад плиток: early js-cascade + keyframes, без transition-reveal', () => {
     const html = readScreens();
-    const markup = html.slice(0, html.indexOf('<script src="ambient-particle-flags.js">'));
+    const markup = html.slice(0, html.search(/<script src="ambient-particle-flags\.js/));
 
     // Подсказка «Открыть» — только из JS.
     expect(markup).not.toContain('class="zoom"');

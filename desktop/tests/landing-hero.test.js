@@ -134,7 +134,7 @@ test('летающая частица — небольшая искра со с�
   const particleCss = html.match(/\.ambient-particle\s*\{([^}]*)\}/);
 
   expect(html).toContain('class="ambient-particle"');
-  expect(html).toContain('src="ambient-particle-flags.js"');
+  expect(html).toMatch(/src="ambient-particle-flags\.js\?v=[^"]+"/);
   expect(html).toContain('.ambient-particle.is-dimmed');
   expect(html).toContain('.ambient-particle.is-near-cursor');
   expect(html).toContain('.ambient-particle.is-impulsed');
@@ -161,16 +161,27 @@ test('летающая частица — небольшая искра со с�
   // Переключатели в общем файле, значения отдельно для index / screens.
   expect(flags).toContain('LANDING_PARTICLE_FLAGS');
   expect(flags).toContain('function getLandingParticleFlags');
-  expect(flags).toMatch(/index:\s*\{[\s\S]*?ENABLE_AMBIENT_PARTICLE:\s*true/);
+  expect(flags).toMatch(/index:\s*\{[\s\S]*?ENABLE_AMBIENT_PARTICLE:\s*false/);
   expect(flags).toMatch(/index:\s*\{[\s\S]*?ENABLE_HOVER_ATTRACTION:\s*false/);
-  expect(flags).toMatch(/screens:\s*\{[\s\S]*?ENABLE_AMBIENT_PARTICLE:\s*true/);
+  expect(flags).toMatch(/index:\s*\{[\s\S]*?ENABLE_BRAND_SPARKLES:\s*true/);
+  expect(flags).toMatch(/index:\s*\{[\s\S]*?BRAND_SPARKLES_INTRO:\s*false/);
+  expect(flags).toMatch(
+    /index:\s*\{[\s\S]*?BRAND_SPARKLES_WORKING:\s*'twinkle-pairs'/
+  );
+  expect(flags).toMatch(/screens:\s*\{[\s\S]*?ENABLE_AMBIENT_PARTICLE:\s*false/);
   expect(flags).toMatch(/screens:\s*\{[\s\S]*?ENABLE_HOVER_ATTRACTION:\s*false/);
+  expect(flags).toMatch(/screens:\s*\{[\s\S]*?ENABLE_BRAND_SPARKLES:\s*true/);
+  expect(flags).toMatch(/screens:\s*\{[\s\S]*?BRAND_SPARKLES_INTRO:\s*false/);
+  expect(flags).toMatch(
+    /screens:\s*\{[\s\S]*?BRAND_SPARKLES_WORKING:\s*'twinkle-pairs'/
+  );
   expect(html).toContain("getLandingParticleFlags('index')");
   expect(html).toContain('if (!ENABLE_AMBIENT_PARTICLE)');
   expect(html).toContain('particle.remove()');
   // Дефолты флагов не захардкожены в HTML — только в shared-файле.
   expect(html).not.toMatch(/ENABLE_AMBIENT_PARTICLE:\s*(?:true|false)/);
   expect(html).not.toMatch(/ENABLE_HOVER_ATTRACTION:\s*(?:true|false)/);
+  expect(html).not.toMatch(/ENABLE_BRAND_SPARKLES:\s*(?:true|false)/);
 });
 
 test('обе страницы лендинга подключают общий файл флагов и выбирают свой ключ', () => {
@@ -178,8 +189,10 @@ test('обе страницы лендинга подключают общий �
   const indexHtml = fs.readFileSync(path.join(landingDir, 'index.html'), 'utf8');
   const screensHtml = fs.readFileSync(path.join(landingDir, 'screens.html'), 'utf8');
 
-  expect(indexHtml).toContain('src="ambient-particle-flags.js"');
-  expect(screensHtml).toContain('src="ambient-particle-flags.js"');
+  // Версия в query обязательна: без неё телефон держит в кеше старые значения
+  // флагов, и правка «включить искры» на устройстве не применяется.
+  expect(indexHtml).toMatch(/src="ambient-particle-flags\.js\?v=[^"]+"/);
+  expect(screensHtml).toMatch(/src="ambient-particle-flags\.js\?v=[^"]+"/);
   expect(indexHtml).toContain("getLandingParticleFlags('index')");
   expect(screensHtml).toContain("getLandingParticleFlags('screens')");
   expect(fs.existsSync(path.join(landingDir, 'ambient-particle-flags.js'))).toBe(true);

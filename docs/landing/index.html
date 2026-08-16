@@ -5,6 +5,8 @@
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0b0f">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- .dmg только на Mac desktop: класс is-mac / not-mac до первой отрисовки. -->
+<script src="mac-desktop.js?v=mac1"></script>
 <title>Photo Metadata AI — метаданные для фотостоков за минуты</title>
 <meta name="description" content="Десктопное приложение для macOS: AI генерирует полный набор метаданных для фотостоков — заголовок, описание, ключевые слова, категории, лицензию, локацию, editorial-блок и релизы. Под Adobe Stock, Shutterstock и Getty Images они пересобираются автоматически, вшиваются в IPTC и выгружаются в CSV.">
 <meta name="google-site-verification" content="_3FNEMQIHbwZlNvblw_x_wcGY8cC-bEQtI5WKkej-Wo" />
@@ -94,6 +96,13 @@
 
   * { box-sizing: border-box; }
 
+  /* .dmg и подпись к нему — только Mac desktop (класс ставит mac-desktop.js).
+     Без JS кнопка остаётся: основная аудитория — macOS. Ширина сюда не входит. */
+  html.not-mac a[href*="/releases/download/"],
+  html.not-mac .cta-note {
+    display: none !important;
+  }
+
   /* Тёмный canvas задан до первой отрисовки. Межстраничный View Transition намеренно
      не используется: в Chrome он давал вспышку при возврате из screens.html.
      Вместо него — opacity-swap шапки (header-swap.js + класс на <html>). */
@@ -182,12 +191,38 @@
      курсора расходятся обратно. Двигается только диафрагма внутри метки:
      геометрию покадрово пересчитывают модули brand-iris/, плитка неподвижна,
      overflow подрезает всё, что вышло бы за её края. */
-  .brand-name { transition: color .3s ease, text-shadow .3s ease; }
-  /* Надпись отзывается вместе с затвором — сдержанно, без сдвига соседей. */
-  .brand:hover .brand-name,
-  .brand:focus-visible .brand-name {
+  /* Подсветка — отдельный слой с opacity, а не смена color/filter у самой
+     надписи. iOS на тапе применяет :hover без transition, а color от
+     var(--text) к #fff не интерполируется: надпись мигала. Opacity всегда
+     плавная. filter на слое, не на клипуемом .brand-name — ореол не режет
+     overflow: hidden (ellipsis на узкой ширине). */
+  .brand-wordmark { position: relative; min-width: 0; }
+  .brand-name {
+    color: var(--text);
+    display: block;
+  }
+  .brand-name-lit {
+    position: absolute;
+    inset: 0;
     color: #fff;
-    text-shadow: 0 0 16px rgba(139, 136, 248, .38);
+    filter: drop-shadow(0 0 3.5px rgba(139, 136, 248, .55));
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Мышь: CSS-transition. Тап: opacity ставит brand-iris/ кадр за кадром —
+     iOS на :hover/:focus-visible transition не играет, надпись щёлкала. */
+  @media (hover: hover) and (pointer: fine) {
+    .brand:not(.is-tap) .brand-name-lit {
+      transition: opacity .38s ease;
+    }
+    .brand:hover:not(.is-tap) .brand-name-lit,
+    .brand:focus-visible:not(.is-tap) .brand-name-lit {
+      opacity: 1;
+      transition: opacity .34s ease;
+    }
   }
 
   .nav {
@@ -200,21 +235,376 @@
   .brand {
     display: flex;
     align-items: center;
-    gap: 11px;
     font-weight: 600;
     color: var(--text);
     margin-right: auto;
+    -webkit-tap-highlight-color: transparent;
   }
   .brand:hover { text-decoration: none; }
+  /* Метка + надпись. На узкой ширине .brand тянется до бургера,
+     а искры сидят только на этой связке (и на расширенных краях). */
+  .brand-lockup {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 11px;
+    min-width: 0;
+    max-width: 100%;
+  }
   /* Как в приложении: только метка-затвор, без плитки icon.svg. */
   .brand-logo {
     display: block;
     flex: none;
     width: 30px;
     height: 30px;
+    position: relative;
+    z-index: 0;
   }
   .brand-mark { display: block; width: 100%; height: 100%; }
-
+  /* Одна область: метка, буквы и края inset. ровный ход ≥6 бликов, без пусто/густо. */
+  .brand-sparkles {
+    position: absolute;
+    /* Справа короче, чем слева: меньше вылета за wordmark.
+       Слева не больше padding .wrap (16px на узком): иначе body.scrollWidth
+       растёт и Safari зумит visualViewport на всём скролле.
+       top/bottom отдельно: на intro зона расширяется (класс is-intro-zone).
+       Без анимации границ: иначе при снятии класса искры сжимаются вместе с рамкой. */
+    top: -8px;
+    right: -20px;
+    bottom: -8px;
+    left: -16px;
+    pointer-events: none;
+    z-index: 1;
+    overflow: visible;
+  }
+  /* Intro: вверх до края шапки, вниз — лёгкий выход за полосу.
+     Ниже шапки бока отрезаны ровно по вертикали, без диагоналей: у краёв
+     под полосой искр не появляется вовсе.
+     Пиксели считает brand-sparkles.js по header/lockup. */
+  .brand-sparkles.is-intro-zone {
+    top: var(--spark-intro-top, -18px);
+    bottom: var(--spark-intro-bottom, -24px);
+    clip-path: polygon(
+      0 0,
+      100% 0,
+      100% var(--spark-intro-band, 80%),
+      calc(100% - var(--spark-intro-side, 22%)) var(--spark-intro-band, 80%),
+      calc(100% - var(--spark-intro-side, 22%)) 100%,
+      var(--spark-intro-side, 22%) 100%,
+      var(--spark-intro-side, 22%) var(--spark-intro-band, 80%),
+      0 var(--spark-intro-band, 80%)
+    );
+  }
+  .brand-sparkle {
+    position: absolute;
+    display: block;
+    left: var(--x);
+    top: var(--y);
+    width: var(--sz, 8px);
+    height: var(--sz, 8px);
+    opacity: 0;
+    transform-origin: center;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      rgba(232, 248, 255, .72) 0 10%,
+      rgba(143, 217, 255, .2) 18%,
+      rgba(155, 152, 251, .08) 38%,
+      transparent 68%
+    );
+    filter: drop-shadow(0 0 3px rgba(139, 136, 248, .45))
+      drop-shadow(0 0 10px rgba(139, 136, 248, .28));
+    /* Один --dur у всех + сдвинутые фазы → стабильно ≥6 видимых. */
+    animation: brand-sparkle-glint var(--dur, 5s) var(--delay, 0s) ease-in-out infinite;
+  }
+  /* Луч рисует ::before, а не сама искра: маска на элементе обрезала бы и
+     спутника. Габарит, фаза и opacity остаются на .brand-sparkle — их читает
+     brand-sparkles.js (перекладка невидимых точек, animationiteration). */
+  .brand-sparkle::before,
+  .brand-sparkle::after {
+    content: "";
+    position: absolute;
+    /* Не серебро: мягкое белое ядро с лилово-голубым краем акцента. */
+    background:
+      radial-gradient(closest-side, rgba(245, 244, 255, .95) 0%, rgba(245, 244, 255, 0) 68%),
+      linear-gradient(145deg, #e4e2ff 0%, #9b98fb 38%, #7a77ea 64%, #8fd9ff 100%);
+    /* Луч узкий и вытянутый по вертикали: снежинка симметрична по всем осям,
+       знак AI — нет. */
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M12 0C12.32 7.35 15.26 11.55 20.4 12C15.26 12.45 12.32 16.65 12 24C11.68 16.65 8.74 12.45 3.6 12C8.74 11.55 11.68 7.35 12 0Z'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M12 0C12.32 7.35 15.26 11.55 20.4 12C15.26 12.45 12.32 16.65 12 24C11.68 16.65 8.74 12.45 3.6 12C8.74 11.55 11.68 7.35 12 0Z'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+  .brand-sparkle::before {
+    inset: 0;
+    animation: brand-sparkle-form var(--dur, 5s) var(--delay, 0s) ease-in-out infinite;
+  }
+  /* Пара «крупная + малая» — тот же знак, что у AI-действий в интерфейсах.
+     Явный класс: среди 16 их ровно 5, рядом с 5 одиночными и 6 триадами.
+     Без размеров ::after нулевой, поэтому у остальных искр его не видно. */
+  .brand-sparkle-pair::after {
+    left: 62%;
+    top: -32%;
+    width: 46%;
+    height: 46%;
+    opacity: 0;
+    transform: rotate(18deg) scale(.25);
+    background:
+      radial-gradient(closest-side, rgba(247, 252, 255, .95) 0%, rgba(247, 252, 255, 0) 68%),
+      linear-gradient(145deg, #d9f4ff 0%, #8fd9ff 44%, #9b98fb 100%);
+    filter: drop-shadow(0 0 4px rgba(121, 212, 255, .45));
+    animation: brand-sparkle-companion var(--dur, 5s) var(--delay, 0s) ease-in-out infinite;
+  }
+  /* У парных знаков расходится почти невесомый signal-ring. Это добавляет
+     ощущение генерации/обработки, но не делает каждую точку отдельным пузырём. */
+  .brand-sparkle-pair {
+    animation-name: brand-sparkle-glint, brand-sparkle-signal;
+    animation-duration: var(--dur, 5s), var(--dur, 5s);
+    animation-delay: var(--delay, 0s), var(--delay, 0s);
+    animation-timing-function: ease-in-out, ease-out;
+    animation-iteration-count: infinite, infinite;
+  }
+  /* Generative-триада: 2 вертикальных вверх, 2 диагональных вверх в разные
+     стороны и 2 горизонтальных в разные стороны. Одна группа = одна ячейка;
+     среди 16 их 6. */
+  .brand-sparkle-step {
+    position: absolute;
+    display: block;
+    opacity: 0;
+    background:
+      radial-gradient(closest-side, rgba(247, 252, 255, .95) 0%, rgba(247, 252, 255, 0) 68%),
+      linear-gradient(145deg, #e4e2ff 0%, #9b98fb 42%, #8fd9ff 100%);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M12 0C12.32 7.35 15.26 11.55 20.4 12C15.26 12.45 12.32 16.65 12 24C11.68 16.65 8.74 12.45 3.6 12C8.74 11.55 11.68 7.35 12 0Z'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M12 0C12.32 7.35 15.26 11.55 20.4 12C15.26 12.45 12.32 16.65 12 24C11.68 16.65 8.74 12.45 3.6 12C8.74 11.55 11.68 7.35 12 0Z'/%3E%3C/svg%3E") center / contain no-repeat;
+    filter: drop-shadow(0 0 4px rgba(121, 212, 255, .42));
+  }
+  .brand-sparkle-step-2 {
+    left: 19%;
+    top: -72%;
+    width: 62%;
+    height: 62%;
+    animation: brand-sparkle-chain-2 var(--dur, 5s) var(--delay, 0s) ease-in-out infinite;
+  }
+  .brand-sparkle-step-3 {
+    left: 31%;
+    top: -118%;
+    width: 38%;
+    height: 38%;
+    animation: brand-sparkle-chain-3 var(--dur, 5s) var(--delay, 0s) ease-in-out infinite;
+  }
+  .brand-sparkle-triad-dur .brand-sparkle-step-2 {
+    left: 78%;
+    top: -72%;
+  }
+  .brand-sparkle-triad-dur .brand-sparkle-step-3 {
+    left: 128%;
+    top: -118%;
+  }
+  .brand-sparkle-triad-dul .brand-sparkle-step-2 {
+    left: -40%;
+    top: -72%;
+  }
+  .brand-sparkle-triad-dul .brand-sparkle-step-3 {
+    left: -66%;
+    top: -118%;
+  }
+  .brand-sparkle-triad-hr .brand-sparkle-step-2 {
+    left: 108%;
+    top: 19%;
+  }
+  .brand-sparkle-triad-hr .brand-sparkle-step-3 {
+    left: 180%;
+    top: 31%;
+  }
+  .brand-sparkle-triad-hl .brand-sparkle-step-2 {
+    left: -70%;
+    top: 19%;
+  }
+  .brand-sparkle-triad-hl .brand-sparkle-step-3 {
+    left: -118%;
+    top: 31%;
+  }
+  /* Спокойный desktop-режим: один знак поблёскивает раз в 3–6 секунд.
+     Исходная сетка скрыта; половина импульсов — двойной знак с signal-ring. */
+  .brand-sparkles.is-desktop-twinkle >
+    .brand-sparkle:not(.brand-sparkle-desktop-twinkle) {
+    display: none;
+    animation: none;
+  }
+  .brand-sparkle-desktop-twinkle {
+    width: var(--sz, 11px);
+    height: var(--sz, 11px);
+    animation: none;
+    opacity: 0;
+  }
+  .brand-sparkle-desktop-twinkle::before {
+    animation: none;
+    opacity: 1;
+    clip-path: none;
+    transform: none;
+  }
+  .brand-sparkle-desktop-twinkle::after {
+    display: none;
+    animation: none;
+  }
+  .brand-sparkle-desktop-twinkle.is-flashing {
+    animation: brand-sparkle-mobile-twinkle 900ms ease-out 1 both;
+  }
+  .brand-sparkle-desktop-twinkle.brand-sparkle-pair::after {
+    display: block;
+  }
+  .brand-sparkle-desktop-twinkle.brand-sparkle-pair.is-flashing {
+    animation:
+      brand-sparkle-mobile-twinkle 900ms ease-out 1 both,
+      brand-sparkle-signal 900ms ease-out 1 both;
+  }
+  .brand-sparkle-desktop-twinkle.brand-sparkle-pair.is-flashing::after {
+    animation: brand-sparkle-companion 900ms ease-in-out 1 both;
+  }
+  /* Мобильная система отдельная: исходные 16 знаков и intro не рендерятся.
+     Один средний/крупный знак кратко вспыхивает в той же зоне, что и рабочий
+     режим (слой вокруг локапа), затем слой снова статичен. */
+  @media (hover: none), (pointer: coarse) {
+    .brand-sparkles.is-mobile-twinkle > .brand-sparkle:not(.brand-sparkle-mobile) {
+      display: none;
+      animation: none;
+    }
+    .brand-sparkle-mobile {
+      width: var(--sz, 8px);
+      height: var(--sz, 8px);
+      animation: none;
+      opacity: 0;
+    }
+    .brand-sparkle-mobile::before {
+      animation: none;
+      opacity: 1;
+      clip-path: none;
+      transform: none;
+    }
+    .brand-sparkle-mobile::after {
+      display: none;
+      animation: none;
+    }
+    .brand-sparkle-mobile.is-flashing {
+      animation: brand-sparkle-mobile-twinkle 900ms ease-out 1 both;
+    }
+  }
+  @keyframes brand-sparkle-mobile-twinkle {
+    0% { opacity: 0; transform: scale(.45) rotate(var(--rot, 0deg)); }
+    32% { opacity: .92; transform: scale(1.08) rotate(var(--rot, 0deg)); }
+    62% { opacity: .58; transform: scale(.94) rotate(var(--rot, 0deg)); }
+    100% { opacity: 0; transform: scale(.55) rotate(var(--rot, 0deg)); }
+  }
+  @keyframes brand-sparkle-chain-2 {
+    0%, 17%, 54%, 100% { opacity: 0; transform: scale(.2); }
+    28% { opacity: .76; transform: scale(1); }
+    42% { opacity: .42; transform: scale(.84); }
+  }
+  @keyframes brand-sparkle-chain-3 {
+    0%, 28%, 54%, 100% { opacity: 0; transform: scale(.2); }
+    39% { opacity: .72; transform: scale(1); }
+    48% { opacity: .32; transform: scale(.78); }
+  }
+  @keyframes brand-sparkle-signal {
+    0%, 20%, 54%, 100% {
+      box-shadow: 0 0 0 0 rgba(143, 217, 255, 0);
+    }
+    30% {
+      box-shadow: 0 0 0 1px rgba(143, 217, 255, .2);
+    }
+    44% {
+      box-shadow: 0 0 0 6px rgba(155, 152, 251, 0);
+    }
+  }
+  /* Сначала видна только световая «затравка», затем знак собирается из
+     центра. Спутник отвечает позже — как второй шаг генерации. */
+  @keyframes brand-sparkle-form {
+    0%, 7% {
+      opacity: 0;
+      transform: scale(.2);
+      clip-path: inset(46% 42%);
+    }
+    15% {
+      opacity: .38;
+      transform: scale(.58);
+      clip-path: inset(30% 26%);
+    }
+    26% {
+      opacity: 1;
+      transform: scale(1);
+      clip-path: inset(0);
+    }
+    40% {
+      opacity: .7;
+      transform: scale(.94);
+      clip-path: inset(3%);
+    }
+    54%, 100% {
+      opacity: 0;
+      transform: scale(.58);
+      clip-path: inset(30%);
+    }
+  }
+  @keyframes brand-sparkle-companion {
+    0%, 19%, 54%, 100% {
+      opacity: 0;
+      transform: rotate(18deg) scale(.25);
+    }
+    29% {
+      opacity: .68;
+      transform: rotate(18deg) scale(1);
+    }
+    42% {
+      opacity: .38;
+      transform: rotate(18deg) scale(.82);
+    }
+  }
+  /* Мягкое дыхание на месте: без щелчка и доворота — магия остаётся в
+     ореоле и форме, а не в резкости. Тёмная фаза с 54% — контракт с
+     brand-sparkles.js (BRAND_SPARKLES_DARK_AT_MS). */
+  @keyframes brand-sparkle-glint {
+    0% {
+      opacity: 0;
+      transform: scale(0.55) rotate(var(--rot, 0deg));
+      filter: drop-shadow(0 0 2px rgba(139, 136, 248, .2))
+        drop-shadow(0 0 6px rgba(139, 136, 248, .1));
+    }
+    12% {
+      opacity: .55;
+      transform: scale(0.88) rotate(var(--rot, 0deg));
+      filter: drop-shadow(0 0 3px rgba(139, 136, 248, .4))
+        drop-shadow(0 0 9px rgba(139, 136, 248, .22));
+    }
+    24% {
+      opacity: .82;
+      transform: scale(1.04) rotate(var(--rot, 0deg));
+      filter: drop-shadow(0 0 4px rgba(170, 168, 255, .55))
+        drop-shadow(0 0 14px rgba(139, 136, 248, .35));
+    }
+    38% {
+      opacity: .48;
+      transform: scale(0.94) rotate(var(--rot, 0deg));
+      filter: drop-shadow(0 0 3px rgba(139, 136, 248, .35))
+        drop-shadow(0 0 8px rgba(139, 136, 248, .18));
+    }
+    54%, 100% {
+      opacity: 0;
+      transform: scale(0.5) rotate(var(--rot, 0deg));
+      filter: drop-shadow(0 0 2px rgba(139, 136, 248, .12))
+        drop-shadow(0 0 5px rgba(139, 136, 248, .06));
+    }
+  }
+  /* До старта intro гасим CSS-цикл; дальше тот же glint без обрыва. */
+  .brand-sparkles.is-intro .brand-sparkle {
+    animation: none !important;
+    opacity: 0;
+  }
+  .brand-sparkles.is-intro .brand-sparkle::before,
+  .brand-sparkles.is-intro .brand-sparkle::after,
+  .brand-sparkles.is-intro .brand-sparkle-step,
+  .brand-sparkle.is-restarting::before,
+  .brand-sparkle.is-restarting::after,
+  .brand-sparkle.is-restarting .brand-sparkle-step {
+    animation: none !important;
+  }
   .nav-links { display: flex; gap: 22px; font-size: 14.5px; }
   .nav-links a {
     position: relative;
@@ -314,8 +704,6 @@
   }
   .btn:hover { text-decoration: none; }
   .btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-  /* Логотип Apple — сплошная заливка, а не обводка, как у остальных иконок. */
-  .btn svg.apple { width: 15px; height: 18px; fill: currentColor; stroke: none; margin-top: -2px; }
 
   .btn-primary {
     position: relative;
@@ -365,7 +753,6 @@
   .btn-ghost:hover svg { transform: translateX(3px); }
 
   .btn-sm { padding: 9px 16px; font-size: 14px; }
-  .btn-sm svg.apple { width: 13px; height: 16px; }
 
   /* ---------- hero ---------- */
 
@@ -1939,6 +2326,9 @@
     width: min(100%, 960px);
     height: 410px;
     margin: 46px auto 0;
+    /* Ореолы узлов (отрицательный inset + scale) не должны раздувать
+       body.scrollWidth — на iOS это даёт дрожь visualViewport при скролле. */
+    overflow-x: clip;
   }
   .metadata-core {
     --metadata-core-final-transform: translate(-50%, -50%);
@@ -2836,7 +3226,7 @@
 
   /* Узкий экран: вместо обрезанной ленты — бургер и выезжающая панель.
      Те же 5 ссылок в #nav-links; desktop-ряд не меняется.
-     DMG только для macOS — кнопки скачивания на телефоне/планшете прячем. */
+     .dmg прячет html.not-mac (mac-desktop.js), не ширина. */
   @media (max-width: 860px) {
     :root { --header-h: 64px; }
     .nav {
@@ -2863,8 +3253,6 @@
       z-index: 2;
       margin-left: auto;
     }
-    a[href*="/releases/download/"] { display: none; }
-    .cta-note { display: none; }
 
     .nav-links {
       position: absolute;
@@ -2966,6 +3354,8 @@
     .hero-visual::after { display: none; }
     .thumbs { display: none; }
     .platforms { gap: 14px 26px; }
+    /* Лейбл «Готово для» на своей строке; имена площадок — ниже. */
+    .platforms .label { flex-basis: 100%; text-align: center; }
     .platforms b { font-size: 15px; }
   }
   @keyframes install-line-in-mobile { from { transform: scaleY(0); } }
@@ -3032,9 +3422,9 @@
     header.hero-cta-visible .nav-cta { transform: none; }
     h1 .grad { animation: none; }
     /* Затвор остаётся раскрытым (это же проверяют модули brand-iris/), надпись
-       не подсвечивается. */
-    .brand:hover .brand-name,
-    .brand:focus-visible .brand-name { color: var(--text); text-shadow: none; }
+       не подсвечивается. Искры вокруг метки тоже гасим. */
+    .brand-name-lit { opacity: 0; filter: none; transition: none; }
+    .brand-sparkles { display: none; }
     .to-top { transition: opacity .2s ease; transform: none; }
     .to-top:hover svg { animation: none; }
     .reveal.in .stack tr, .reveal .stack tr { animation: none; opacity: 1; }
@@ -3112,6 +3502,25 @@
 <header class="hero-cta-visible">
   <div class="wrap nav">
     <a class="brand" href="#top">
+      <span class="brand-lockup">
+      <span class="brand-sparkles" aria-hidden="true">
+        <i class="brand-sparkle" style="--x:3%;--y:36%;--sz:8px;--dur:5s;--delay:0s;--rot:-11deg"></i>
+        <i class="brand-sparkle brand-sparkle-pair" style="--x:8%;--y:58%;--sz:6px;--dur:5s;--delay:-2.5s;--rot:9deg"></i>
+        <i class="brand-sparkle brand-sparkle-triad brand-sparkle-triad-hr" style="--x:14%;--y:28%;--sz:11px;--dur:5s;--delay:-1.25s;--rot:5deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
+        <i class="brand-sparkle" style="--x:20%;--y:64%;--sz:8px;--dur:5s;--delay:-3.75s;--rot:-8deg"></i>
+        <i class="brand-sparkle brand-sparkle-pair" style="--x:27%;--y:40%;--sz:6px;--dur:5s;--delay:-0.62s;--rot:12deg"></i>
+        <i class="brand-sparkle" style="--x:33%;--y:18%;--sz:8px;--dur:5s;--delay:-3.12s;--rot:-6deg"></i>
+        <i class="brand-sparkle brand-sparkle-triad brand-sparkle-triad-dur" style="--x:40%;--y:52%;--sz:11px;--dur:5s;--delay:-1.88s;--rot:8deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
+        <i class="brand-sparkle brand-sparkle-pair" style="--x:46%;--y:34%;--sz:6px;--dur:5s;--delay:-4.38s;--rot:-12deg"></i>
+        <i class="brand-sparkle" style="--x:52%;--y:68%;--sz:6px;--dur:5s;--delay:-0.31s;--rot:6deg"></i>
+        <i class="brand-sparkle brand-sparkle-triad brand-sparkle-triad-dul" style="--x:58%;--y:24%;--sz:11px;--dur:5s;--delay:-2.81s;--rot:-9deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
+        <i class="brand-sparkle brand-sparkle-pair" style="--x:64%;--y:48%;--sz:8px;--dur:5s;--delay:-1.56s;--rot:11deg"></i>
+        <i class="brand-sparkle brand-sparkle-triad brand-sparkle-triad-hl" style="--x:70%;--y:72%;--sz:11px;--dur:5s;--delay:-4.06s;--rot:-5deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
+        <i class="brand-sparkle" style="--x:76%;--y:30%;--sz:6px;--dur:5s;--delay:-0.94s;--rot:12deg"></i>
+        <i class="brand-sparkle brand-sparkle-pair" style="--x:81%;--y:56%;--sz:11px;--dur:5s;--delay:-3.44s;--rot:-10deg"></i>
+        <i class="brand-sparkle brand-sparkle-triad" style="--x:85%;--y:22%;--sz:11px;--dur:5s;--delay:-2.19s;--rot:3deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
+        <i class="brand-sparkle brand-sparkle-triad" style="--x:88%;--y:62%;--sz:11px;--dur:5s;--delay:-4.69s;--rot:10deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
+      </span>
       <span class="brand-logo" aria-hidden="true">
         <!-- Координаты затвора 0…31.875 — те же, что в frontend/logo.svg и brand-iris/geometry.js. -->
         <svg class="brand-mark" viewBox="0 0 31.875 31.875" fill="none" aria-hidden="true">
@@ -3119,7 +3528,11 @@
           <path class="brand-blades" d="M8.32812 29.4688L7.26562 27.6094L14.0625 23.6875L13.3438 23.3281C12.5833 22.974 11.8229 22.599 11.0625 22.2031C10.3125 21.8073 9.57292 21.3958 8.84375 20.9688L0.34375 16.0625L1.40625 14.2188L8.3125 18.2031C8.22917 17.849 8.16146 17.4792 8.10938 17.0938C8.06771 16.7083 8.04688 16.3229 8.04688 15.9375V2.51562H10.1719V10.4531C10.9635 9.89062 11.7812 9.33854 12.625 8.79688C13.4792 8.25521 14.3333 7.73438 15.1875 7.23438L23.5469 2.40625L24.625 4.26562L17.8125 8.1875L18.125 8.3125C18.9479 8.69792 19.7656 9.10938 20.5781 9.54688C21.401 9.98438 22.2135 10.4323 23.0156 10.8906L31.5312 15.7969L30.4844 17.6562L23.5625 13.6719C23.6458 14.026 23.7083 14.3958 23.75 14.7812C23.8021 15.1562 23.8281 15.5417 23.8281 15.9375V29.3594H21.7188V21.4062C20.9167 21.9792 20.0885 22.5365 19.2344 23.0781C18.3906 23.6198 17.5312 24.1458 16.6562 24.6562L8.32812 29.4688ZM15.9375 21.7031C17 21.7031 17.9635 21.4427 18.8281 20.9219C19.7031 20.401 20.401 19.7083 20.9219 18.8438C21.4427 17.9688 21.7031 17 21.7031 15.9375C21.7031 14.875 21.4427 13.9115 20.9219 13.0469C20.401 12.1719 19.7031 11.474 18.8281 10.9531C17.9635 10.4323 17 10.1719 15.9375 10.1719C14.875 10.1719 13.9062 10.4323 13.0312 10.9531C12.1667 11.474 11.474 12.1719 10.9531 13.0469C10.4323 13.9115 10.1719 14.875 10.1719 15.9375C10.1719 17 10.4323 17.9688 10.9531 18.8438C11.474 19.7083 12.1667 20.401 13.0312 20.9219C13.9062 21.4427 14.875 21.7031 15.9375 21.7031ZM15.9375 31.875C13.7396 31.875 11.6771 31.4583 9.75 30.625C7.82292 29.8021 6.13021 28.6615 4.67188 27.2031C3.21354 25.7448 2.06771 24.0521 1.23438 22.125C0.411458 20.1979 0 18.1354 0 15.9375C0 13.7396 0.411458 11.6771 1.23438 9.75C2.06771 7.82292 3.21354 6.13021 4.67188 4.67188C6.13021 3.20312 7.82292 2.05729 9.75 1.23438C11.6771 0.411458 13.7396 0 15.9375 0C18.1354 0 20.1979 0.411458 22.125 1.23438C24.0521 2.05729 25.7448 3.20312 27.2031 4.67188C28.6615 6.13021 29.8021 7.82292 30.625 9.75C31.4583 11.6771 31.875 13.7396 31.875 15.9375C31.875 18.1354 31.4583 20.1979 30.625 22.125C29.8021 24.0521 28.6615 25.7448 27.2031 27.2031C25.7448 28.6615 24.0521 29.8021 22.125 30.625C20.1979 31.4583 18.1354 31.875 15.9375 31.875ZM15.9375 29.2188C17.7708 29.2188 19.4896 28.875 21.0938 28.1875C22.6979 27.5 24.1094 26.5469 25.3281 25.3281C26.5469 24.1094 27.5 22.6979 28.1875 21.0938C28.875 19.4896 29.2188 17.7708 29.2188 15.9375C29.2188 14.1042 28.875 12.3854 28.1875 10.7812C27.5 9.16667 26.5469 7.75521 25.3281 6.54688C24.1094 5.32812 22.6979 4.375 21.0938 3.6875C19.4896 3 17.7708 2.65625 15.9375 2.65625C14.1042 2.65625 12.3854 3 10.7812 3.6875C9.17708 4.375 7.76562 5.32812 6.54688 6.54688C5.32812 7.75521 4.375 9.16667 3.6875 10.7812C3 12.3854 2.65625 13.7396 2.65625 15.9375C2.65625 17.7708 3 19.4896 3.6875 21.0938C4.375 22.6979 5.32812 24.1094 6.54688 25.3281C7.76562 26.5469 9.17708 27.5 10.7812 28.1875C12.3854 28.875 14.1042 29.2188 15.9375 29.2188Z" fill="#9191F3"/>
         </svg>
       </span>
-      <span class="brand-name">Photo Metadata AI</span>
+      <span class="brand-wordmark">
+        <span class="brand-name">Photo Metadata AI</span>
+        <span class="brand-name-lit" aria-hidden="true">Photo Metadata AI</span>
+      </span>
+      </span>
     </a>
     <nav class="nav-links" id="nav-links">
       <a href="#features">Возможности</a>
@@ -3131,7 +3544,7 @@
     <button type="button" class="nav-toggle" id="nav-toggle" aria-controls="nav-links" aria-expanded="false" aria-label="Открыть меню">
       <span class="nav-toggle-bars" aria-hidden="true"><span></span></span>
     </button>
-    <a class="btn btn-ghost btn-sm nav-cta" href="https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.2.1/Photo-Metadata-AI-1.2.1-arm64.dmg"><svg class="apple" viewBox="0 0 384 512" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>Скачать</a>
+    <a class="btn btn-ghost btn-sm nav-cta" href="https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.2.1/Photo-Metadata-AI-1.2.1-arm64.dmg">Скачать</a>
   </div>
 </header>
 
@@ -3150,10 +3563,7 @@
           пересобираются автоматически, вшиваются в файлы и выгружаются в CSV.
         </p>
         <div class="cta" id="hero-cta">
-          <a class="btn btn-primary" href="https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.2.1/Photo-Metadata-AI-1.2.1-arm64.dmg">
-            <svg class="apple" viewBox="0 0 384 512" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>
-            Скачать для macOS
-          </a>
+          <a class="btn btn-primary" href="https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.2.1/Photo-Metadata-AI-1.2.1-arm64.dmg">Скачать</a>
           <a class="btn btn-ghost" href="#how">
             Как это работает
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13"/><path d="M12.5 6.5L18 12l-5.5 5.5"/></svg>
@@ -3773,8 +4183,8 @@ ollama pull qwen2.5vl</code></pre>
         <p>Загрузите файлы, проверьте сгенерированные поля и выгрузите готовый пакет для стока.</p>
         <div class="cta" id="final-cta" style="margin-bottom:0">
           <a class="btn btn-primary" href="https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.2.1/Photo-Metadata-AI-1.2.1-arm64.dmg">
-            <svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7.5 11l4.5 4.5 4.5-4.5"/><path d="M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17"/></svg>
-            Скачать для macOS
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="M7.5 11l4.5 4.5 4.5-4.5"/><path d="M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17"/></svg>
+            Скачать
           </a>
         </div>
       </div>
@@ -3797,12 +4207,13 @@ ollama pull qwen2.5vl</code></pre>
   </div>
 </footer>
 
-<script src="ambient-particle-flags.js"></script>
-<script src="brand-iris/geometry.js?v=tap4"></script>
-<script src="brand-iris/motion.js?v=tap4"></script>
-<script src="brand-iris/handoff.js?v=tap4"></script>
-<script src="brand-iris/presence.js?v=tap4"></script>
-<script src="brand-iris/init.js?v=tap4"></script>
+<script src="ambient-particle-flags.js?v=flags6"></script>
+<script src="brand-iris/geometry.js?v=spark7"></script>
+<script src="brand-iris/motion.js?v=spark7"></script>
+<script src="brand-iris/handoff.js?v=spark7"></script>
+<script src="brand-iris/presence.js?v=spark7"></script>
+<script src="brand-iris/init.js?v=spark7"></script>
+<script src="brand-sparkles.js?v=spark67"></script>
 <script src="header-swap.js"></script>
 <script>
   // Мобильное меню: бургер открывает ту же #nav-links панелью под шапкой.
@@ -4282,7 +4693,7 @@ ollama pull qwen2.5vl</code></pre>
   // Частица движется по плавной неповторяющейся кривой поверх всей страницы.
   // Координаты — в пространстве документа: при скролле пятно уезжает вместе со страницей,
   // а не «висит» в viewport. Становится прозрачной над контентом и реагирует на мышь.
-  // Флаги ENABLE_* — в ambient-particle-flags.js, ключ 'index' (отдельно от screens).
+  // Флаги ENABLE_* и BRAND_SPARKLES_INTRO/WORKING — в ambient-particle-flags.js, ключ 'index'.
   (function () {
     var particleFlags = getLandingParticleFlags('index');
     var ENABLE_AMBIENT_PARTICLE = particleFlags.ENABLE_AMBIENT_PARTICLE;

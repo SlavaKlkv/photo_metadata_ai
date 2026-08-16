@@ -36,6 +36,34 @@ test('кнопки скачивания DMG сходятся на один ре�
   expect([...new Set(dmgHrefs)]).toEqual([dmgUrl]);
 });
 
+test('кнопки .dmg: текст «Скачать»; Apple нет; в финале — иконка загрузки', () => {
+  const screensPath = path.resolve(__dirname, '../../docs/landing/screens.html');
+  const indexHtml = readLanding();
+  const screensHtml = fs.readFileSync(screensPath, 'utf8');
+
+  expect(indexHtml).not.toMatch(/svg\.apple|class="apple"/);
+  expect(screensHtml).not.toMatch(/svg\.apple|class="apple"/);
+
+  const dmgInners = (html) =>
+    [...html.matchAll(
+      /<a\b[^>]*href="https:\/\/github\.com\/SlavaKlkv\/photo_metadata_ai\/releases\/download\/[^"]+\.dmg"[^>]*>([\s\S]*?)<\/a>/g,
+    )].map((m) => m[1]);
+
+  const indexDmgs = dmgInners(indexHtml);
+  expect(indexDmgs).toHaveLength(3);
+
+  // Шапка и герой — только текст.
+  expect(indexDmgs[0].trim()).toBe('Скачать');
+  expect(indexDmgs[1].trim()).toBe('Скачать');
+
+  // Финальный CTA — стрелка загрузки + «Скачать».
+  expect(indexDmgs[2]).toMatch(/<svg viewBox="0 0 24 24"/);
+  expect(indexDmgs[2]).toMatch(/Скачать/);
+  expect(indexDmgs[2]).not.toMatch(/apple/i);
+
+  expect(dmgInners(screensHtml)[0].trim()).toBe('Скачать');
+});
+
 test('финальный CTA не дублирует ссылку на исходный код из футера', () => {
   const html = readLanding();
   const final = html.match(/<!-- FINAL CTA -->([\s\S]*?)<\/main>/);

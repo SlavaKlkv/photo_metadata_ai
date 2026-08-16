@@ -1,42 +1,49 @@
 # Скриншоты приложения
 
-Снято 3 августа 2026 года на macOS, сборка Photo Metadata AI 1.1.0-universal.
+Снято 3 августа 2026 года на macOS, сборка **1.1.0**.
+
+На лендинге: [главная](https://slavaklkv.github.io/photo_metadata_ai/landing/) · [все экраны](https://slavaklkv.github.io/photo_metadata_ai/landing/screens.html).
+Как устроены страницы — в [docs/landing/README.md](../landing/README.md).
+
+[Установка](#установка-и-настройка) · [Мастер](#мастер-от-загрузки-до-проверки) · [Экспорт](#экспорт-и-результат) · [Копии](#уменьшенные-копии)
 
 ## Установка и настройка
 
 | Файл | Что изображено |
 | --- | --- |
-| [01_dmg_installer.png](01_dmg_installer.png) | Смонтированный DMG: перетаскивание «Photo Metadata AI.app» в папку Applications. |
-| [02_onboarding.png](02_onboarding.png) | Онбординг «Checking your AI setup»: найден локальный QWEN 2.5 VL и ключ Gemini, поле для ключа OpenRouter. |
-| [03_ai_setup.png](03_ai_setup.png) | Окно «AI Setup»: QWEN 2.5 VL отключён, ввод ключа OpenRouter с ошибкой «invalid key». |
+| <a href="./01_dmg_installer.png"><code>01_dmg_installer.png</code></a> | Смонтированный DMG: перетаскивание «Photo Metadata AI.app» в папку Applications. |
+| <a href="./02_onboarding.png"><code>02_onboarding.png</code></a> | Онбординг «Checking your AI setup»: найдена локальная модель QWEN 2.5 VL и ключ Gemini, поле для ключа OpenRouter. |
+| <a href="./03_ai_setup.png"><code>03_ai_setup.png</code></a> | Окно «AI Setup»: локальная модель отключена, ввод ключа OpenRouter с ошибкой «invalid key». |
 
 ## Мастер: от загрузки до проверки
 
 | Файл | Что изображено |
 | --- | --- |
-| [04_start_screen.png](04_start_screen.png) | Шаг 1 «Upload»: пустая зона drag & drop, панель «Context & Settings» с выбором провайдера (Gemini), стоковой площадки (Getty Images) и формата экспорта, карточки возможностей. |
-| [05_upload_and_context.png](05_upload_and_context.png) | Шаг 2 «Context»: загружено 113 фотографий, заполнены заметки съёмки, активна кнопка «Start processing». |
-| [06_processing.png](06_processing.png) | Шаг 3 «Process»: модальное окно прогресса «Processing: 73/113», обработка через QWEN 2.5 VL. |
-| [07_review_metadata_preview.png](07_review_metadata_preview.png) | Шаг 4 «Review»: таблица результатов и панель «Metadata Preview» с заголовком, описанием, ключевыми словами и категорией; поле Keywords отредактировано вручную — его подпись подсвечена; 2 файла с ошибками обработки и ссылка «Retry failed (2)». |
-| [08_retry_failed.png](08_retry_failed.png) | Повтор упавших файлов: прогресс «Processing: 1/2» отмена по «Cancel» останавливает только повторный прогон. |
-| [09_review_recommendations_filter.png](09_review_recommendations_filter.png) | Быстрый фильтр «Recommendations»: 16 из 113 фотографий, навигация по группе (7 of 16) и подсказка о релизах для съёмок с людьми. |
-| [10_review_regenerating.png](10_review_regenerating.png) | Перегенерация метаданных для выбранного файла: поля в состоянии «Regenerating…». |
+| <a href="./04_start_screen.png"><code>04_start_screen.png</code></a> | Шаг 1 «Upload»: пустая зона drag & drop, панель «Context & Settings» с выбором провайдера (Gemini), стоковой площадки (Getty Images) и формата экспорта, а также карточки возможностей. |
+| <a href="./05_upload_and_context.png"><code>05_upload_and_context.png</code></a> | Шаг 2 «Context»: загружено 113 фотографий, заполнены заметки съёмки, активна кнопка «Start processing». |
+| <a href="./06_processing.png"><code>06_processing.png</code></a> | Шаг 3 «Process»: модальное окно прогресса «Processing: 73/113», обработка через локальную модель QWEN 2.5 VL. |
+| <a href="./07_review_metadata_preview.png"><code>07_review_metadata_preview.png</code></a> | Шаг 4 «Review»: таблица результатов и панель «Metadata Preview» с заголовком, описанием, ключевыми словами и категорией. Поле Keywords отредактировано вручную — его подпись подсвечена. 2 файла с ошибками и ссылка «Retry failed (2)». |
+| <a href="./08_retry_failed.png"><code>08_retry_failed.png</code></a> | Повтор упавших файлов: прогресс «Processing: 1/2»; отмена по «Cancel» останавливает только повторный прогон. |
+| <a href="./09_review_recommendations_filter.png"><code>09_review_recommendations_filter.png</code></a> | Быстрый фильтр «Recommendations»: 16 из 113 фотографий, навигация по группе (7 of 16) и подсказка о релизах для съёмок с людьми. |
+| <a href="./10_review_regenerating.png"><code>10_review_regenerating.png</code></a> | Перегенерация метаданных для выбранного файла: поля в состоянии «Regenerating…». |
 
 ## Экспорт и результат
 
 | Файл | Что изображено |
 | --- | --- |
-| [11_select_ready_only.png](11_select_ready_only.png) | Редакционные поля: License Type = Editorial, подпись, локация и ошибка об обязательной editorial-дате; экспорт в CSV и IPTC, выбраны только Ready (66 из 113). |
-| [12_export_in_progress.png](12_export_in_progress.png) | Шаг 5 «Export»: модальное окно прогресса «Exporting: 48/70» с возможностью отмены. |
-| [13_export_completed.png](13_export_completed.png) | Экспорт завершён: 70 фотографий готовы к загрузке на сток, кнопки «Open CSV file» и «Open folder». |
-| [14_exported_csv_adobe_stock.png](14_exported_csv_adobe_stock.png) | Выгруженный CSV для Adobe Stock, открытый в Numbers: колонки Filename, Title, Description, Keywords, Category и флаги. |
-| [15_exported_file_iptc_metadata.png](15_exported_file_iptc_metadata.png) | Экспортированный JPEG в «Просмотре» macOS: вшитые IPTC-поля — описание, город, страна, ключевые слова, название, категория. |
+| <a href="./11_select_ready_only.png"><code>11_select_ready_only.png</code></a> | Редакционные поля: License Type = Editorial, подпись, локация и ошибка об обязательной editorial-дате; экспорт в CSV и IPTC, выбраны только Ready (66 из 113). |
+| <a href="./12_export_in_progress.png"><code>12_export_in_progress.png</code></a> | Шаг 5 «Export»: модальное окно прогресса «Exporting: 48/70» с возможностью отмены. |
+| <a href="./13_export_completed.png"><code>13_export_completed.png</code></a> | Экспорт завершён: 70 фотографий готовы к загрузке на сток, кнопки «Open CSV file» и «Open folder». |
+| <a href="./14_exported_csv_adobe_stock.png"><code>14_exported_csv_adobe_stock.png</code></a> | Выгруженный CSV для Adobe Stock, открытый в Numbers: колонки Filename, Title, Description, Keywords, Category, Editorial Caption, Location и флаги. |
+| <a href="./15_exported_file_iptc_metadata.png"><code>15_exported_file_iptc_metadata.png</code></a> | Экспортированный JPEG в «Просмотре» macOS: вшитые IPTC-поля — название, описание, ключевые слова, категория, страна, область, город, а также лицензия и флаги в «Инструкциях». |
 
 ## Уменьшенные копии
 
-Оригиналы сняты в 3424 px и весят от одного до одиннадцати мегабайт, поэтому страницы
-лендинга грузят их только в лайтбоксе, а в сетке и в плитках — уменьшенные копии рядом
-с оригиналом. Суффикс копии — её ширина в пикселях:
+Оригиналы окна приложения (04–13) сняты в 3424 px и весят около мегабайта
+и больше. 14 — таблица из Numbers (3358 px, 2,2 МБ), 15 — окно «Просмотра»
+(3886 px, 11 МБ). Страницы лендинга грузят оригиналы только в лайтбоксе,
+а в сетке и в плитках — уменьшенные копии рядом с оригиналом. Суффикс
+копии — её ширина в пикселях:
 
 | Суффикс | Где используется |
 | --- | --- |
@@ -44,9 +51,27 @@
 | `_1200` | карточки в сетке экранов (`screens.html`) и крупный снимок в блоке «Как это выглядит в работе» |
 
 Ступень 1200 px одна на снимок: и карточка, и крупный блок берут один и тот же файл.
-Она есть у всех снимков, снятых в 3424 px, то есть у 04–15; у 05, 06, 13 и 15 есть
-ещё и 640 px под плитки. Копия не нужна только 01, 02 и 03 — они сняты в 1424, 954
-и 923 px и в карточку идут как есть.
+
+| Снимок | Оригинал | `_1200` | `_640` |
+| --- | --- | :---: | :---: |
+| 01 | 1424×1024 | — | — |
+| 02 | 954×1224 | — | — |
+| 03 | 923×1016 | — | — |
+| 04 | 3424×2626 | есть | — |
+| 05 | 3424×2624 | есть | есть |
+| 06 | 3424×2624 | есть | есть |
+| 07 | 3424×2626 | есть | — |
+| 08 | 3424×2626 | есть | — |
+| 09 | 3424×2626 | есть | — |
+| 10 | 3424×2626 | есть | — |
+| 11 | 3424×2626 | есть | — |
+| 12 | 3424×2626 | есть | — |
+| 13 | 3424×2626 | есть | есть |
+| 14 | 3358×3104 | есть | — |
+| 15 | 3886×3078 | есть | есть |
+
+Копия не нужна только 01, 02 и 03 — они уже достаточно узкие и в карточку
+идут как есть.
 
 Новую копию делают так:
 
@@ -56,11 +81,6 @@ sips --resampleWidth 640 06_processing.png --out 06_processing_640.png
 
 Суффикс дописывается к полному имени оригинала, ничего из него не выбрасывая.
 
-> [!NOTE]
-> У 07 в самом имени есть слово «preview» — это часть названия экрана
-> («Metadata Preview»), а не суффикс размера. Поэтому оригинал называется
-> `07_review_metadata_preview.png` (3424 px), а его копия —
-> `07_review_metadata_preview_1200.png`.
 
 ### Почему после уменьшения надо проверять рамки
 
@@ -106,4 +126,4 @@ editorial-даты на 11 — у неё не рисовались верх, н�
 | **Уменьшение** | Снимок уменьшен до 1200 px |
 | **Перерисовка сетки** | Уже в его пикселях: 13 вертикальных и 53 горизонтальных линии по 2 px `#afafaf` |
 | **Акценты** | Рамка таблицы, низ шапки и правая грань колонки Filename — 3 px `#5a5a5a`: в оригинале они тоже темнее прочих, без этого таблица теряет структуру |
-| **Палитра** | 256 цветов: снимок почти монохромный, отличие от полноцветного не больше 0,1 уровня яркости в среднем, а вес падает с 790 до 300 КБ |
+| **Палитра** | 256 цветов: снимок почти монохромный, отличие от полноцветного не больше 0,1 уровня яркости в среднем, а вес падает с 790 до ~300 КБ |
