@@ -34,7 +34,7 @@ describe('ресурсы страниц не выходят за пределы 
 
     const missing = refs
       .filter((ref) => !/^(?:https?:|mailto:|#|data:)/.test(ref))
-      .map((ref) => ref.split('#')[0])
+      .map((ref) => ref.split('#')[0].split('?')[0])
       .filter((ref) => ref && !fs.existsSync(path.join(landingDir, ref)));
 
     expect([...new Set(missing)]).toEqual([]);

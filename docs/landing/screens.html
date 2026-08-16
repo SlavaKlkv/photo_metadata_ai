@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="color-scheme" content="dark">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- .dmg только на Mac desktop: класс is-mac / not-mac до первой отрисовки. -->
+<script src="mac-desktop.js?v=mac1"></script>
 <title>Photo Metadata AI — все экраны приложения</title>
 <meta name="description" content="Все экраны Photo Metadata AI: онбординг, загрузка, обработка, проверка метаданных и экспорт. Сборка 1.2.0-arm64.">
 <link rel="icon" href="icon.svg">
@@ -82,9 +84,22 @@
 
   * { box-sizing: border-box; }
 
+  /* .dmg только на Mac desktop (класс ставит mac-desktop.js). Без JS кнопка
+     остаётся. Ширина сюда не входит — узкий Mac всё ещё может скачать. */
+  html.not-mac a[href*="/releases/download/"] {
+    display: none !important;
+  }
+
   /* Тёмный canvas задан до первой отрисовки; межстраничный View Transition не
      используется (вспышка в Chrome). Вместо — opacity-swap шапки (header-swap.js). */
-  html { background: var(--bg); color-scheme: dark; }
+  html {
+    background: var(--bg);
+    color-scheme: dark;
+    /* Без горизонтального пана: ширина = viewport, сдвиг только по вертикали.
+       overscroll-behavior гасит «резиновый» увод в пустоту на таче. */
+    overflow-x: clip;
+    overscroll-behavior-x: none;
+  }
 
   body {
     margin: 0;
@@ -92,7 +107,8 @@
     color: var(--text);
     font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
-    overflow-x: hidden;
+    overflow-x: clip;
+    overscroll-behavior-x: none;
   }
 
   a { color: var(--accent-2); text-decoration: none; }
@@ -171,27 +187,409 @@
   .brand {
     display: flex;
     align-items: center;
-    gap: 11px;
     font-weight: 600;
     color: var(--text);
     margin-right: auto;
+    -webkit-tap-highlight-color: transparent;
   }
   .brand:hover { text-decoration: none; }
+  /* Метка + надпись. На узкой ширине .brand тянется до бургера,
+     а искры сидят только на этой связке (и на расширенных краях). */
+  .brand-lockup {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 11px;
+    min-width: 0;
+    max-width: 100%;
+  }
   /* Как в приложении: только метка-затвор, без плитки icon.svg. */
   .brand-logo {
     display: block;
     flex: none;
     width: 30px;
     height: 30px;
+    position: relative;
+    z-index: 0;
   }
   .brand-mark { display: block; width: 100%; height: 100%; }
+  /* Одна область: метка, буквы и края inset. ровный ход ≥6 бликов, без пусто/густо. */
+  .brand-sparkles {
+    position: absolute;
+    /* Справа короче, чем слева: меньше вылета за wordmark.
+       Слева не больше padding .wrap (16px на узком): иначе body.scrollWidth
+       растёт и Safari зумит visualViewport на всём скролле.
+       top/bottom отдельно: на intro зона расширяется (класс is-intro-zone).
+       Без анимации границ: иначе при снятии класса искры сжимаются вместе с рамкой. */
+    top: -8px;
+    right: -20px;
+    bottom: -8px;
+    left: -16px;
+    pointer-events: none;
+    z-index: 1;
+    overflow: visible;
+  }
+  /* Intro: вверх до края шапки, вниз — лёгкий выход за полосу.
+     Ниже шапки бока отрезаны ровно по вертикали, без диагоналей: у краёв
+     под полосой искр не появляется вовсе.
+     Пиксели считает brand-sparkles.js по header/lockup. */
+  .brand-sparkles.is-intro-zone {
+    top: var(--spark-intro-top, -18px);
+    bottom: var(--spark-intro-bottom, -24px);
+    clip-path: polygon(
+      0 0,
+      100% 0,
+      100% var(--spark-intro-band, 80%),
+      calc(100% - var(--spark-intro-side, 22%)) var(--spark-intro-band, 80%),
+      calc(100% - var(--spark-intro-side, 22%)) 100%,
+      var(--spark-intro-side, 22%) 100%,
+      var(--spark-intro-side, 22%) var(--spark-intro-band, 80%),
+      0 var(--spark-intro-band, 80%)
+    );
+  }
+  .brand-sparkle {
+    position: absolute;
+    display: block;
+    left: var(--x);
+    top: var(--y);
+    width: var(--sz, 8px);
+    height: var(--sz, 8px);
+    opacity: 0;
+    transform-origin: center;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      rgba(232, 248, 255, .72) 0 10%,
+      rgba(143, 217, 255, .2) 18%,
+      rgba(155, 152, 251, .08) 38%,
+      transparent 68%
+    );
+    filter: drop-shadow(0 0 3px rgba(139, 136, 248, .45))
+      drop-shadow(0 0 10px rgba(139, 136, 248, .28));
+    /* Один --dur у всех + сдвинутые фазы → стабильно ≥6 видимых. */
+    animation: brand-sparkle-glint var(--dur, 5s) var(--delay, 0s) ease-in-out infinite;
+  }
+  /* Луч рисует ::before, а не сама искра: маска на элементе обрезала бы и
+     спутника. Габарит, фаза и opacity остаются на .brand-sparkle — их читает
+     brand-sparkles.js (перекладка невидимых точек, animationiteration). */
+  .brand-sparkle::before,
+  .brand-sparkle::after {
+    content: "";
+    position: absolute;
+    /* Не серебро: мягкое белое ядро с лилово-голубым краем акцента. */
+    background:
+      radial-gradient(closest-side, rgba(245, 244, 255, .95) 0%, rgba(245, 244, 255, 0) 68%),
+      linear-gradient(145deg, #e4e2ff 0%, #9b98fb 38%, #7a77ea 64%, #8fd9ff 100%);
+    /* Луч узкий и вытянутый по вертикали: снежинка симметрична по всем осям,
+       знак AI — нет. */
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M12 0C12.32 7.35 15.26 11.55 20.4 12C15.26 12.45 12.32 16.65 12 24C11.68 16.65 8.74 12.45 3.6 12C8.74 11.55 11.68 7.35 12 0Z'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M12 0C12.32 7.35 15.26 11.55 20.4 12C15.26 12.45 12.32 16.65 12 24C11.68 16.65 8.74 12.45 3.6 12C8.74 11.55 11.68 7.35 12 0Z'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+  .brand-sparkle::before {
+    inset: 0;
+    animation: brand-sparkle-form var(--dur, 5s) var(--delay, 0s) ease-in-out infinite;
+  }
+  /* Пара «крупная + малая» — тот же знак, что у AI-действий в интерфейсах.
+     Явный класс: среди 16 их ровно 5, рядом с 5 одиночными и 6 триадами.
+     Без размеров ::after нулевой, поэтому у остальных искр его не видно. */
+  .brand-sparkle-pair::after {
+    left: 62%;
+    top: -32%;
+    width: 46%;
+    height: 46%;
+    opacity: 0;
+    transform: rotate(18deg) scale(.25);
+    background:
+      radial-gradient(closest-side, rgba(247, 252, 255, .95) 0%, rgba(247, 252, 255, 0) 68%),
+      linear-gradient(145deg, #d9f4ff 0%, #8fd9ff 44%, #9b98fb 100%);
+    filter: drop-shadow(0 0 4px rgba(121, 212, 255, .45));
+    animation: brand-sparkle-companion var(--dur, 5s) var(--delay, 0s) ease-in-out infinite;
+  }
+  /* У парных знаков расходится почти невесомый signal-ring. Это добавляет
+     ощущение генерации/обработки, но не делает каждую точку отдельным пузырём. */
+  .brand-sparkle-pair {
+    animation-name: brand-sparkle-glint, brand-sparkle-signal;
+    animation-duration: var(--dur, 5s), var(--dur, 5s);
+    animation-delay: var(--delay, 0s), var(--delay, 0s);
+    animation-timing-function: ease-in-out, ease-out;
+    animation-iteration-count: infinite, infinite;
+  }
+  /* Generative-триада: 2 вертикальных вверх, 2 диагональных вверх в разные
+     стороны и 2 горизонтальных в разные стороны. Одна группа = одна ячейка;
+     среди 16 их 6. */
+  .brand-sparkle-step {
+    position: absolute;
+    display: block;
+    opacity: 0;
+    background:
+      radial-gradient(closest-side, rgba(247, 252, 255, .95) 0%, rgba(247, 252, 255, 0) 68%),
+      linear-gradient(145deg, #e4e2ff 0%, #9b98fb 42%, #8fd9ff 100%);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M12 0C12.32 7.35 15.26 11.55 20.4 12C15.26 12.45 12.32 16.65 12 24C11.68 16.65 8.74 12.45 3.6 12C8.74 11.55 11.68 7.35 12 0Z'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M12 0C12.32 7.35 15.26 11.55 20.4 12C15.26 12.45 12.32 16.65 12 24C11.68 16.65 8.74 12.45 3.6 12C8.74 11.55 11.68 7.35 12 0Z'/%3E%3C/svg%3E") center / contain no-repeat;
+    filter: drop-shadow(0 0 4px rgba(121, 212, 255, .42));
+  }
+  .brand-sparkle-step-2 {
+    left: 19%;
+    top: -72%;
+    width: 62%;
+    height: 62%;
+    animation: brand-sparkle-chain-2 var(--dur, 5s) var(--delay, 0s) ease-in-out infinite;
+  }
+  .brand-sparkle-step-3 {
+    left: 31%;
+    top: -118%;
+    width: 38%;
+    height: 38%;
+    animation: brand-sparkle-chain-3 var(--dur, 5s) var(--delay, 0s) ease-in-out infinite;
+  }
+  .brand-sparkle-triad-dur .brand-sparkle-step-2 {
+    left: 78%;
+    top: -72%;
+  }
+  .brand-sparkle-triad-dur .brand-sparkle-step-3 {
+    left: 128%;
+    top: -118%;
+  }
+  .brand-sparkle-triad-dul .brand-sparkle-step-2 {
+    left: -40%;
+    top: -72%;
+  }
+  .brand-sparkle-triad-dul .brand-sparkle-step-3 {
+    left: -66%;
+    top: -118%;
+  }
+  .brand-sparkle-triad-hr .brand-sparkle-step-2 {
+    left: 108%;
+    top: 19%;
+  }
+  .brand-sparkle-triad-hr .brand-sparkle-step-3 {
+    left: 180%;
+    top: 31%;
+  }
+  .brand-sparkle-triad-hl .brand-sparkle-step-2 {
+    left: -70%;
+    top: 19%;
+  }
+  .brand-sparkle-triad-hl .brand-sparkle-step-3 {
+    left: -118%;
+    top: 31%;
+  }
+  /* Спокойный desktop-режим: один знак поблёскивает раз в 3–6 секунд.
+     Исходная сетка скрыта; половина импульсов — двойной знак с signal-ring. */
+  .brand-sparkles.is-desktop-twinkle >
+    .brand-sparkle:not(.brand-sparkle-desktop-twinkle) {
+    display: none;
+    animation: none;
+  }
+  .brand-sparkle-desktop-twinkle {
+    width: var(--sz, 11px);
+    height: var(--sz, 11px);
+    animation: none;
+    opacity: 0;
+  }
+  .brand-sparkle-desktop-twinkle::before {
+    animation: none;
+    opacity: 1;
+    clip-path: none;
+    transform: none;
+  }
+  .brand-sparkle-desktop-twinkle::after {
+    display: none;
+    animation: none;
+  }
+  .brand-sparkle-desktop-twinkle.is-flashing {
+    animation: brand-sparkle-mobile-twinkle 900ms ease-out 1 both;
+  }
+  .brand-sparkle-desktop-twinkle.brand-sparkle-pair::after {
+    display: block;
+  }
+  .brand-sparkle-desktop-twinkle.brand-sparkle-pair.is-flashing {
+    animation:
+      brand-sparkle-mobile-twinkle 900ms ease-out 1 both,
+      brand-sparkle-signal 900ms ease-out 1 both;
+  }
+  .brand-sparkle-desktop-twinkle.brand-sparkle-pair.is-flashing::after {
+    animation: brand-sparkle-companion 900ms ease-in-out 1 both;
+  }
+  /* Мобильная система отдельная: исходные 16 знаков и intro не рендерятся.
+     Один средний/крупный знак кратко вспыхивает в той же зоне, что и рабочий
+     режим (слой вокруг локапа), затем слой снова статичен. */
+  @media (hover: none), (pointer: coarse) {
+    .brand-sparkles.is-mobile-twinkle > .brand-sparkle:not(.brand-sparkle-mobile) {
+      display: none;
+      animation: none;
+    }
+    .brand-sparkle-mobile {
+      width: var(--sz, 8px);
+      height: var(--sz, 8px);
+      animation: none;
+      opacity: 0;
+    }
+    .brand-sparkle-mobile::before {
+      animation: none;
+      opacity: 1;
+      clip-path: none;
+      transform: none;
+    }
+    .brand-sparkle-mobile::after {
+      display: none;
+      animation: none;
+    }
+    .brand-sparkle-mobile.is-flashing {
+      animation: brand-sparkle-mobile-twinkle 900ms ease-out 1 both;
+    }
+  }
+  @keyframes brand-sparkle-mobile-twinkle {
+    0% { opacity: 0; transform: scale(.45) rotate(var(--rot, 0deg)); }
+    32% { opacity: .92; transform: scale(1.08) rotate(var(--rot, 0deg)); }
+    62% { opacity: .58; transform: scale(.94) rotate(var(--rot, 0deg)); }
+    100% { opacity: 0; transform: scale(.55) rotate(var(--rot, 0deg)); }
+  }
+  @keyframes brand-sparkle-chain-2 {
+    0%, 17%, 54%, 100% { opacity: 0; transform: scale(.2); }
+    28% { opacity: .76; transform: scale(1); }
+    42% { opacity: .42; transform: scale(.84); }
+  }
+  @keyframes brand-sparkle-chain-3 {
+    0%, 28%, 54%, 100% { opacity: 0; transform: scale(.2); }
+    39% { opacity: .72; transform: scale(1); }
+    48% { opacity: .32; transform: scale(.78); }
+  }
+  @keyframes brand-sparkle-signal {
+    0%, 20%, 54%, 100% {
+      box-shadow: 0 0 0 0 rgba(143, 217, 255, 0);
+    }
+    30% {
+      box-shadow: 0 0 0 1px rgba(143, 217, 255, .2);
+    }
+    44% {
+      box-shadow: 0 0 0 6px rgba(155, 152, 251, 0);
+    }
+  }
+  /* Сначала видна только световая «затравка», затем знак собирается из
+     центра. Спутник отвечает позже — как второй шаг генерации. */
+  @keyframes brand-sparkle-form {
+    0%, 7% {
+      opacity: 0;
+      transform: scale(.2);
+      clip-path: inset(46% 42%);
+    }
+    15% {
+      opacity: .38;
+      transform: scale(.58);
+      clip-path: inset(30% 26%);
+    }
+    26% {
+      opacity: 1;
+      transform: scale(1);
+      clip-path: inset(0);
+    }
+    40% {
+      opacity: .7;
+      transform: scale(.94);
+      clip-path: inset(3%);
+    }
+    54%, 100% {
+      opacity: 0;
+      transform: scale(.58);
+      clip-path: inset(30%);
+    }
+  }
+  @keyframes brand-sparkle-companion {
+    0%, 19%, 54%, 100% {
+      opacity: 0;
+      transform: rotate(18deg) scale(.25);
+    }
+    29% {
+      opacity: .68;
+      transform: rotate(18deg) scale(1);
+    }
+    42% {
+      opacity: .38;
+      transform: rotate(18deg) scale(.82);
+    }
+  }
+  /* Мягкое дыхание на месте: без щелчка и доворота — магия остаётся в
+     ореоле и форме, а не в резкости. Тёмная фаза с 54% — контракт с
+     brand-sparkles.js (BRAND_SPARKLES_DARK_AT_MS). */
+  @keyframes brand-sparkle-glint {
+    0% {
+      opacity: 0;
+      transform: scale(0.55) rotate(var(--rot, 0deg));
+      filter: drop-shadow(0 0 2px rgba(139, 136, 248, .2))
+        drop-shadow(0 0 6px rgba(139, 136, 248, .1));
+    }
+    12% {
+      opacity: .55;
+      transform: scale(0.88) rotate(var(--rot, 0deg));
+      filter: drop-shadow(0 0 3px rgba(139, 136, 248, .4))
+        drop-shadow(0 0 9px rgba(139, 136, 248, .22));
+    }
+    24% {
+      opacity: .82;
+      transform: scale(1.04) rotate(var(--rot, 0deg));
+      filter: drop-shadow(0 0 4px rgba(170, 168, 255, .55))
+        drop-shadow(0 0 14px rgba(139, 136, 248, .35));
+    }
+    38% {
+      opacity: .48;
+      transform: scale(0.94) rotate(var(--rot, 0deg));
+      filter: drop-shadow(0 0 3px rgba(139, 136, 248, .35))
+        drop-shadow(0 0 8px rgba(139, 136, 248, .18));
+    }
+    54%, 100% {
+      opacity: 0;
+      transform: scale(0.5) rotate(var(--rot, 0deg));
+      filter: drop-shadow(0 0 2px rgba(139, 136, 248, .12))
+        drop-shadow(0 0 5px rgba(139, 136, 248, .06));
+    }
+  }
+  /* До старта intro гасим CSS-цикл; дальше тот же glint без обрыва. */
+  .brand-sparkles.is-intro .brand-sparkle {
+    animation: none !important;
+    opacity: 0;
+  }
+  .brand-sparkles.is-intro .brand-sparkle::before,
+  .brand-sparkles.is-intro .brand-sparkle::after,
+  .brand-sparkles.is-intro .brand-sparkle-step,
+  .brand-sparkle.is-restarting::before,
+  .brand-sparkle.is-restarting::after,
+  .brand-sparkle.is-restarting .brand-sparkle-step {
+    animation: none !important;
+  }
   /* Диафрагму пересчитывают модули brand-iris/; подсветка wordmark — отдельно. */
-  .brand-name { transition: color .3s ease, text-shadow .3s ease; }
-  /* Надпись отзывается вместе с затвором — сдержанно, без сдвига соседей. */
-  .brand:hover .brand-name,
-  .brand:focus-visible .brand-name {
+  /* Подсветка — отдельный слой с opacity, а не смена color/filter у самой
+     надписи. iOS на тапе применяет :hover без transition, а color от
+     var(--text) к #fff не интерполируется: надпись мигала. Opacity всегда
+     плавная. filter на слое, не на клипуемом .brand-name — ореол не режет
+     overflow: hidden (ellipsis на узкой ширине). */
+  .brand-wordmark { position: relative; min-width: 0; }
+  .brand-name {
+    color: var(--text);
+    display: block;
+  }
+  .brand-name-lit {
+    position: absolute;
+    inset: 0;
     color: #fff;
-    text-shadow: 0 0 16px rgba(139, 136, 248, .38);
+    filter: drop-shadow(0 0 3.5px rgba(139, 136, 248, .55));
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Мышь: CSS-transition. Тап: opacity ставит brand-iris/ кадр за кадром —
+     iOS на :hover/:focus-visible transition не играет, надпись щёлкала. */
+  @media (hover: hover) and (pointer: fine) {
+    .brand:not(.is-tap) .brand-name-lit {
+      transition: opacity .38s ease;
+    }
+    .brand:hover:not(.is-tap) .brand-name-lit,
+    .brand:focus-visible:not(.is-tap) .brand-name-lit {
+      opacity: 1;
+      transition: opacity .34s ease;
+    }
   }
 
   .btn {
@@ -249,24 +647,30 @@
     15% { opacity: 1; }
     100% { left: 120%; opacity: 0; }
   }
-  /* Логотип Apple — сплошная заливка, а не обводка. */
-  .btn svg.apple { width: 13px; height: 16px; fill: currentColor; stroke: none; margin-top: -2px; }
-
-  /* Сверху свечение обрезается, а справа может естественно уйти за край. */
+  /* Режем только сверху и снизу: вбок подсветка должна уходить в поля страницы
+     и гаснуть сама, как на главной. overflow: hidden обрезал её по правому краю
+     колонки — под шапкой была видна вертикальная граница. clip-path (в отличие
+     от старого inset(0 -100vw) + overflow: visible) не даёт горизонтального
+     запаса в layout, а html { overflow-x: clip } не даёт панорамить.
+     Горизонтальный вылет ≥ пика aurora: right (0.18×колонки) + прирост
+     scale(1.16) от центра (0.5×width×0.16) = 0.26×колонки ≈ 291px при
+     --maxw; меньший inset снова резал мягкий край посреди поля. */
   .intro {
     position: relative;
     padding: 56px 0 28px;
-    overflow: visible;
-    clip-path: inset(0 -100vw);
+    clip-path: inset(0 -320px);
   }
-  /* Правый край остаётся на прежнем месте, а увеличенная ширина растягивает
-     подсветку влево примерно на две трети блока. */
+  /* Центр пятна всегда держим на 68% ширины контентной колонки. Пятно той же
+     ширины, что колонка, поэтому right:-18% сдвигает его центр с 50% на 68%.
+     Привязки к краю viewport здесь нет: при сужении пятно масштабируется и
+     смещается вместе с контентом, не съезжая к центру страницы. На телефоне
+     в портрете пятно скрыто отдельно (max-width: 720px). */
   .intro::before {
     content: "";
     position: absolute;
     top: -280px;
-    right: -160px;
-    width: min(100%, 1040px);
+    right: -18%;
+    width: min(100%, var(--maxw));
     height: 560px;
     background: radial-gradient(closest-side, rgba(129, 125, 240, 0.22), transparent);
     pointer-events: none;
@@ -495,7 +899,7 @@
   }
   /* Колонка: картинка отдаёт высоту подписи, а не выдавливает её
      за границу диалога — иначе при подписи в две строки низ обрезается. */
-  dialog.lightbox[open] { display: flex; flex-direction: column; }
+  dialog.lightbox[open] { display: flex; flex-direction: column; touch-action: none; }
   dialog.lightbox::backdrop { background: rgba(6, 6, 9, 0.86); }
 
   /* Появление и закрытие: диалог всплывает, подложка проявляется.
@@ -576,6 +980,24 @@
        (онбординг/AI Setup) раздувала body и подпись «залазила» на кадр. */
     background: #0a0a0e;
     overflow: hidden;
+    /* Жесты (свайп / pinch / двойной тап) берём сами — не отдаём браузеру. */
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: grab;
+  }
+  .lb-body:active { cursor: grabbing; }
+  /* Zoom/pan на stage, а не на img: иначе scale спорит с translateX слайда. */
+  .lb-stage {
+    position: absolute;
+    inset: 0;
+    transform-origin: center center;
+    touch-action: none;
+    will-change: transform;
+  }
+  /* Двойной тап: плавный зум к точке; pinch/pan класс снимают. */
+  .lb-stage.is-tap-zoom {
+    transition: transform .28s cubic-bezier(.22, .61, .36, 1);
   }
   .lb-body img {
     position: absolute;
@@ -592,6 +1014,10 @@
       transform .46s cubic-bezier(.32, .72, 0, 1),
       opacity .46s cubic-bezier(.32, .72, 0, 1);
     will-change: transform;
+    -webkit-user-drag: none;
+    user-select: none;
+    /* Клики/тачи идут в .lb-body — иначе img перехватывает жест. */
+    pointer-events: none;
   }
   /* Оба кадра едут одновременно и с одинаковой скоростью: уходящий за край,
      входящий с противоположной стороны — это и есть сдвиг ленты. */
@@ -605,6 +1031,12 @@
   .lb-body img.is-leaving.to-right { transform: translateX(var(--lb-shift, 100vw)); }
   /* Стартовое положение входящего кадра выставляется без анимации. */
   .lb-body img.no-anim { transition: none; }
+
+  /* Свайп вниз закрывает: на время жеста глушим transition открытия. */
+  dialog.lightbox.is-dismissing,
+  dialog.lightbox.is-dismissing::backdrop {
+    transition: none !important;
+  }
 
   .lb-title,
   .lb-caption {
@@ -625,9 +1057,55 @@
     line-height: 1.45;
   }
 
+  /* Узкий экран: галерея не задаёт
+     min 320px (иначе при padding 24×2 контент уже 272px и появляется
+     горизонтальный скролл). */
   @media (max-width: 720px) {
-    .intro { padding-top: 40px; }
+    .wrap { padding: 0 16px; }
+    .brand {
+      min-width: 0;
+      margin-right: 0;
+    }
+    .nav-home { margin-left: auto; }
+    .brand-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .intro { padding: 36px 0 22px; }
+    /* На телефоне aurora героя на главной тоже скрыта: пятно intro здесь
+       только шумит и спорит с шапкой. На десктопе остаётся. */
+    .intro::before { display: none; }
+    .lede { font-size: 15.5px; }
+    .gallery {
+      grid-template-columns: 1fr;
+      gap: 14px;
+      padding-bottom: 64px;
+    }
+    .gallery .meta { padding: 13px 14px 15px; }
+    .to-top { right: 14px; bottom: 14px; }
+    dialog.lightbox {
+      /* 100% вместо 100vw: vw включает ширину scrollbar/chrome и снова
+         даёт горизонтальный сдвиг на узком экране. */
+      width: 100%;
+      max-width: 100%;
+      height: 100dvh;
+      max-height: 100dvh;
+      margin: 0;
+      border-radius: 0;
+      border-width: 0;
+    }
+    .lb-bar { gap: 8px; padding: 10px 10px 10px 14px; }
     .lb-title { font-size: 14px; }
+    .lb-caption { padding: 12px 14px 16px; font-size: 13.5px; }
+    .lb-body img { inset: 10px; width: calc(100% - 20px); height: calc(100% - 20px); }
+  }
+  /* На таче нет hover: подсказка «Открыть» видна сразу, иначе плитка молчит. */
+  @media (hover: none) {
+    .gallery .zoom {
+      opacity: .92;
+      transform: none;
+    }
   }
   @media (prefers-reduced-motion: reduce) {
     html.header-swap .nav > :not(.brand),
@@ -652,9 +1130,9 @@
       animation: none;
     }
     /* Затвор остаётся раскрытым (это же проверяют модули brand-iris/), надпись
-       не подсвечивается. */
-    .brand:hover .brand-name,
-    .brand:focus-visible .brand-name { color: var(--text); text-shadow: none; }
+       не подсвечивается. Искры вокруг метки тоже гасим. */
+    .brand-name-lit { opacity: 0; filter: none; transition: none; }
+    .brand-sparkles { display: none; }
     .to-top { transition: opacity .2s ease; transform: none; }
     .to-top:hover svg { animation: none; }
     .btn, .btn-primary { transition: none; }
@@ -667,6 +1145,7 @@
     dialog.lightbox { opacity: 1; transform: none; }
     .lb-body img { transition: none; }
     .lb-body img.is-active { transform: none; }
+    .lb-stage.is-tap-zoom { transition: none; }
     .lb-title, .lb-caption { transition: none; }
   }
 </style>
@@ -678,6 +1157,25 @@
 <header>
   <div class="wrap nav">
     <a class="brand" href="index.html">
+      <span class="brand-lockup">
+      <span class="brand-sparkles" aria-hidden="true">
+        <i class="brand-sparkle" style="--x:3%;--y:36%;--sz:8px;--dur:5s;--delay:0s;--rot:-11deg"></i>
+        <i class="brand-sparkle brand-sparkle-pair" style="--x:8%;--y:58%;--sz:6px;--dur:5s;--delay:-2.5s;--rot:9deg"></i>
+        <i class="brand-sparkle brand-sparkle-triad brand-sparkle-triad-hr" style="--x:14%;--y:28%;--sz:11px;--dur:5s;--delay:-1.25s;--rot:5deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
+        <i class="brand-sparkle" style="--x:20%;--y:64%;--sz:8px;--dur:5s;--delay:-3.75s;--rot:-8deg"></i>
+        <i class="brand-sparkle brand-sparkle-pair" style="--x:27%;--y:40%;--sz:6px;--dur:5s;--delay:-0.62s;--rot:12deg"></i>
+        <i class="brand-sparkle" style="--x:33%;--y:18%;--sz:8px;--dur:5s;--delay:-3.12s;--rot:-6deg"></i>
+        <i class="brand-sparkle brand-sparkle-triad brand-sparkle-triad-dur" style="--x:40%;--y:52%;--sz:11px;--dur:5s;--delay:-1.88s;--rot:8deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
+        <i class="brand-sparkle brand-sparkle-pair" style="--x:46%;--y:34%;--sz:6px;--dur:5s;--delay:-4.38s;--rot:-12deg"></i>
+        <i class="brand-sparkle" style="--x:52%;--y:68%;--sz:6px;--dur:5s;--delay:-0.31s;--rot:6deg"></i>
+        <i class="brand-sparkle brand-sparkle-triad brand-sparkle-triad-dul" style="--x:58%;--y:24%;--sz:11px;--dur:5s;--delay:-2.81s;--rot:-9deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
+        <i class="brand-sparkle brand-sparkle-pair" style="--x:64%;--y:48%;--sz:8px;--dur:5s;--delay:-1.56s;--rot:11deg"></i>
+        <i class="brand-sparkle brand-sparkle-triad brand-sparkle-triad-hl" style="--x:70%;--y:72%;--sz:11px;--dur:5s;--delay:-4.06s;--rot:-5deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
+        <i class="brand-sparkle" style="--x:76%;--y:30%;--sz:6px;--dur:5s;--delay:-0.94s;--rot:12deg"></i>
+        <i class="brand-sparkle brand-sparkle-pair" style="--x:81%;--y:56%;--sz:11px;--dur:5s;--delay:-3.44s;--rot:-10deg"></i>
+        <i class="brand-sparkle brand-sparkle-triad" style="--x:85%;--y:22%;--sz:11px;--dur:5s;--delay:-2.19s;--rot:3deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
+        <i class="brand-sparkle brand-sparkle-triad" style="--x:88%;--y:62%;--sz:11px;--dur:5s;--delay:-4.69s;--rot:10deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
+      </span>
       <span class="brand-logo" aria-hidden="true">
         <!-- Координаты затвора 0…31.875 — те же, что в frontend/logo.svg и brand-iris/geometry.js. -->
         <svg class="brand-mark" viewBox="0 0 31.875 31.875" fill="none" aria-hidden="true">
@@ -685,10 +1183,14 @@
           <path class="brand-blades" d="M8.32812 29.4688L7.26562 27.6094L14.0625 23.6875L13.3438 23.3281C12.5833 22.974 11.8229 22.599 11.0625 22.2031C10.3125 21.8073 9.57292 21.3958 8.84375 20.9688L0.34375 16.0625L1.40625 14.2188L8.3125 18.2031C8.22917 17.849 8.16146 17.4792 8.10938 17.0938C8.06771 16.7083 8.04688 16.3229 8.04688 15.9375V2.51562H10.1719V10.4531C10.9635 9.89062 11.7812 9.33854 12.625 8.79688C13.4792 8.25521 14.3333 7.73438 15.1875 7.23438L23.5469 2.40625L24.625 4.26562L17.8125 8.1875L18.125 8.3125C18.9479 8.69792 19.7656 9.10938 20.5781 9.54688C21.401 9.98438 22.2135 10.4323 23.0156 10.8906L31.5312 15.7969L30.4844 17.6562L23.5625 13.6719C23.6458 14.026 23.7083 14.3958 23.75 14.7812C23.8021 15.1562 23.8281 15.5417 23.8281 15.9375V29.3594H21.7188V21.4062C20.9167 21.9792 20.0885 22.5365 19.2344 23.0781C18.3906 23.6198 17.5312 24.1458 16.6562 24.6562L8.32812 29.4688ZM15.9375 21.7031C17 21.7031 17.9635 21.4427 18.8281 20.9219C19.7031 20.401 20.401 19.7083 20.9219 18.8438C21.4427 17.9688 21.7031 17 21.7031 15.9375C21.7031 14.875 21.4427 13.9115 20.9219 13.0469C20.401 12.1719 19.7031 11.474 18.8281 10.9531C17.9635 10.4323 17 10.1719 15.9375 10.1719C14.875 10.1719 13.9062 10.4323 13.0312 10.9531C12.1667 11.474 11.474 12.1719 10.9531 13.0469C10.4323 13.9115 10.1719 14.875 10.1719 15.9375C10.1719 17 10.4323 17.9688 10.9531 18.8438C11.474 19.7083 12.1667 20.401 13.0312 20.9219C13.9062 21.4427 14.875 21.7031 15.9375 21.7031ZM15.9375 31.875C13.7396 31.875 11.6771 31.4583 9.75 30.625C7.82292 29.8021 6.13021 28.6615 4.67188 27.2031C3.21354 25.7448 2.06771 24.0521 1.23438 22.125C0.411458 20.1979 0 18.1354 0 15.9375C0 13.7396 0.411458 11.6771 1.23438 9.75C2.06771 7.82292 3.21354 6.13021 4.67188 4.67188C6.13021 3.20312 7.82292 2.05729 9.75 1.23438C11.6771 0.411458 13.7396 0 15.9375 0C18.1354 0 20.1979 0.411458 22.125 1.23438C24.0521 2.05729 25.7448 3.20312 27.2031 4.67188C28.6615 6.13021 29.8021 7.82292 30.625 9.75C31.4583 11.6771 31.875 13.7396 31.875 15.9375C31.875 18.1354 31.4583 20.1979 30.625 22.125C29.8021 24.0521 28.6615 25.7448 27.2031 27.2031C25.7448 28.6615 24.0521 29.8021 22.125 30.625C20.1979 31.4583 18.1354 31.875 15.9375 31.875ZM15.9375 29.2188C17.7708 29.2188 19.4896 28.875 21.0938 28.1875C22.6979 27.5 24.1094 26.5469 25.3281 25.3281C26.5469 24.1094 27.5 22.6979 28.1875 21.0938C28.875 19.4896 29.2188 17.7708 29.2188 15.9375C29.2188 14.1042 28.875 12.3854 28.1875 10.7812C27.5 9.16667 26.5469 7.75521 25.3281 6.54688C24.1094 5.32812 22.6979 4.375 21.0938 3.6875C19.4896 3 17.7708 2.65625 15.9375 2.65625C14.1042 2.65625 12.3854 3 10.7812 3.6875C9.17708 4.375 7.76562 5.32812 6.54688 6.54688C5.32812 7.75521 4.375 9.16667 3.6875 10.7812C3 12.3854 2.65625 13.7396 2.65625 15.9375C2.65625 17.7708 3 19.4896 3.6875 21.0938C4.375 22.6979 5.32812 24.1094 6.54688 25.3281C7.76562 26.5469 9.17708 27.5 10.7812 28.1875C12.3854 28.875 14.1042 29.2188 15.9375 29.2188Z" fill="#9191F3"/>
         </svg>
       </span>
-      <span class="brand-name">Photo Metadata AI</span>
+      <span class="brand-wordmark">
+        <span class="brand-name">Photo Metadata AI</span>
+        <span class="brand-name-lit" aria-hidden="true">Photo Metadata AI</span>
+      </span>
+      </span>
     </a>
-    <a class="btn" href="index.html">← На главную</a>
-    <a class="btn btn-primary" href="https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.2.0/Photo-Metadata-AI-1.2.0-arm64.dmg"><svg class="apple" viewBox="0 0 384 512" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>Скачать</a>
+    <a class="btn btn-primary" href="https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.2.0/Photo-Metadata-AI-1.2.0-arm64.dmg">Скачать</a>
+    <a class="btn nav-home" href="index.html">← На главную</a>
   </div>
 </header>
 
@@ -699,7 +1201,7 @@
     <p class="lede">
       Полный путь от установки до готового CSV. Снято 11 августа 2026 года на macOS,
       сборка Photo Metadata AI 1.2.0-arm64. Нажмите на любой экран, чтобы открыть
-      в полном размере — листать можно стрелками.
+      в полном размере — листать можно стрелками и свайпом.
     </p>
   </div>
 
@@ -792,18 +1294,21 @@
     </button>
   </div>
   <div class="lb-body" id="lb-body">
-    <img class="lb-layer" src="" alt="">
-    <img class="lb-layer" src="" alt="" aria-hidden="true">
+    <div class="lb-stage" id="lb-stage">
+      <img class="lb-layer" src="" alt="">
+      <img class="lb-layer" src="" alt="" aria-hidden="true">
+    </div>
   </div>
   <p class="lb-caption" id="lb-caption"></p>
 </dialog>
 
-<script src="ambient-particle-flags.js"></script>
-<script src="brand-iris/geometry.js"></script>
-<script src="brand-iris/motion.js"></script>
-<script src="brand-iris/handoff.js"></script>
-<script src="brand-iris/presence.js"></script>
-<script src="brand-iris/init.js"></script>
+<script src="ambient-particle-flags.js?v=flags6"></script>
+<script src="brand-iris/geometry.js?v=spark7"></script>
+<script src="brand-iris/motion.js?v=spark7"></script>
+<script src="brand-iris/handoff.js?v=spark7"></script>
+<script src="brand-iris/presence.js?v=spark7"></script>
+<script src="brand-iris/init.js?v=spark7"></script>
+<script src="brand-sparkles.js?v=spark67"></script>
 <script src="header-swap.js"></script>
 <script>
   (function () {
@@ -819,10 +1324,124 @@
     var prev = document.getElementById('lb-prev');
     var next = document.getElementById('lb-next');
     var body = document.getElementById('lb-body');
+    var stage = document.getElementById('lb-stage');
     var current = 0;
     var active = 0;
     var token = 0;
     var reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    // Zoom/pan на .lb-stage (не на img — там translateX слайда).
+    var zoom = 1;
+    var panX = 0;
+    var panY = 0;
+    var MIN_ZOOM = 1;
+    var MAX_ZOOM = 4;
+    var TAP_ZOOM = 2;
+    var TAP_MS = 350;
+    var TAP_SLACK = 40;
+    var lastTapAt = 0;
+    var lastTapX = 0;
+    var lastTapY = 0;
+    var tapZoomTimer = 0;
+    var skipTap = false;
+
+    function applyStage() {
+      stage.style.transform =
+        'translate(' + panX.toFixed(1) + 'px,' + panY.toFixed(1) + 'px) scale(' + zoom.toFixed(3) + ')';
+    }
+
+    function clampPan() {
+      var maxX = Math.max(0, (body.clientWidth * (zoom - 1)) / 2);
+      var maxY = Math.max(0, (body.clientHeight * (zoom - 1)) / 2);
+      panX = Math.max(-maxX, Math.min(maxX, panX));
+      panY = Math.max(-maxY, Math.min(maxY, panY));
+    }
+
+    function stopTapZoomAnim() {
+      window.clearTimeout(tapZoomTimer);
+      stage.classList.remove('is-tap-zoom');
+      stage.style.transition = 'none';
+    }
+
+    function resetZoom() {
+      lastTapAt = 0;
+      skipTap = false;
+      stopTapZoomAnim();
+      zoom = 1;
+      panX = 0;
+      panY = 0;
+      applyStage();
+      clearDismiss();
+    }
+
+    function clearDismiss() {
+      dialog.classList.remove('is-dismissing');
+      dialog.style.transform = '';
+      dialog.style.opacity = '';
+    }
+
+    function setZoom(next) {
+      zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, next));
+      if (zoom <= 1.01) {
+        zoom = 1;
+        panX = 0;
+        panY = 0;
+      } else {
+        clampPan();
+      }
+      applyStage();
+    }
+
+    // Зум так, чтобы точка (x, y) в координатах окна осталась под пальцем.
+    function zoomToward(next, x, y) {
+      var rect = body.getBoundingClientRect();
+      var sx = x - (rect.left + rect.width / 2);
+      var sy = y - (rect.top + rect.height / 2);
+      var contentX = (sx - panX) / zoom;
+      var contentY = (sy - panY) / zoom;
+      zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, next));
+      if (zoom <= 1.01) {
+        zoom = 1;
+        panX = 0;
+        panY = 0;
+      } else {
+        panX = sx - contentX * zoom;
+        panY = sy - contentY * zoom;
+        clampPan();
+      }
+      applyStage();
+    }
+
+    function toggleTapZoom(x, y) {
+      if (!reduced.matches) {
+        stage.style.transition = '';
+        stage.classList.add('is-tap-zoom');
+        window.clearTimeout(tapZoomTimer);
+        tapZoomTimer = window.setTimeout(function () {
+          stage.classList.remove('is-tap-zoom');
+        }, 320);
+      }
+      if (zoom > 1.05) zoomToward(1, x, y);
+      else zoomToward(TAP_ZOOM, x, y);
+    }
+
+    function onPossibleTap(x, y) {
+      if (skipTap) {
+        skipTap = false;
+        return;
+      }
+      var now = Date.now();
+      var dt = now - lastTapAt;
+      var dist = Math.sqrt((x - lastTapX) * (x - lastTapX) + (y - lastTapY) * (y - lastTapY));
+      if (lastTapAt && dt < TAP_MS && dist < TAP_SLACK) {
+        lastTapAt = 0;
+        toggleTapZoom(x, y);
+        return;
+      }
+      lastTapAt = now;
+      lastTapX = x;
+      lastTapY = y;
+    }
 
     // Дистанция сдвига — ширина области просмотра: кадр уезжает ровно за край.
     function updateShift() {
@@ -866,6 +1485,7 @@
       var outgoing = layers[active];
       var mine = ++token;
       current = index;
+      resetZoom();
 
       if (!direction || reduced.matches) {
         // Первое открытие: показываем сразу в активном слое, без перехода.
@@ -961,6 +1581,261 @@
       if (event.key === 'ArrowLeft') { event.preventDefault(); go(-1); }
     });
 
+    // Колесо / трекпад: горизонталь — кадры, вниз — закрыть, ctrl — pinch-zoom.
+    // Пауза ~длина анимации, иначе один жест трекпада пролистывает пачку.
+    var wheelLockUntil = 0;
+    dialog.addEventListener('wheel', function (event) {
+      if (!dialog.open) return;
+      event.preventDefault();
+
+      // Pinch на трекпаде приходит как wheel + ctrlKey.
+      if (event.ctrlKey) {
+        setZoom(zoom * Math.exp(-event.deltaY * 0.01));
+        return;
+      }
+
+      // Уже увеличено — колесо панорамирует, не листает и не закрывает.
+      if (zoom > 1.05) {
+        panX -= event.deltaX;
+        panY -= event.deltaY;
+        clampPan();
+        applyStage();
+        return;
+      }
+
+      var dx = event.deltaX;
+      var dy = event.deltaY;
+      if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return;
+      var now = Date.now();
+      if (now < wheelLockUntil) return;
+      wheelLockUntil = now + 480;
+
+      if (Math.abs(dx) > Math.abs(dy)) {
+        go(dx > 0 ? 1 : -1);
+      } else if (dy > 0) {
+        dialog.close();
+      } else {
+        go(-1);
+      }
+    }, { passive: false });
+
+    // Жесты на кадре.
+    // Тач — через Touch Events: на iOS Pointer Events + setPointerCapture
+    // ломают второй палец (pinch не начинается). Мышь — pointer events.
+    var gesture = null; // 'nav' | 'dismiss' | 'pan' | 'pinch'
+    var startX = 0;
+    var startY = 0;
+    var startPanX = 0;
+    var startPanY = 0;
+    var pinchStartDist = 0;
+    var pinchStartZoom = 1;
+    var dismissDy = 0;
+    var mouseDrag = false;
+
+    function distOf(a, b) {
+      var dx = a.clientX - b.clientX;
+      var dy = a.clientY - b.clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    function beginOneFinger(x, y) {
+      stopTapZoomAnim();
+      startX = x;
+      startY = y;
+      startPanX = panX;
+      startPanY = panY;
+      dismissDy = 0;
+      gesture = zoom > 1.05 ? 'pan' : null;
+    }
+
+    function moveOneFinger(x, y) {
+      var dx = x - startX;
+      var dy = y - startY;
+
+      if (gesture === 'pan' || (zoom > 1.05 && gesture !== 'dismiss' && gesture !== 'nav')) {
+        gesture = 'pan';
+        if (Math.abs(dx) >= 10 || Math.abs(dy) >= 10) {
+          lastTapAt = 0;
+          skipTap = false;
+        }
+        panX = startPanX + dx;
+        panY = startPanY + dy;
+        clampPan();
+        applyStage();
+        return;
+      }
+
+      if (!gesture) {
+        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+        lastTapAt = 0;
+        if (dy > 0 && dy >= Math.abs(dx) * 1.1) gesture = 'dismiss';
+        else if (Math.abs(dx) >= Math.abs(dy) * 1.1) gesture = 'nav';
+        else if (dy > 0) gesture = 'dismiss';
+        else gesture = 'nav';
+      }
+
+      if (gesture === 'dismiss') {
+        dismissDy = Math.max(0, dy);
+        dialog.classList.add('is-dismissing');
+        dialog.style.transform = 'translateY(' + dismissDy.toFixed(1) + 'px)';
+        dialog.style.opacity = String(Math.max(0.35, 1 - dismissDy / 420));
+      }
+    }
+
+    function endOneFinger(x, y) {
+      var dx = x - startX;
+      var dy = y - startY;
+      var mode = gesture;
+      var isTap = Math.abs(dx) < 10 && Math.abs(dy) < 10;
+      gesture = null;
+
+      if (mode === 'pinch') return;
+
+      // Пан с почти нулевым сдвигом — это тап (иначе при зуме > 1
+      // beginOneFinger ставит 'pan' и двойной тап никогда не срабатывает).
+      if (mode === 'pan') {
+        if (isTap) onPossibleTap(x, y);
+        return;
+      }
+
+      if (mode === 'dismiss') {
+        var shouldClose = dismissDy > 110 || (dismissDy > 56 && dy > 0);
+        dismissDy = 0;
+        dialog.classList.remove('is-dismissing');
+        if (shouldClose) {
+          dialog.style.transform = '';
+          dialog.style.opacity = '';
+          dialog.close();
+          return;
+        }
+        if (reduced.matches) {
+          dialog.style.transform = '';
+          dialog.style.opacity = '';
+        } else {
+          dialog.style.transition = 'transform .28s ease, opacity .28s ease';
+          dialog.style.transform = 'translateY(0)';
+          dialog.style.opacity = '1';
+          window.setTimeout(function () {
+            dialog.style.transition = '';
+            dialog.style.transform = '';
+            dialog.style.opacity = '';
+          }, 300);
+        }
+        return;
+      }
+
+      if (mode === 'nav') {
+        if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+        go(dx < 0 ? 1 : -1);
+        return;
+      }
+
+      if (isTap) onPossibleTap(x, y);
+    }
+
+    // —— Touch (iOS / Android): надёжный мультитач ——
+    // capture: true — до того, как кто-то ещё съест событие.
+    body.addEventListener('touchstart', function (event) {
+      if (!dialog.open) return;
+      var touches = event.touches;
+      if (touches.length >= 2) {
+        event.preventDefault();
+        lastTapAt = 0;
+        stopTapZoomAnim();
+        gesture = 'pinch';
+        clearDismiss();
+        pinchStartDist = Math.max(1, distOf(touches[0], touches[1]));
+        pinchStartZoom = zoom;
+        return;
+      }
+      if (touches.length === 1) {
+        beginOneFinger(touches[0].clientX, touches[0].clientY);
+      }
+    }, { passive: false, capture: true });
+
+    body.addEventListener('touchmove', function (event) {
+      if (!dialog.open) return;
+      event.preventDefault(); // иначе Safari зумит всю страницу
+      var touches = event.touches;
+
+      if (touches.length >= 2) {
+        if (gesture !== 'pinch') {
+          lastTapAt = 0;
+          stopTapZoomAnim();
+          gesture = 'pinch';
+          clearDismiss();
+          pinchStartDist = Math.max(1, distOf(touches[0], touches[1]));
+          pinchStartZoom = zoom;
+        }
+        var dist = Math.max(1, distOf(touches[0], touches[1]));
+        setZoom(pinchStartZoom * (dist / pinchStartDist));
+        return;
+      }
+
+      if (touches.length === 1 && gesture !== 'pinch') {
+        moveOneFinger(touches[0].clientX, touches[0].clientY);
+      }
+    }, { passive: false, capture: true });
+
+    body.addEventListener('touchend', function (event) {
+      if (!dialog.open) return;
+      var touches = event.touches;
+
+      if (gesture === 'pinch') {
+        if (touches.length >= 2) return;
+        lastTapAt = 0;
+        // Остался один палец — дальше пан; его подъём не считать тапом.
+        if (touches.length === 1) {
+          skipTap = true;
+          beginOneFinger(touches[0].clientX, touches[0].clientY);
+          gesture = zoom > 1.05 ? 'pan' : null;
+        } else {
+          gesture = null;
+        }
+        return;
+      }
+
+      if (touches.length > 0) return;
+      var ended = event.changedTouches[0];
+      if (ended) endOneFinger(ended.clientX, ended.clientY);
+    }, { passive: false, capture: true });
+
+    body.addEventListener('touchcancel', function () {
+      gesture = null;
+      dismissDy = 0;
+      lastTapAt = 0;
+      skipTap = false;
+      clearDismiss();
+    }, { passive: true, capture: true });
+
+    // Старый Safari: нативный gesture* зумит документ поверх нашего pinch.
+    ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (name) {
+      dialog.addEventListener(name, function (event) {
+        if (dialog.open) event.preventDefault();
+      });
+    });
+
+    // —— Мышь (десктоп без тача): drag для nav/dismiss/pan ——
+    body.addEventListener('pointerdown', function (event) {
+      if (!dialog.open || event.pointerType !== 'mouse' || event.button !== 0) return;
+      mouseDrag = true;
+      beginOneFinger(event.clientX, event.clientY);
+      try { body.setPointerCapture(event.pointerId); } catch (err) { /* ignore */ }
+    });
+
+    body.addEventListener('pointermove', function (event) {
+      if (!mouseDrag || event.pointerType !== 'mouse') return;
+      moveOneFinger(event.clientX, event.clientY);
+    });
+
+    function endMouse(event) {
+      if (!mouseDrag || event.pointerType !== 'mouse') return;
+      mouseDrag = false;
+      endOneFinger(event.clientX, event.clientY);
+    }
+    body.addEventListener('pointerup', endMouse);
+    body.addEventListener('pointercancel', endMouse);
+
     // Клик по подложке вокруг картинки закрывает окно.
     dialog.addEventListener('click', function (event) {
       if (event.target === dialog) dialog.close();
@@ -970,6 +1845,9 @@
     // Раз закрытие с клавиатуры, :focus-visible оставляет обводку и «Открыть».
     // Снимаем фокус после restore (он может быть чуть позже close).
     dialog.addEventListener('close', function () {
+      mouseDrag = false;
+      gesture = null;
+      resetZoom();
       queueMicrotask(function () {
         var el = document.activeElement;
         if (el && items.indexOf(el) !== -1) el.blur();
@@ -1094,7 +1972,7 @@
   // Частица движется по плавной неповторяющейся кривой поверх всей страницы.
   // Координаты — в пространстве документа: при скролле пятно уезжает вместе со страницей,
   // а не «висит» в viewport. Становится прозрачной над контентом и реагирует на мышь.
-  // Флаги ENABLE_* — в ambient-particle-flags.js, ключ 'screens' (отдельно от index).
+  // Флаги ENABLE_* и BRAND_SPARKLES_INTRO/WORKING — в ambient-particle-flags.js, ключ 'screens'.
   (function () {
     var particleFlags = getLandingParticleFlags('screens');
     var ENABLE_AMBIENT_PARTICLE = particleFlags.ENABLE_AMBIENT_PARTICLE;
@@ -1105,6 +1983,11 @@
       return;
     }
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    // На телефоне частица только грузит main thread во время скролла.
+    if (window.matchMedia('(hover: none), (pointer: coarse)').matches) {
+      if (particle) particle.remove();
+      return;
+    }
     if (!particle) return;
 
     // pageX/pageY — логическая позиция в документе. viewX/viewY — client-координаты

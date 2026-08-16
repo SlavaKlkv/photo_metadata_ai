@@ -1,0 +1,22 @@
+Copyright (c) 2026 Photo Metadata AI
+All rights reserved.
+
+This repository is source-available under a proprietary license. It is not
+an OSI-approved open source license.
+
+Permission is granted to view and download the source code solely for
+inspection and security review.
+
+Permission is NOT granted to:
+
+- use the source code, or substantial portions of it, in any software,
+  service, product, or derivative work;
+- modify, adapt, or create derivative works based on the source code for
+  distribution or reuse;
+- redistribute the source code or derivative works;
+- remove or alter this copyright notice.
+
+Third-party dependencies remain under their own licenses.
+
+The compiled application is governed by TERMS.md (and the Terms page on
+the project site), not by this file alone.

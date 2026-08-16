@@ -14,7 +14,7 @@ AI анализирует каждый кадр, генерирует полны
 [![Python](https://img.shields.io/badge/Python-3.11%2B-6f6ce4?style=flat-square&logo=python&logoColor=white)](backend/)
 [![React](https://img.shields.io/badge/React-18%20%2B%20TS-6f6ce4?style=flat-square&logo=react&logoColor=white)](frontend/)
 [![Electron](https://img.shields.io/badge/Electron-33-6f6ce4?style=flat-square&logo=electron&logoColor=white)](desktop/)
-[![License](https://img.shields.io/badge/license-MIT-6f6ce4?style=flat-square)](#лицензия)
+[![License](https://img.shields.io/badge/license-Source--available-6f6ce4?style=flat-square)](#лицензия)
 
 [**Страница проекта**](https://slavaklkv.github.io/photo_metadata_ai/landing/) ·
 [Все экраны](https://slavaklkv.github.io/photo_metadata_ai/landing/screens.html) ·
@@ -256,7 +256,7 @@ desktop/scripts/build-mac.sh     # полная сборка macOS: .app и .dmg
 
 > [!IMPORTANT]
 > Приложение не нотаризовано, поэтому macOS помечает скачанный файл карантином.
-> Открыть его из браузера можно только после проверки системой, сразу - через Finder. 
+> Открыть его из браузера можно только после проверки системой, сразу — через Finder.
 > Порядок первого запуска:
 > 1. Открыть `.dmg` и перетащить приложение в `Applications`.
 >    Разрешение Gatekeeper выдаётся конкретному экземпляру: если запустить и разрешить
@@ -277,4 +277,14 @@ desktop/scripts/build-mac.sh     # полная сборка macOS: .app и .dmg
 
 ## Лицензия
 
-MIT
+Source available, not open source. Copyright (c) 2026 Photo Metadata AI. All rights reserved.
+
+- Исходный код: просмотр и аудит — разрешены; использование, производные работы и распространение исходников — запрещены. Полный текст: [LICENSE](LICENSE).
+- Скомпилированное приложение: [TERMS.md](TERMS.md).
+- Ранее репозиторий заявлялся как MIT; актуальные условия — в `LICENSE` и `TERMS.md`.
+
+## Credits
+
+**Contributors:** [Nastassja](https://github.com/nastassja-dev), [Konstantin Borodich](https://github.com/KoBorodich)
+
+

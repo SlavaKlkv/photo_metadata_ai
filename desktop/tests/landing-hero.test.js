@@ -134,7 +134,7 @@ test('летающая частица — небольшая искра со с�
   const particleCss = html.match(/\.ambient-particle\s*\{([^}]*)\}/);
 
   expect(html).toContain('class="ambient-particle"');
-  expect(html).toContain('src="ambient-particle-flags.js"');
+  expect(html).toMatch(/src="ambient-particle-flags\.js\?v=[^"]+"/);
   expect(html).toContain('.ambient-particle.is-dimmed');
   expect(html).toContain('.ambient-particle.is-near-cursor');
   expect(html).toContain('.ambient-particle.is-impulsed');
@@ -161,16 +161,27 @@ test('летающая частица — небольшая искра со с�
   // Переключатели в общем файле, значения отдельно для index / screens.
   expect(flags).toContain('LANDING_PARTICLE_FLAGS');
   expect(flags).toContain('function getLandingParticleFlags');
-  expect(flags).toMatch(/index:\s*\{[\s\S]*?ENABLE_AMBIENT_PARTICLE:\s*true/);
+  expect(flags).toMatch(/index:\s*\{[\s\S]*?ENABLE_AMBIENT_PARTICLE:\s*false/);
   expect(flags).toMatch(/index:\s*\{[\s\S]*?ENABLE_HOVER_ATTRACTION:\s*false/);
-  expect(flags).toMatch(/screens:\s*\{[\s\S]*?ENABLE_AMBIENT_PARTICLE:\s*true/);
+  expect(flags).toMatch(/index:\s*\{[\s\S]*?ENABLE_BRAND_SPARKLES:\s*true/);
+  expect(flags).toMatch(/index:\s*\{[\s\S]*?BRAND_SPARKLES_INTRO:\s*false/);
+  expect(flags).toMatch(
+    /index:\s*\{[\s\S]*?BRAND_SPARKLES_WORKING:\s*'twinkle-pairs'/
+  );
+  expect(flags).toMatch(/screens:\s*\{[\s\S]*?ENABLE_AMBIENT_PARTICLE:\s*false/);
   expect(flags).toMatch(/screens:\s*\{[\s\S]*?ENABLE_HOVER_ATTRACTION:\s*false/);
+  expect(flags).toMatch(/screens:\s*\{[\s\S]*?ENABLE_BRAND_SPARKLES:\s*true/);
+  expect(flags).toMatch(/screens:\s*\{[\s\S]*?BRAND_SPARKLES_INTRO:\s*false/);
+  expect(flags).toMatch(
+    /screens:\s*\{[\s\S]*?BRAND_SPARKLES_WORKING:\s*'twinkle-pairs'/
+  );
   expect(html).toContain("getLandingParticleFlags('index')");
   expect(html).toContain('if (!ENABLE_AMBIENT_PARTICLE)');
   expect(html).toContain('particle.remove()');
   // Дефолты флагов не захардкожены в HTML — только в shared-файле.
   expect(html).not.toMatch(/ENABLE_AMBIENT_PARTICLE:\s*(?:true|false)/);
   expect(html).not.toMatch(/ENABLE_HOVER_ATTRACTION:\s*(?:true|false)/);
+  expect(html).not.toMatch(/ENABLE_BRAND_SPARKLES:\s*(?:true|false)/);
 });
 
 test('обе страницы лендинга подключают общий файл флагов и выбирают свой ключ', () => {
@@ -178,8 +189,10 @@ test('обе страницы лендинга подключают общий �
   const indexHtml = fs.readFileSync(path.join(landingDir, 'index.html'), 'utf8');
   const screensHtml = fs.readFileSync(path.join(landingDir, 'screens.html'), 'utf8');
 
-  expect(indexHtml).toContain('src="ambient-particle-flags.js"');
-  expect(screensHtml).toContain('src="ambient-particle-flags.js"');
+  // Версия в query обязательна: без неё телефон держит в кеше старые значения
+  // флагов, и правка «включить искры» на устройстве не применяется.
+  expect(indexHtml).toMatch(/src="ambient-particle-flags\.js\?v=[^"]+"/);
+  expect(screensHtml).toMatch(/src="ambient-particle-flags\.js\?v=[^"]+"/);
   expect(indexHtml).toContain("getLandingParticleFlags('index')");
   expect(screensHtml).toContain("getLandingParticleFlags('screens')");
   expect(fs.existsSync(path.join(landingDir, 'ambient-particle-flags.js'))).toBe(true);
@@ -550,19 +563,32 @@ test('мокап масштабируется вместе с колонкой �
   expect(Number.parseFloat(min)).toBeLessThanOrEqual(0.74);
 });
 
-test('на узком экране список Results короче, чтобы не наезжать на полосу шагов', () => {
+test('hero-мокап подгоняет шкалу, блок выбранных и целые строки под кадр', () => {
   const html = fs.readFileSync(landingPath, 'utf8');
-  // Блоков @media (max-width: 720px) в стилях несколько; нужен тот, где hero
-  // сворачивается в одну колонку и Metadata Preview прячется.
+
+  // Фиксированный nth-child больше не режет список — число строк считает fitMock.
   const narrow = [...html.matchAll(/@media \(max-width: 720px\)\s*\{([\s\S]*?)\n {2}\}/g)]
     .map(([, body]) => body)
     .find((body) => body.includes('.mock-preview { display: none; }'));
 
   expect(narrow).toBeDefined();
-  expect(narrow).toMatch(/\.mock-row:nth-child\(n\+6\)\s*\{\s*display:\s*none/);
-  // Выбранная строка — четвёртая, она должна остаться видимой.
+  expect(narrow).not.toMatch(/\.mock-row:nth-child\(n\+6\)/);
+
+  // 1) Шаги без подписей, 2) футер выбранных скрыт, 3) только целые строки.
+  expect(html).toMatch(/\.mock\.mock-steps-compact \.mock-steps > span:not\(\.mock-action\)/);
+  expect(html).toMatch(/\.mock\.mock-foot-hidden \.mock-foot\s*\{\s*display:\s*none/);
+  expect(html).toMatch(
+    /\.mock\.mock-fitted \.mock-rows\s*\{[^}]*align-content:\s*space-evenly/s,
+  );
+  expect(html).toContain('new ResizeObserver(scheduleFit)');
+  expect(html).toContain('mock-steps-compact');
+  expect(html).toContain('mock-foot-hidden');
+  expect(html).toContain('setVisibleRows');
+  expect(html).toContain('footBlock');
+  expect(html).toContain('align-content: space-evenly');
+  // Выбранная строка — четвёртая: окно видимости сдвигается, чтобы она осталась.
   const rows = [...html.matchAll(/<div class="mock-row( on)?">/g)];
-  expect(rows.findIndex(([, on]) => on)).toBeLessThan(5);
+  expect(rows.findIndex(([, on]) => on)).toBe(3);
 });
 
 test('hero-мокап имеет отдельные слои для перспективы, плавания и реакции на курсор', () => {
@@ -577,6 +603,18 @@ test('hero-мокап имеет отдельные слои для перспе
   expect(html).toContain('@keyframes mock-float');
   expect(html).toContain("stage.style.setProperty('--tilt-x'");
   expect(html).toContain("stage.style.setProperty('--tilt-y'");
+});
+
+test('scroll-parallax мокапа не анимирует transform через CSS transition', () => {
+  const html = fs.readFileSync(landingPath, 'utf8');
+  const stage = html.match(/\n {2}\.mock-stage\s*\{([\s\S]*?)\n {2}\}/);
+
+  expect(stage).not.toBeNull();
+  // transition на transform + --py на каждом кадре скролла = рывки на таче.
+  expect(stage[1]).not.toMatch(/transition:\s*transform/);
+  // Плавный возврат tilt — только на pointerleave, не в базовом CSS.
+  expect(html).toContain("stage.style.transition = TILT_EASE");
+  expect(html).toContain("stage.style.setProperty('--py'");
 });
 
 test('reduced motion отключает движение, но сохраняет боковую перспективу', () => {
