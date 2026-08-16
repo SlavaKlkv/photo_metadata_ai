@@ -64,16 +64,15 @@ test('кнопки .dmg: текст «Скачать»; Apple нет; в фин�
   expect(dmgInners(screensHtml)[0].trim()).toBe('Скачать');
 });
 
-test('финальный CTA предлагает скачать DMG и открыть репозиторий', () => {
+test('финальный CTA не дублирует ссылку на исходный код из футера', () => {
   const html = readLanding();
   const final = html.match(/<!-- FINAL CTA -->([\s\S]*?)<\/main>/);
 
   expect(final).not.toBeNull();
   expect(final[1]).toContain('id="final-cta"');
   expect(final[1]).toContain(dmgUrl);
-  expect(final[1]).toContain('href="https://github.com/SlavaKlkv/photo_metadata_ai"');
-  expect(final[1]).toMatch(/target="_blank"/);
-  expect(final[1]).toMatch(/rel="noopener"/);
+  expect(final[1]).not.toContain('href="https://github.com/SlavaKlkv/photo_metadata_ai"');
+  expect(final[1]).not.toMatch(/Смотреть на GitHub/);
 });
 
 test('строка площадок называет Adobe Stock, Shutterstock и Getty Images', () => {
