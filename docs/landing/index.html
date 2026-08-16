@@ -3114,7 +3114,7 @@
     opacity: 0;
     transform: translateY(12px) scale(.9);
     pointer-events: none;
-    transition: opacity .25s ease, transform .25s cubic-bezier(.22, .8, .3, 1), border-color .18s ease;
+    transition: opacity .25s ease, transform .25s cubic-bezier(.22, .8, .3, 1), border-color .18s ease, bottom .25s ease;
   }
   .to-top.show { opacity: 1; transform: none; pointer-events: auto; }
   .to-top:hover { border-color: rgba(139, 136, 248, 0.5); }
@@ -4391,6 +4391,11 @@ ollama pull qwen2.5vl</code></pre>
   // поэтому считаем их в одном обработчике.
   (function () {
     var header = document.querySelector('header');
+    var footer = document.querySelector('footer');
+    var defaultBottom = 22;
+    var btnSize = 42;
+    var btnRight = 22;
+    var gap = 12;
 
     var toTop = document.createElement('button');
     toTop.type = 'button';
@@ -4401,17 +4406,61 @@ ollama pull qwen2.5vl</code></pre>
     toTop.addEventListener('click', function () {
       var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' });
+      toTop.blur();
     });
     document.body.appendChild(toTop);
 
     var ticking = false;
 
+    function rectsOverlap(a, b) {
+      return !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom);
+    }
+
+    // Любой видимый текст в футере — через client rects текстовых узлов.
+    function footerTextOverlaps(btnRect) {
+      if (!footer) return false;
+      var walker = document.createTreeWalker(footer, NodeFilter.SHOW_TEXT);
+      var node;
+      while ((node = walker.nextNode())) {
+        if (!/\S/.test(node.nodeValue)) continue;
+        var range = document.createRange();
+        range.selectNodeContents(node);
+        var list = range.getClientRects();
+        for (var i = 0; i < list.length; i++) {
+          if (rectsOverlap(btnRect, list[i])) return true;
+        }
+      }
+      return false;
+    }
+
     function update() {
       var y = window.scrollY;
+      var vh = window.innerHeight;
+      var vw = window.innerWidth;
 
       if (header) header.classList.toggle('stuck', y > 8);
       // Кнопка появляется, когда первый экран уже пролистан.
-      toTop.classList.toggle('show', y > window.innerHeight * 0.9);
+      toTop.classList.toggle('show', y > vh * 0.9);
+
+      // У низа: зеркально под полосой, если там нет текста; иначе над полосой.
+      var bottom = defaultBottom;
+      if (footer) {
+        var fr = footer.getBoundingClientRect();
+        if (fr.top < vh - defaultBottom) {
+          var below = vh - fr.top - gap - btnSize;
+          var belowRect = {
+            left: vw - btnRight - btnSize,
+            right: vw - btnRight,
+            top: vh - below - btnSize,
+            bottom: vh - below
+          };
+          var target = footerTextOverlaps(belowRect)
+            ? (vh - fr.top + gap)
+            : below;
+          bottom = Math.max(defaultBottom, target);
+        }
+      }
+      toTop.style.bottom = bottom + 'px';
     }
 
     window.addEventListener('scroll', function () {
