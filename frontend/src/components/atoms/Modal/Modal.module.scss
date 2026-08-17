@@ -7,11 +7,13 @@
   background-color: rgba(0, 0, 0, 0.75); /* было var(--bg-secondary) — перекрывало всё непрозрачным */
   backdrop-filter: blur(1px);
   display: flex;
+  /* статус и остальные модалки всегда по центру вьюпорта — даже в
+     низком окне Electron (полезная высота часто < 620 при minHeight 640) */
   align-items: center;
   justify-content: center;
   z-index: var(--z-modal-backdrop);
   animation: fadeIn var(--transition-fast);
-  /* в низком окне модалка не должна уезжать за край — оверлей
+  /* в низком окне высокая модалка не должна уезжать за край — оверлей
      прокручивается, отступы гарантируют видимые границы */
   padding: var(--spacing-lg);
   overflow-y: auto;
@@ -27,9 +29,13 @@
   animation: slideUp var(--transition-normal);
   max-height: 100%;
   overflow-y: auto;
+  /* вместе с flex-центром держит диалог посредине, когда оверлей
+     выше контента или сам начинает скроллиться */
+  margin: auto;
+  flex-shrink: 0;
 }
 
-  .md {
+.md {
   max-width: 480px;
 }
 
@@ -40,7 +46,6 @@
 @media (max-width: 620px), (max-height: 620px) {
   .overlay {
     padding: var(--spacing-sm);
-    align-items: flex-start;
   }
 
   .modal {
