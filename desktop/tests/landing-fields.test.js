@@ -13,6 +13,18 @@ function fieldsSection(html) {
   return html.match(/<!-- FIELDS -->([\s\S]*?)<!-- MAPPING -->/);
 }
 
+function styleSheet(html) {
+  return html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
+}
+
+// Одно и то же условие встречается в файле не раз, поэтому склеиваем все
+// блоки с ним: правило может лежать в любом из них.
+function mediaBlock(css, condition) {
+  const escaped = condition.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const blocks = [...css.matchAll(new RegExp(`@media ${escaped} \\{([\\s\\S]*?)\\n  \\}`, 'g'))];
+  return blocks.length ? blocks.map((m) => m[1]).join('\n') : null;
+}
+
 const FIELD_GROUPS = {
   text: ['title', 'description', 'keywords'],
   classification: [
@@ -121,4 +133,62 @@ test('поля связаны с группами орбиты: hover стопи
     /139,\s*136,\s*248|170,\s*168,\s*255|129,\s*125,\s*240/,
   );
   expect(css).toMatch(/\.field-cloud span\s*\{[^}]*transition:/s);
+});
+
+test('ниже 1000px лучи и фоновая подсветка групп уходят вместе', () => {
+  const css = styleSheet(readLanding());
+  const narrow = mediaBlock(css, '(max-width: 1000px)');
+
+  expect(narrow).not.toBeNull();
+  // Луч в 31% орбиты дотягивается до подписи, только пока орбита держит
+  // проектные 960px. Ниже — лучи режут круг, поэтому уходят вместе с ореолом.
+  expect(narrow).toMatch(/\.metadata-ray\s*\{\s*display:\s*none;?\s*\}/);
+  // content: none снимает псевдоэлемент целиком, поэтому и автоцикл, и
+  // подсветка от pill остаются без фона — opacity в других правилах не оживит.
+  expect(narrow).toMatch(/\.metadata-node::before\s*\{\s*content:\s*none;?\s*\}/);
+  // Исчезновение декора не должно перестраивать диаграмму.
+  expect(narrow).not.toMatch(/\.metadata-orbit\s*\{[^}]*display:\s*grid/s);
+  expect(narrow).not.toMatch(/\.metadata-core\s*\{[^}]*order:/s);
+  // Орбита сжимается вместе с окном, иначе подписи уезжают к краям колонки.
+  expect(narrow).toMatch(/\.metadata-orbit\s*\{[^}]*width:\s*min\(100%, 720px\)/s);
+
+  // Порог по ширине, а не по типу ввода: ландшафт телефона шире 720px, а
+  // тач-планшет шире 1000px должен получать ту же радиальную схему, что и десктоп.
+  const touch = mediaBlock(css, '(hover: none), (pointer: coarse)');
+  expect(touch).not.toMatch(/\.metadata-ray|\.metadata-node/);
+
+  // Буквы по-прежнему подсвечиваются: цикл заголовка не выключаем.
+  expect(narrow).not.toMatch(/\.metadata-node h3\s*\{[^}]*animation/s);
+  expect(css).toMatch(/\.metadata-node h3\s*\{[^}]*animation:\s*metadata-label-glow/s);
+});
+
+test('круг 17 полей центрирован в обеих раскладках орбиты', () => {
+  const css = styleSheet(readLanding());
+  const core = css.match(/\n  \.metadata-core\s*\{([^}]*)\}/);
+  const compact = mediaBlock(css, '(max-width: 720px)');
+
+  expect(core).not.toBeNull();
+  expect(core[1]).toMatch(/left:\s*50%/);
+  expect(core[1]).toMatch(/transform:\s*var\(--metadata-core-final-transform\)/);
+  expect(core[1]).toMatch(/--metadata-core-final-transform:\s*translate\(-50%,\s*-50%\)/);
+
+  // В сетке ядро занимает всю строку и центрируется автомаргинами.
+  expect(compact).toMatch(/\.metadata-core\s*\{[^}]*grid-column:\s*1 \/ -1/s);
+  expect(compact).toMatch(/\.metadata-core\s*\{[^}]*margin:\s*\d+px auto/s);
+
+  // Подписи держатся вокруг центра: колонки по ширине контента, а не 1fr 1fr
+  // во всю ширину — иначе круг остаётся один посреди пустоты.
+  expect(compact).toMatch(
+    /\.metadata-orbit\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, max-content\)\)/s,
+  );
+  expect(compact).toMatch(/\.metadata-orbit\s*\{[^}]*justify-content:\s*center/s);
+
+  // При столкновении подписей схема не меняется: верхняя пара, круг, нижняя пара.
+  expect(compact).toMatch(/\.metadata-core\s*\{[^}]*order:\s*2/s);
+  expect(compact).toMatch(
+    /\.metadata-node:nth-of-type\(2\), \.metadata-node:nth-of-type\(3\)\s*\{\s*order:\s*1/,
+  );
+  expect(compact).toMatch(
+    /\.metadata-node:nth-of-type\(4\), \.metadata-node:nth-of-type\(5\)\s*\{\s*order:\s*3/,
+  );
 });

@@ -2616,12 +2616,17 @@
     78% { color: var(--text); text-shadow: none; }
   }
 
+  /* Когда фиксированные подписи начинают упираться в круг, раскладываем ту
+     же схему в три ряда: верхняя пара, круг по центру, нижняя пара. */
   @media (max-width: 720px) {
     .metadata-orbit {
       height: auto;
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 28px 18px;
+      /* Колонки по ширине подписей и по центру: на 1fr 1fr они разъезжались
+         к краям колонки, и круг оставался один посреди пустоты. */
+      grid-template-columns: repeat(2, minmax(0, max-content));
+      justify-content: center;
+      gap: 28px 44px;
       margin-top: 38px;
     }
     .metadata-core {
@@ -2630,13 +2635,13 @@
       top: auto;
       left: auto;
       grid-column: 1 / -1;
+      order: 2;
       width: 132px;
       height: 132px;
-      margin: 0 auto 12px;
+      margin: 6px auto;
       transform: none;
     }
     .metadata-core strong { font-size: 46px; }
-    .metadata-ray { display: none; }
     .metadata-node,
     .metadata-node:nth-of-type(2), .metadata-node:nth-of-type(3),
     .metadata-node:nth-of-type(4), .metadata-node:nth-of-type(5) {
@@ -2645,6 +2650,8 @@
       width: auto;
       text-align: left;
     }
+    .metadata-node:nth-of-type(2), .metadata-node:nth-of-type(3) { order: 1; }
+    .metadata-node:nth-of-type(4), .metadata-node:nth-of-type(5) { order: 3; }
     .metadata-node h3 { font-size: 16px; }
     .reveal .metadata-core { transform: scale(.82); }
   }
@@ -3168,6 +3175,13 @@
   }
 
   @media (max-width: 1000px) {
+    /* Когда лучи перестают попадать в подписи, убираем их вместе с фоновыми
+       ореолами, но не меняем радиальную схему. Орбита при этом сжимается
+       вместе с окном: иначе подписи уезжают к краям колонки, а круг остаётся
+       один посреди пустоты. */
+    .metadata-orbit { width: min(100%, 720px); }
+    .metadata-ray { display: none; }
+    .metadata-node::before { content: none; }
     /* Мокап под текстом: в узкой колонке его подписи становятся нечитаемы. */
     .hero-grid { grid-template-columns: 1fr; gap: 46px; }
     .hero-copy { max-width: 62ch; }
