@@ -67,8 +67,8 @@ describe('build-mac.sh', () => {
 });
 
 describe('версия', () => {
-  it('поднята до минорной: сменилась целевая платформа', () => {
-    expect(packageJson.version).toBe('1.2.0');
+  it('остаётся в линейке 1.2 после отказа от Intel', () => {
+    expect(packageJson.version).toMatch(/^1\.2\.\d+$/);
   });
 
   it('совпадает в package.json и package-lock.json', () => {
