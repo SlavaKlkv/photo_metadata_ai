@@ -163,11 +163,13 @@ describe('мета-данные страницы', () => {
     },
   );
 
-  test('favicon-48.png — квадрат 48×48', () => {
+  test('favicon-48.png — прозрачная RGBA-метка 48×48', () => {
     const buf = fs.readFileSync(path.join(landingDir, 'favicon-48.png'));
     // IHDR: width/height — big-endian uint32 сразу после сигнатуры PNG + chunk header.
     expect(buf.readUInt32BE(16)).toBe(48);
     expect(buf.readUInt32BE(20)).toBe(48);
+    // Color type 6 — RGBA: фон остаётся прозрачным, без desktop-плитки.
+    expect(buf.readUInt8(25)).toBe(6);
   });
 
   test('главная объявляет canonical, og и twitter-карточку на тот же URL и изображение', () => {
