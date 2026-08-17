@@ -148,6 +148,28 @@ describe('мета-данные страницы', () => {
     expect(data.offers).toMatchObject({ '@type': 'Offer', price: '0' });
   });
 
+  test.each(['index.html', 'screens.html', 'terms.html'])(
+    '%s объявляет PNG-фавикон 48×48 и apple-touch-icon',
+    (filename) => {
+      const html = readPage(filename);
+
+      expect(html).toContain(
+        '<link rel="icon" href="favicon-48.png" type="image/png" sizes="48x48">',
+      );
+      expect(html).toContain('<link rel="icon" href="icon.svg" type="image/svg+xml">');
+      expect(html).toContain(
+        '<link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">',
+      );
+    },
+  );
+
+  test('favicon-48.png — квадрат 48×48', () => {
+    const buf = fs.readFileSync(path.join(landingDir, 'favicon-48.png'));
+    // IHDR: width/height — big-endian uint32 сразу после сигнатуры PNG + chunk header.
+    expect(buf.readUInt32BE(16)).toBe(48);
+    expect(buf.readUInt32BE(20)).toBe(48);
+  });
+
   test('главная объявляет canonical, og и twitter-карточку на тот же URL и изображение', () => {
     const html = readPage('index.html');
     const pageUrl = 'https://slavaklkv.github.io/photo_metadata_ai/landing/';
@@ -158,11 +180,23 @@ describe('мета-данные страницы', () => {
     expect(html).toContain(`<meta property="og:image" content="${imageUrl}">`);
     expect(html).toContain('<meta name="twitter:card" content="summary_large_image">');
     expect(html).toContain(`<meta name="twitter:image" content="${imageUrl}">`);
-    expect(html).toContain('<link rel="icon" href="icon.svg">');
   });
 
-  test('icon.svg, logo.svg и og.png лежат рядом со страницами', () => {
+  test('главная отдаёт logo в JSON-LD на брендовую иконку 192×192', () => {
+    const html = readPage('index.html');
+    const ld = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+    const data = JSON.parse(ld[1]);
+
+    expect(data.logo).toBe(
+      'https://slavaklkv.github.io/photo_metadata_ai/landing/icon-192.png',
+    );
+  });
+
+  test('icon.svg, PNG-фавиконы, logo.svg и og.png лежат рядом со страницами', () => {
     expect(fs.existsSync(path.join(landingDir, 'icon.svg'))).toBe(true);
+    expect(fs.existsSync(path.join(landingDir, 'favicon-48.png'))).toBe(true);
+    expect(fs.existsSync(path.join(landingDir, 'apple-touch-icon.png'))).toBe(true);
+    expect(fs.existsSync(path.join(landingDir, 'icon-192.png'))).toBe(true);
     expect(fs.existsSync(path.join(landingDir, 'logo.svg'))).toBe(true);
     expect(fs.existsSync(path.join(landingDir, 'og.png'))).toBe(true);
   });

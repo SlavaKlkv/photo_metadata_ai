@@ -26,7 +26,10 @@
 | `brand-iris/` | Диафрагма логотипа |
 | `brand-sparkles.js` | Искры у бренда |
 | `header-swap.js` | Смена пунктов шапки index ↔ screens |
-| `icon.svg` | Фавикон (метка на плитке) |
+| `icon.svg` | Фавикон SVG (метка на плитке) |
+| `favicon-48.png` | Фавикон PNG 48×48 для Google Search |
+| `apple-touch-icon.png` | Иконка 180×180 для Home Screen |
+| `icon-192.png` | Логотип 192×192 для JSON-LD `logo` |
 | `logo.svg` | Метка в мокапе окна на главной (без плитки) |
 | `og.png` | Картинка для соцсетей, собирается из `.hero-visual` |
 
