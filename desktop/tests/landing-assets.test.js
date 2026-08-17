@@ -156,22 +156,28 @@ describe('мета-данные страницы', () => {
       expect(html).toContain(
         '<link rel="icon" href="favicon-48.png" type="image/png" sizes="48x48">',
       );
-      // Плитка icon.svg — иконка приложения, во вкладке браузера её быть не должно.
-      expect(html).toContain('<link rel="icon" href="logo.svg" type="image/svg+xml">');
-      expect(html).not.toContain('href="icon.svg"');
+      // SVG и PNG повторяют иконку приложения: метка на собственной плитке.
+      expect(html).toContain('<link rel="icon" href="icon.svg" type="image/svg+xml">');
       expect(html).toContain(
         '<link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">',
       );
     },
   );
 
-  test('favicon-48.png — прозрачная RGBA-метка 48×48', () => {
+  test('favicon-48.png — RGBA-плитка приложения 48×48', () => {
     const buf = fs.readFileSync(path.join(landingDir, 'favicon-48.png'));
     // IHDR: width/height — big-endian uint32 сразу после сигнатуры PNG + chunk header.
     expect(buf.readUInt32BE(16)).toBe(48);
     expect(buf.readUInt32BE(20)).toBe(48);
-    // Color type 6 — RGBA: фон остаётся прозрачным, без desktop-плитки.
+    // Color type 6 — RGBA, как исходная PNG-иконка приложения.
     expect(buf.readUInt8(25)).toBe(6);
+  });
+
+  test('SVG-фавикон содержит фирменную тёмную плитку', () => {
+    const icon = fs.readFileSync(path.join(landingDir, 'icon.svg'), 'utf8');
+
+    expect(icon).toContain('<rect width="1024" height="1024" fill="url(#background)"/>');
+    expect(icon).toContain('fill="url(#mark)"');
   });
 
   test('главная объявляет canonical, og и twitter-карточку на тот же URL и изображение', () => {
