@@ -21,6 +21,7 @@ const {
 const { installExternalLinkHandler } = require('./external-links');
 const { waitForBackend } = require('./health-check');
 const { pipeBackendLogs } = require('./logging');
+const { clearRendererCacheOnVersionChange } = require('./render-cache');
 const {
   getWindowState,
   saveWindowState,
@@ -165,6 +166,7 @@ function showBackendFailureAndQuit(logPath) {
 
 app.whenReady().then(async () => {
   installApplicationMenu();
+  await clearRendererCacheOnVersionChange();
   const loadingWindow = createLoadingWindow();
 
   killOrphanedBackends();
