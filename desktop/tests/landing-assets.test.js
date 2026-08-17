@@ -156,7 +156,9 @@ describe('мета-данные страницы', () => {
       expect(html).toContain(
         '<link rel="icon" href="favicon-48.png" type="image/png" sizes="48x48">',
       );
-      expect(html).toContain('<link rel="icon" href="icon.svg" type="image/svg+xml">');
+      // Плитка icon.svg — иконка приложения, во вкладке браузера её быть не должно.
+      expect(html).toContain('<link rel="icon" href="logo.svg" type="image/svg+xml">');
+      expect(html).not.toContain('href="icon.svg"');
       expect(html).toContain(
         '<link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">',
       );
