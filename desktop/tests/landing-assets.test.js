@@ -156,8 +156,9 @@ describe('мета-данные страницы', () => {
       expect(html).toContain(
         '<link rel="icon" href="favicon-48.png" type="image/png" sizes="48x48">',
       );
-      // SVG и PNG повторяют иконку приложения: метка на собственной плитке.
-      expect(html).toContain('<link rel="icon" href="icon.svg" type="image/svg+xml">');
+      // Браузер берёт SVG-метку без плитки; Google Search — PNG-плитку выше.
+      expect(html).toContain('<link rel="icon" href="logo.svg" type="image/svg+xml">');
+      expect(html).not.toContain('href="icon.svg"');
       expect(html).toContain(
         '<link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">',
       );
@@ -173,7 +174,7 @@ describe('мета-данные страницы', () => {
     expect(buf.readUInt8(25)).toBe(6);
   });
 
-  test('SVG-фавикон содержит фирменную тёмную плитку', () => {
+  test('icon.svg сохраняет фирменную тёмную плитку для PNG-фавиконов', () => {
     const icon = fs.readFileSync(path.join(landingDir, 'icon.svg'), 'utf8');
 
     expect(icon).toContain('<rect width="1024" height="1024" fill="url(#background)"/>');
