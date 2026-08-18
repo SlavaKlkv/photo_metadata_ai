@@ -107,7 +107,7 @@ function findOpenPrNumber({ baseBranch, headBranch }) {
 }
 
 function createPullRequest({ baseBranch, headBranch, version }) {
-  const { stdout } = runCommand('gh', [
+  const { stdout: url } = runCommand('gh', [
     'pr',
     'create',
     '--base',
@@ -128,8 +128,16 @@ function createPullRequest({ baseBranch, headBranch, version }) {
     ].join('\n'),
   ]);
 
-  const byUrl = runCommand('gh', ['pr', 'view', stdout, '--json', 'number', '-q', '.number']);
-  return byUrl;
+  const { stdout: prNumber } = runCommand('gh', [
+    'pr',
+    'view',
+    url,
+    '--json',
+    'number',
+    '-q',
+    '.number',
+  ]);
+  return prNumber;
 }
 
 function mergePullRequest(prNumber) {
