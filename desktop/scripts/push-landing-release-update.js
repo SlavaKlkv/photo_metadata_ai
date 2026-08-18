@@ -49,7 +49,10 @@ function configureGitIdentity() {
 }
 
 function checkoutBranch(branch, remoteRef) {
-  runCommand('git', ['fetch', 'origin', branch]);
+  const remoteBranch = remoteRef.startsWith('origin/')
+    ? remoteRef.slice('origin/'.length)
+    : remoteRef;
+  runCommand('git', ['fetch', 'origin', remoteBranch]);
   runCommand('git', ['checkout', '-B', branch, remoteRef]);
 }
 
