@@ -15,9 +15,9 @@
 #     иконки через NSWorkspace (резурс-форк + флаг custom icon);
 #   - дописывает их в settings-JSON от dmg-builder: dmgbuild копирует
 #     contents-файлы через /usr/bin/ditto, сохраняя резурс-форки;
-#   - фиксирует окну размер 600x400 (композиция рассчитана на него);
-#   - задаёт служебным файлам тома далёкие координаты, чтобы при
-#     включённом показе скрытых файлов они не лежали рядом с иконками.
+#   - фиксирует окну размер 660x440 (3:2, как у 600x400) и держит
+#     композицию по центру с запасом снизу, чтобы Finder не показывал
+#     нижний скролл.
 # Затем вызывает python-бандл dmgbuild (путь бинарника в
 # REAL_DMGBUILD, задаётся в build-mac.sh) через мини-драйвер.
 
@@ -106,8 +106,27 @@ settings.pop('background', None)
 settings.pop('background-color', None)
 
 window = settings.setdefault('window', {})
-window['size'] = {'width': 600, 'height': 400}
+window['size'] = {'width': 660, 'height': 440}
 window['position'] = {'x': 400, 'y': 200}
+
+# Явно фиксируем параметры иконкового вида Finder, чтобы окно тома
+# открывалось с нулевым scroll-offset и без автоподгонки viewport.
+settings['default_view'] = 'icon-view'
+settings['show_status_bar'] = False
+settings['show_tab_view'] = False
+settings['show_toolbar'] = False
+settings['show_pathbar'] = False
+settings['show_sidebar'] = False
+settings['sidebar_width'] = 0
+settings['include_icon_view_settings'] = True
+settings['include_list_view_settings'] = False
+settings['arrange_by'] = None
+settings['grid_offset'] = [0, 0]
+settings['grid_spacing'] = 100
+settings['scroll_position'] = [0, 0]
+settings['label_pos'] = 'bottom'
+settings['text_size'] = 16
+settings['icon_size'] = 128
 
 contents = settings.setdefault('contents', [])
 
@@ -117,31 +136,17 @@ extra_dir = os.environ['EXTRA_DIR']
 arrow = '\u00a0'
 tiles = ['\u2002', '\u2003', '\u2004', '\u2005']
 contents.append({
-    'x': 300,
-    'y': 150,
+    'x': 330,
+    'y': 153,
     'type': 'file',
     'path': os.path.join(extra_dir, arrow),
 })
-for x, name in zip([108, 236, 364, 492], tiles):
+for x, name in zip([138, 266, 394, 522], tiles):
     contents.append({
         'x': x,
-        'y': 315,
+        'y': 303,
         'type': 'file',
         'path': os.path.join(extra_dir, name),
-    })
-
-service_files = [
-    '.VolumeIcon.icns',
-    '.DS_Store',
-    '.fseventsd',
-    '.Trashes',
-]
-for index, name in enumerate(service_files):
-    contents.append({
-        'x': 2000 + 110 * index,
-        'y': 1500,
-        'type': 'position',
-        'path': name,
     })
 
 with open(path, 'w') as fp:

@@ -113,6 +113,24 @@ describe('поиск dmgbuild в кэше', () => {
   });
 });
 
+// Finder хранит смещение/вид окна тома в .DS_Store. Если не зафиксировать
+// icon-view с нулевым scroll_position, при первом открытии может мигать
+// правый скроллбар и пропадать после автодоресайза.
+describe('настройки окна DMG в Finder', () => {
+  it('принудительно задаёт icon-view с нулевым scroll offset', () => {
+    const wrapper = fs.readFileSync(
+      path.resolve(__dirname, '../scripts/dmgbuild-wrapper.sh'),
+      'utf8',
+    );
+
+    expect(wrapper).toMatch(/settings\['default_view'\] = 'icon-view'/);
+    expect(wrapper).toMatch(/settings\['scroll_position'\] = \[0, 0\]/);
+    expect(wrapper).toMatch(/settings\['include_icon_view_settings'\] = True/);
+    expect(wrapper).toMatch(/settings\['show_sidebar'\] = False/);
+    expect(wrapper).toMatch(/window\['size'\] = \{'width': 660, 'height': 440\}/);
+  });
+});
+
 // Workflow не должен возвращаться к публикации силами electron-builder.
 describe('release.yml', () => {
   const workflow = fs.readFileSync(
