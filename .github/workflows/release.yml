@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   # Бэкенд собирается нативно на Apple Silicon. Intel-срез убран вместе
@@ -134,37 +135,19 @@ jobs:
       # так что правка коммитится в обе ветки: в main — чтобы обновился
       # сайт, в develop — чтобы следующая работа не начиналась со
       # старых чисел и не откатывала их обратно.
+      #
+      # main защищён rule «changes through pull request», поэтому прямой
+      # push из workflow падает. develop обновляется push'ем, main — PR
+      # из chore/landing-size-vX.Y.Z с автоматическим merge.
       - name: Update landing with actual release size
         if: github.ref_type == 'tag' || inputs.publish == true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           version="$(node -p "require('./desktop/package.json').version")"
-          app="desktop/out/mac-arm64/Photo Metadata AI.app"
-          dmg="desktop/out/Photo Metadata AI-$version-arm64.dmg"
-
-          git config user.name 'github-actions[bot]'
-          git config user.email 'github-actions[bot]@users.noreply.github.com'
-
-          # Одна и та же правка применяется к каждой ветке отдельным
-          # коммитом, а не мержем main в develop: иначе релизный прогон
-          # затащил бы в develop всё остальное расхождение веток.
-          for branch in main develop; do
-            git fetch origin "$branch"
-            git checkout -B "$branch" "origin/$branch"
-
-            node desktop/scripts/update-landing-release.js \
-              --app "$app" --dmg "$dmg" \
-              --landing docs/landing/index.html --version "$version"
-
-            # Повторный прогон того же релиза ничего не меняет — тогда
-            # и коммитить нечего.
-            if git diff --quiet -- docs/landing/index.html; then
-              echo "==> $branch: лендинг уже актуален"
-              continue
-            fi
-
-            git add docs/landing/index.html
-            git commit -m "chore: update landing download size for v$version"
-            git push origin "$branch"
-          done
+          node desktop/scripts/push-landing-release-update.js \
+            --version "$version" \
+            --app "desktop/out/mac-arm64/Photo Metadata AI.app" \
+            --dmg "desktop/out/Photo Metadata AI-$version-arm64.dmg" \
+            --landing docs/landing/index.html \
+            --branches develop,main
