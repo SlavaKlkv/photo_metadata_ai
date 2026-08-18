@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Button } from '../../atoms/Button/Button';
 import { useAppStore } from '../../../store/useAppStore';
 import styles from './UpdateBanner.module.scss';
@@ -7,16 +7,38 @@ export const UpdateBanner: React.FC = () => {
   const isVisible = useAppStore((state) => state.isUpdateBannerVisible);
   const updateInfo = useAppStore((state) => state.updateInfo);
   const dismiss = useAppStore((state) => state.dismissUpdateBanner);
+  const hideUpdateBanner = useAppStore((state) => state.hideUpdateBanner);
+  const restoreUpdateBanner = useAppStore((state) => state.restoreUpdateBanner);
+
+  useEffect(() => {
+    const subscribe = window.desktopShell?.onUpdateDownloadEnded;
+    if (!subscribe) {
+      return;
+    }
+
+    return subscribe(() => {
+      restoreUpdateBanner();
+    });
+  }, [restoreUpdateBanner]);
 
   if (!isVisible || !updateInfo?.latest_version) {
     return null;
   }
 
-  const downloadUrl = updateInfo.download_url ?? updateInfo.release_url;
+  const downloadUrl = updateInfo.download_url;
+  const fallbackUrl = downloadUrl ?? updateInfo.release_url;
 
   const download = () => {
-    if (downloadUrl) {
-      window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+    if (downloadUrl && window.desktopShell?.downloadUpdate) {
+      hideUpdateBanner();
+      void window.desktopShell.downloadUpdate().catch(() => {
+        restoreUpdateBanner();
+      });
+      return;
+    }
+
+    if (fallbackUrl) {
+      window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -30,7 +52,7 @@ export const UpdateBanner: React.FC = () => {
           variant="primary"
           size="sm"
           onClick={download}
-          disabled={!downloadUrl}
+          disabled={!fallbackUrl}
         >
           Download
         </Button>

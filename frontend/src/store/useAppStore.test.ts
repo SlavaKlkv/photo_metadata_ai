@@ -299,6 +299,41 @@ test('dismisses the current version and persists the choice', () => {
   expect(useAppStore.getState().isUpdateBannerVisible).toBe(false);
 });
 
+test('hideUpdateBanner hides without persisting dismiss', () => {
+  useAppStore.setState({
+    updateInfo: availableUpdate,
+    isUpdateBannerVisible: true,
+  });
+
+  useAppStore.getState().hideUpdateBanner();
+
+  expect(useAppStore.getState().isUpdateBannerVisible).toBe(false);
+  expect(localStorage.getItem('update_dismissed_version')).toBeNull();
+});
+
+test('restoreUpdateBanner shows an available update again', () => {
+  useAppStore.setState({
+    updateInfo: availableUpdate,
+    isUpdateBannerVisible: false,
+  });
+
+  useAppStore.getState().restoreUpdateBanner();
+
+  expect(useAppStore.getState().isUpdateBannerVisible).toBe(true);
+});
+
+test('restoreUpdateBanner respects a dismissed version', () => {
+  localStorage.setItem('update_dismissed_version', '1.1.0');
+  useAppStore.setState({
+    updateInfo: availableUpdate,
+    isUpdateBannerVisible: false,
+  });
+
+  useAppStore.getState().restoreUpdateBanner();
+
+  expect(useAppStore.getState().isUpdateBannerVisible).toBe(false);
+});
+
 describe('cancelBatchProcessing', () => {
   test('restores photos to the just-added state and keeps the context', () => {
     useAppStore.setState({

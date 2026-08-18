@@ -62,6 +62,7 @@ test('shows the installed version is current', async () => {
       latest_version: '1.0.0',
     }),
     showMessageBox,
+    downloadAndQuit: jest.fn(),
     openExternal: jest.fn(),
   });
 
@@ -73,16 +74,16 @@ test('shows the installed version is current', async () => {
   );
 });
 
-test('offers and opens the DMG for an available version', async () => {
+test('downloads the DMG and quits after the file is saved', async () => {
   const showMessageBox = jest.fn().mockResolvedValue({ response: 0 });
-  const openExternal = jest.fn().mockResolvedValue(undefined);
-  const quit = jest.fn();
+  const downloadAndQuit = jest.fn().mockResolvedValue('/tmp/app.dmg');
+  const openExternal = jest.fn();
 
   await checkForUpdatesFromMenu({
     requestUpdate: jest.fn().mockResolvedValue(availableUpdate),
     showMessageBox,
+    downloadAndQuit,
     openExternal,
-    quit,
   });
 
   expect(showMessageBox).toHaveBeenCalledWith(
@@ -91,28 +92,49 @@ test('offers and opens the DMG for an available version', async () => {
       buttons: ['Download', 'Later'],
     })
   );
-  expect(openExternal).toHaveBeenCalledWith(availableUpdate.download_url);
-  expect(quit).toHaveBeenCalledTimes(1);
+  expect(downloadAndQuit).toHaveBeenCalledWith(availableUpdate.download_url);
+  expect(openExternal).not.toHaveBeenCalled();
 });
 
 test('does not download when the user chooses Later', async () => {
+  const downloadAndQuit = jest.fn();
   const openExternal = jest.fn();
-  const quit = jest.fn();
 
   await checkForUpdatesFromMenu({
     requestUpdate: jest.fn().mockResolvedValue(availableUpdate),
     showMessageBox: jest.fn().mockResolvedValue({ response: 1 }),
+    downloadAndQuit,
     openExternal,
-    quit,
   });
 
+  expect(downloadAndQuit).not.toHaveBeenCalled();
   expect(openExternal).not.toHaveBeenCalled();
-  expect(quit).not.toHaveBeenCalled();
 });
 
-test('falls back to the release page when a DMG is absent', async () => {
+test('keeps the app open when the DMG download fails', async () => {
+  const showMessageBox = jest
+    .fn()
+    .mockResolvedValueOnce({ response: 0 })
+    .mockResolvedValueOnce({ response: 0 });
+  const downloadAndQuit = jest.fn().mockRejectedValue(new Error('offline'));
+
+  await checkForUpdatesFromMenu({
+    requestUpdate: jest.fn().mockResolvedValue(availableUpdate),
+    showMessageBox,
+    downloadAndQuit,
+    openExternal: jest.fn(),
+  });
+
+  expect(showMessageBox).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      message: 'Could not download the update.',
+    })
+  );
+});
+
+test('opens the release page when a DMG is absent', async () => {
   const openExternal = jest.fn().mockResolvedValue(undefined);
-  const quit = jest.fn();
+  const downloadAndQuit = jest.fn();
 
   await checkForUpdatesFromMenu({
     requestUpdate: jest.fn().mockResolvedValue({
@@ -120,18 +142,18 @@ test('falls back to the release page when a DMG is absent', async () => {
       download_url: null,
     }),
     showMessageBox: jest.fn().mockResolvedValue({ response: 0 }),
+    downloadAndQuit,
     openExternal,
-    quit,
   });
 
   expect(openExternal).toHaveBeenCalledWith(availableUpdate.release_url);
-  expect(quit).toHaveBeenCalledTimes(1);
+  expect(downloadAndQuit).not.toHaveBeenCalled();
 });
 
 test('shows an informational result when no download link exists', async () => {
   const showMessageBox = jest.fn().mockResolvedValue({ response: 0 });
+  const downloadAndQuit = jest.fn();
   const openExternal = jest.fn();
-  const quit = jest.fn();
 
   await checkForUpdatesFromMenu({
     requestUpdate: jest.fn().mockResolvedValue({
@@ -140,15 +162,15 @@ test('shows an informational result when no download link exists', async () => {
       release_url: null,
     }),
     showMessageBox,
+    downloadAndQuit,
     openExternal,
-    quit,
   });
 
   expect(showMessageBox).toHaveBeenCalledWith(
     expect.objectContaining({ buttons: ['OK'], cancelId: 0 })
   );
+  expect(downloadAndQuit).not.toHaveBeenCalled();
   expect(openExternal).not.toHaveBeenCalled();
-  expect(quit).not.toHaveBeenCalled();
 });
 
 test.each([
@@ -176,6 +198,7 @@ test.each([
   await checkForUpdatesFromMenu({
     requestUpdate,
     showMessageBox,
+    downloadAndQuit: jest.fn(),
     openExternal: jest.fn(),
   });
 
