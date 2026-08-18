@@ -149,8 +149,7 @@ test('ниже 1000px лучи и фоновая подсветка групп �
   // Исчезновение декора не должно перестраивать диаграмму.
   expect(narrow).not.toMatch(/\.metadata-orbit\s*\{[^}]*display:\s*grid/s);
   expect(narrow).not.toMatch(/\.metadata-core\s*\{[^}]*order:/s);
-  // Орбита сжимается вместе с окном, иначе подписи уезжают к краям колонки.
-  expect(narrow).toMatch(/\.metadata-orbit\s*\{[^}]*width:\s*min\(100%, 720px\)/s);
+  // Орбита продолжает сжиматься с окном — без скачка на 720px.
 
   // Порог по ширине, а не по типу ввода: ландшафт телефона шире 720px, а
   // тач-планшет шире 1000px должен получать ту же радиальную схему, что и десктоп.
@@ -162,33 +161,44 @@ test('ниже 1000px лучи и фоновая подсветка групп �
   expect(css).toMatch(/\.metadata-node h3\s*\{[^}]*animation:\s*metadata-label-glow/s);
 });
 
-test('круг 17 полей центрирован в обеих раскладках орбиты', () => {
+test('категории якорятся внутренней вертикалью от круга', () => {
+  const css = styleSheet(readLanding());
+  const node = css.match(/\n  \.metadata-node\s*\{([^}]*)\}/);
+
+  expect(node).not.toBeNull();
+  expect(node[1]).toMatch(/width:\s*auto/);
+  expect(css).toMatch(
+    /\.metadata-node:nth-of-type\(2\),\s*\n\s*\.metadata-node:nth-of-type\(4\)\s*\{[^}]*text-align:\s*right/s,
+  );
+  expect(node[1]).toMatch(/min-width:\s*0/);
+  expect(css).toMatch(
+    /\.metadata-node:nth-of-type\(2\),\s*\n\s*\.metadata-node:nth-of-type\(4\)\s*\{[^}]*left:\s*var\(--metadata-node-edge\)/s,
+  );
+  expect(css).toMatch(
+    /\.metadata-node:nth-of-type\(2\),\s*\n\s*\.metadata-node:nth-of-type\(4\)\s*\{[^}]*right:\s*calc\(50% \+ \(var\(--metadata-core-size\) \/ 2\) \+ var\(--metadata-node-gap\)\)/s,
+  );
+  expect(css).toMatch(
+    /\.metadata-node:nth-of-type\(3\),\s*\n\s*\.metadata-node:nth-of-type\(5\)\s*\{[^}]*text-align:\s*left/s,
+  );
+  expect(css).toMatch(
+    /\.metadata-node:nth-of-type\(3\),\s*\n\s*\.metadata-node:nth-of-type\(5\)\s*\{[^}]*right:\s*var\(--metadata-node-edge\)/s,
+  );
+  expect(css).toMatch(
+    /\.metadata-node:nth-of-type\(3\),\s*\n\s*\.metadata-node:nth-of-type\(5\)\s*\{[^}]*left:\s*calc\(50% \+ \(var\(--metadata-core-size\) \/ 2\) \+ var\(--metadata-node-gap\)\)/s,
+  );
+});
+
+test('круг 17 полей центрирован, схема орбиты не ломается на узком', () => {
   const css = styleSheet(readLanding());
   const core = css.match(/\n  \.metadata-core\s*\{([^}]*)\}/);
-  const compact = mediaBlock(css, '(max-width: 720px)');
+  const compact = mediaBlock(css, '(max-width: 520px)');
 
   expect(core).not.toBeNull();
   expect(core[1]).toMatch(/left:\s*50%/);
   expect(core[1]).toMatch(/transform:\s*var\(--metadata-core-final-transform\)/);
   expect(core[1]).toMatch(/--metadata-core-final-transform:\s*translate\(-50%,\s*-50%\)/);
 
-  // В сетке ядро занимает всю строку и центрируется автомаргинами.
-  expect(compact).toMatch(/\.metadata-core\s*\{[^}]*grid-column:\s*1 \/ -1/s);
-  expect(compact).toMatch(/\.metadata-core\s*\{[^}]*margin:\s*\d+px auto/s);
-
-  // Подписи держатся вокруг центра: колонки по ширине контента, а не 1fr 1fr
-  // во всю ширину — иначе круг остаётся один посреди пустоты.
-  expect(compact).toMatch(
-    /\.metadata-orbit\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, max-content\)\)/s,
-  );
-  expect(compact).toMatch(/\.metadata-orbit\s*\{[^}]*justify-content:\s*center/s);
-
-  // При столкновении подписей схема не меняется: верхняя пара, круг, нижняя пара.
-  expect(compact).toMatch(/\.metadata-core\s*\{[^}]*order:\s*2/s);
-  expect(compact).toMatch(
-    /\.metadata-node:nth-of-type\(2\), \.metadata-node:nth-of-type\(3\)\s*\{\s*order:\s*1/,
-  );
-  expect(compact).toMatch(
-    /\.metadata-node:nth-of-type\(4\), \.metadata-node:nth-of-type\(5\)\s*\{\s*order:\s*3/,
-  );
+  // Телефонная сетка больше не перестраивает орбиту: блоки остаются у краёв.
+  expect(compact).toBeNull();
+  expect(css).not.toMatch(/@media \(max-width: 520px\)/);
 });

@@ -204,6 +204,7 @@
   .brand-name {
     color: var(--text);
     display: block;
+    white-space: nowrap;
   }
   .brand-name-lit {
     position: absolute;
@@ -245,13 +246,15 @@
     -webkit-tap-highlight-color: transparent;
   }
   .brand:hover { text-decoration: none; }
-  /* Метка + надпись. На узкой ширине .brand тянется до бургера,
-     а искры сидят только на этой связке (и на расширенных краях). */
+  /* Метка + надпись. Искры и hover живут на этой связке (плюс inset слоя).
+     На узкой ширине .brand не растягивается до бургера: зона остаётся
+     вокруг локапа и сжимается, только если имя не влезает. */
   .brand-lockup {
     position: relative;
     display: inline-flex;
     align-items: center;
     gap: 11px;
+    width: max-content;
     min-width: 0;
     max-width: 100%;
   }
@@ -2346,9 +2349,17 @@
      четыре группы и их объём. */
   .metadata-orbit {
     --metadata-cycle: 10.5s;
+    --metadata-core-size: clamp(96px, 16vw, 148px);
+    /* На широком — воздух у круга; на узком зазор растёт, чтобы блоки
+       у края экрана не врезались в окружность. */
+    --metadata-node-gap: max(16px, min(120px, 12%), calc(100px - 10vw));
+    /* Верхние уезжают вверх, нижние вниз, когда орбита уже. */
+    --metadata-node-inset: clamp(0px, 3vw, 28px);
+    /* Небольшой сдвиг от края орбиты, чтобы длинные слова не резались clip. */
+    --metadata-node-edge: clamp(6px, 2vw, 14px);
     position: relative;
     width: min(100%, 960px);
-    height: 410px;
+    height: clamp(410px, calc(560px - 18vw), 500px);
     margin: 46px auto 0;
     /* Ореолы узлов (отрицательный inset + scale) не должны раздувать
        body.scrollWidth — на iOS это даёт дрожь visualViewport при скролле. */
@@ -2363,24 +2374,13 @@
     display: grid;
     place-items: center;
     align-content: center;
-    width: 148px;
-    height: 148px;
+    width: var(--metadata-core-size);
+    height: var(--metadata-core-size);
     border: 1px solid rgba(139, 136, 248, .58);
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(139, 136, 248, .22), var(--panel) 66%, var(--bg-soft));
-    box-shadow: 0 0 0 10px rgba(139, 136, 248, .035), 0 0 60px rgba(129, 125, 240, .2);
+    background: var(--panel);
     text-align: center;
     transform: var(--metadata-core-final-transform);
-  }
-  .metadata-core::after {
-    content: "";
-    position: absolute;
-    inset: -13px;
-    z-index: -1;
-    border: 1px solid rgba(139, 136, 248, .12);
-    border-radius: 50%;
-    box-shadow: 0 0 48px rgba(129, 125, 240, .16);
-    animation: metadata-breathe var(--metadata-cycle) cubic-bezier(.45, 0, .55, 1) infinite;
   }
   .metadata-core strong { font-size: 50px; font-weight: 600; line-height: .9; letter-spacing: -.05em; }
   .metadata-core span { margin-top: 8px; color: var(--accent-2); font-family: inherit; font-size: 12.5px; font-weight: 600; letter-spacing: 0; }
@@ -2402,13 +2402,30 @@
   .metadata-node {
     position: absolute;
     isolation: isolate;
-    width: 260px;
+    box-sizing: border-box;
+    width: auto;
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
     transition: opacity .22s ease;
   }
-  .metadata-node:nth-of-type(2) { top: 28px; left: 18px; text-align: right; }
-  .metadata-node:nth-of-type(3) { top: 28px; right: 18px; }
-  .metadata-node:nth-of-type(4) { bottom: 28px; left: 18px; text-align: right; }
-  .metadata-node:nth-of-type(5) { right: 18px; bottom: 28px; }
+  /* Внешняя кромка чуть внутри края, внутренняя — вертикаль за окружностью. */
+  .metadata-node:nth-of-type(2),
+  .metadata-node:nth-of-type(4) {
+    left: var(--metadata-node-edge);
+    right: calc(50% + (var(--metadata-core-size) / 2) + var(--metadata-node-gap));
+    text-align: right;
+  }
+  .metadata-node:nth-of-type(3),
+  .metadata-node:nth-of-type(5) {
+    right: var(--metadata-node-edge);
+    left: calc(50% + (var(--metadata-core-size) / 2) + var(--metadata-node-gap));
+    text-align: left;
+  }
+  .metadata-node:nth-of-type(2),
+  .metadata-node:nth-of-type(3) { top: var(--metadata-node-inset); }
+  .metadata-node:nth-of-type(4),
+  .metadata-node:nth-of-type(5) { bottom: var(--metadata-node-inset); }
   .metadata-node::before {
     content: "";
     position: absolute;
@@ -2435,6 +2452,8 @@
     font-weight: 600;
     line-height: 1;
     letter-spacing: .01em;
+    max-width: 100%;
+    flex-wrap: wrap;
     transition: border-color .22s ease, background .22s ease, color .22s ease;
   }
   .metadata-node h3 {
@@ -2442,6 +2461,7 @@
     font-size: 17.5px;
     font-weight: 600;
     letter-spacing: -.01em;
+    overflow-wrap: anywhere;
     animation: metadata-label-glow var(--metadata-cycle) ease-in-out infinite;
   }
   .metadata-node p { margin: 0; color: #8c8c9a; font-family: inherit; font-size: 13.5px; line-height: 1.5; }
@@ -2604,11 +2624,6 @@
   @keyframes metadata-core-in { to { opacity: 1; transform: var(--metadata-core-final-transform); } }
   @keyframes metadata-ray-in { to { opacity: 1; scale: 1 1; } }
   @keyframes metadata-node-in { to { opacity: 1; transform: none; } }
-  @keyframes metadata-breathe {
-    0% { opacity: .18; transform: scale(.9); }
-    24%, 78% { opacity: 1; transform: scale(1.08); }
-    100% { opacity: .18; transform: scale(.9); }
-  }
   @keyframes metadata-focus {
     0%, 28%, 100% { opacity: 0; transform: scale(.96); }
     46%, 62% { opacity: .9; transform: scale(1.02); }
@@ -2618,46 +2633,6 @@
     0%, 30%, 100% { color: var(--text); text-shadow: none; }
     46%, 62% { color: var(--accent-2); text-shadow: 0 0 18px rgba(139, 136, 248, .28); }
     78% { color: var(--text); text-shadow: none; }
-  }
-
-  /* Когда фиксированные подписи начинают упираться в круг, раскладываем ту
-     же схему в три ряда: верхняя пара, круг по центру, нижняя пара. */
-  @media (max-width: 720px) {
-    .metadata-orbit {
-      height: auto;
-      display: grid;
-      /* Колонки по ширине подписей и по центру: на 1fr 1fr они разъезжались
-         к краям колонки, и круг оставался один посреди пустоты. */
-      grid-template-columns: repeat(2, minmax(0, max-content));
-      justify-content: center;
-      gap: 28px 44px;
-      margin-top: 38px;
-    }
-    .metadata-core {
-      --metadata-core-final-transform: none;
-      position: relative;
-      top: auto;
-      left: auto;
-      grid-column: 1 / -1;
-      order: 2;
-      width: 132px;
-      height: 132px;
-      margin: 6px auto;
-      transform: none;
-    }
-    .metadata-core strong { font-size: 46px; }
-    .metadata-node,
-    .metadata-node:nth-of-type(2), .metadata-node:nth-of-type(3),
-    .metadata-node:nth-of-type(4), .metadata-node:nth-of-type(5) {
-      position: relative;
-      inset: auto;
-      width: auto;
-      text-align: left;
-    }
-    .metadata-node:nth-of-type(2), .metadata-node:nth-of-type(3) { order: 1; }
-    .metadata-node:nth-of-type(4), .metadata-node:nth-of-type(5) { order: 3; }
-    .metadata-node h3 { font-size: 16px; }
-    .reveal .metadata-core { transform: scale(.82); }
   }
 
   /* ---------- faq ---------- */
@@ -3178,12 +3153,84 @@
     box-shadow: 0 50px 90px -40px rgba(0, 0, 0, 1);
   }
 
+  /* Узкий экран: вместо обрезанной ленты — бургер и выезжающая панель.
+     Те же 5 ссылок в #nav-links; desktop-ряд не меняется.
+     .dmg прячет html.not-mac (mac-desktop.js), не ширина. */
+  @media (max-width: 1080px) {
+    :root { --header-h: 64px; }
+    .nav {
+      position: relative;
+      height: var(--header-h);
+      flex-wrap: nowrap;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand {
+      min-width: 0;
+      /* Не расти к бургеру: иначе зона искр/hover заполняет всю шапку. */
+      flex: 0 1 auto;
+      width: max-content;
+      max-width: calc(100% - 52px);
+    }
+    .brand-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .nav-toggle {
+      display: grid;
+      position: relative;
+      z-index: 2;
+      margin-left: auto;
+    }
+    /* Бургер у правого края, пока «Скачать» нет в шапке (hero/final в кадре
+       или html.not-mac). Когда кнопка есть — бургер слева от неё, как в HTML.
+       Скрытую .nav-cta вынимаем из потока: opacity:0 всё равно держит слот. */
+    header.hero-cta-visible .nav-cta {
+      position: absolute;
+      width: 0;
+      height: 0;
+      overflow: hidden;
+    }
+
+    .nav-links {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      z-index: 1;
+      display: none;
+      flex-direction: column;
+      gap: 0;
+      width: auto;
+      margin: 0;
+      padding: 8px 24px 14px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(11, 11, 15, 0.96);
+      backdrop-filter: saturate(160%) blur(14px);
+      box-shadow: 0 18px 40px -28px rgba(0, 0, 0, 1);
+    }
+    header.nav-open .nav-links { display: flex; }
+    .nav-links a {
+      flex: none;
+      padding: 12px 0;
+      font-size: 15.5px;
+      border-bottom: 1px solid var(--line);
+      text-align: center;
+    }
+    .nav-links a:last-child { border-bottom: 0; }
+    .nav-links a::after {
+      left: 0;
+      right: auto;
+      width: 18px;
+      bottom: 10px;
+    }
+  }
+
   @media (max-width: 1000px) {
     /* Когда лучи перестают попадать в подписи, убираем их вместе с фоновыми
-       ореолами, но не меняем радиальную схему. Орбита при этом сжимается
-       вместе с окном: иначе подписи уезжают к краям колонки, а круг остаётся
-       один посреди пустоты. */
-    .metadata-orbit { width: min(100%, 720px); }
+       ореолами. Радиальная схема и ширина орбиты остаются: блоки сами
+       сжимаются от круга, без скачка на фиксированные 720px. */
     .metadata-ray { display: none; }
     .metadata-node::before { content: none; }
     /* Мокап под текстом: в узкой колонке его подписи становятся нечитаемы. */
@@ -3269,68 +3316,6 @@
     .step:nth-child(even):hover .step-copy { transform: translateY(-3px); }
   }
 
-  /* Узкий экран: вместо обрезанной ленты — бургер и выезжающая панель.
-     Те же 5 ссылок в #nav-links; desktop-ряд не меняется.
-     .dmg прячет html.not-mac (mac-desktop.js), не ширина. */
-  @media (max-width: 860px) {
-    :root { --header-h: 64px; }
-    .nav {
-      position: relative;
-      height: var(--header-h);
-      flex-wrap: nowrap;
-      align-items: center;
-      gap: 10px;
-    }
-    .brand {
-      min-width: 0;
-      flex: 1 1 auto;
-      /* Место под бургер справа. */
-      max-width: calc(100% - 52px);
-    }
-    .brand-name {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .nav-toggle {
-      display: grid;
-      position: relative;
-      z-index: 2;
-      margin-left: auto;
-    }
-
-    .nav-links {
-      position: absolute;
-      top: 100%;
-      left: 0;
-      right: 0;
-      z-index: 1;
-      display: none;
-      flex-direction: column;
-      gap: 0;
-      width: auto;
-      margin: 0;
-      padding: 8px 24px 14px;
-      border-bottom: 1px solid var(--line);
-      background: rgba(11, 11, 15, 0.96);
-      backdrop-filter: saturate(160%) blur(14px);
-      box-shadow: 0 18px 40px -28px rgba(0, 0, 0, 1);
-    }
-    header.nav-open .nav-links { display: flex; }
-    .nav-links a {
-      flex: none;
-      padding: 12px 0;
-      font-size: 15.5px;
-      border-bottom: 1px solid var(--line);
-    }
-    .nav-links a:last-child { border-bottom: 0; }
-    .nav-links a::after {
-      left: 0;
-      right: auto;
-      width: 18px;
-      bottom: 10px;
-    }
-  }
   @media (max-width: 720px) {
     .wrap { padding: 0 16px; }
     .nav-links { padding-left: 16px; padding-right: 16px; }
@@ -3506,7 +3491,6 @@
       scale: 1 1;
       transform: none;
     }
-    .metadata-core::after { animation: none; opacity: .55; transform: none; }
     .metadata-node::before { animation: none; opacity: 0; transform: none; }
     .metadata-node h3 { animation: none; }
     .metadata-node { transition: none; }
@@ -3619,7 +3603,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13"/><path d="M12.5 6.5L18 12l-5.5 5.5"/></svg>
           </a>
         </div>
-        <p class="cta-note">Загрузка 128 МБ · после установки 298 МБ<br>без регистрации и подписки — нужен ключ AI-провайдера или локальная модель.</p>
+        <p class="cta-note">Загрузка 135 МБ · после установки 319 МБ<br>без регистрации и подписки — нужен ключ AI-провайдера или локальная модель.</p>
       </div>
 
       <!-- Мокап окна, а не снимок экрана: см. комментарий у .mock в стилях. -->
@@ -4272,7 +4256,7 @@ ollama pull qwen2.5vl</code></pre>
     var nav = document.getElementById('nav-links');
     if (!header || !toggle || !nav) return;
 
-    var mq = window.matchMedia('(max-width: 860px)');
+    var mq = window.matchMedia('(max-width: 1080px)');
 
     function setOpen(open) {
       if (!mq.matches) open = false;
