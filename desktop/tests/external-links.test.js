@@ -3,11 +3,9 @@
 const { shell } = require('electron');
 
 jest.mock('electron', () => ({
-  app: { quit: jest.fn() },
   shell: { openExternal: jest.fn() },
 }));
 
-const { app } = require('electron');
 const { installExternalLinkHandler } = require('../src/external-links');
 
 function installAndGetHandler(deps) {
@@ -22,7 +20,7 @@ beforeEach(() => {
   shell.openExternal.mockResolvedValue(undefined);
 });
 
-test('opens https links in the system browser, denies the window, then quits', async () => {
+test('opens https links in the system browser and keeps the app running', async () => {
   const handler = installAndGetHandler();
 
   const result = handler({
@@ -35,37 +33,32 @@ test('opens https links in the system browser, denies the window, then quits', a
   expect(result).toEqual({ action: 'deny' });
 
   await Promise.resolve();
-  expect(app.quit).toHaveBeenCalledTimes(1);
 });
 
-test('does not quit when opening the download URL fails', async () => {
+test('does not throw when opening the download URL fails', async () => {
   const openExternal = jest.fn().mockRejectedValue(new Error('blocked'));
-  const quit = jest.fn();
-  const handler = installAndGetHandler({ openExternal, quit });
+  const handler = installAndGetHandler({ openExternal });
 
-  handler({
-    url: 'https://github.com/example/releases/download/v1.1.0/app.dmg',
-  });
+  expect(() =>
+    handler({
+      url: 'https://github.com/example/releases/download/v1.1.0/app.dmg',
+    })
+  ).not.toThrow();
 
   await Promise.resolve();
   await Promise.resolve();
 
   expect(openExternal).toHaveBeenCalled();
-  expect(quit).not.toHaveBeenCalled();
 });
 
 test.each(['http://localhost:8000/', 'file:///etc/passwd', 'about:blank'])(
-  'denies %s without opening it externally or quitting',
+  'denies %s without opening it externally',
   async (url) => {
-    const quit = jest.fn();
-    const handler = installAndGetHandler({ quit });
+    const handler = installAndGetHandler();
 
     const result = handler({ url });
 
     expect(shell.openExternal).not.toHaveBeenCalled();
     expect(result).toEqual({ action: 'deny' });
-
-    await Promise.resolve();
-    expect(quit).not.toHaveBeenCalled();
   }
 );
