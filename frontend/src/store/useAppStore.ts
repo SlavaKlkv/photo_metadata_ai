@@ -17,6 +17,18 @@ import { jobsApi } from "../services/api/api";
 import { fetchAllStockResults } from "../services/api/fetchAllStockResults";
 import { logger } from "../utils/logger";
 
+function shouldShowUpdateBanner(
+  updateInfo: DesktopUpdateCheckResponse | null,
+  dismissedVersion: string | null,
+): boolean {
+  return (
+    updateInfo?.status === "ok" &&
+    updateInfo.update_available &&
+    updateInfo.latest_version !== null &&
+    dismissedVersion !== updateInfo.latest_version
+  );
+}
+
 const defaultSessionSettings: SessionSettings = {
   selectedProvider: null,
 };
@@ -59,6 +71,8 @@ export interface AppState {
   setStockOptions: (options: StockOptions) => void;
   checkForUpdates: () => Promise<void>;
   dismissUpdateBanner: () => void;
+  hideUpdateBanner: () => void;
+  restoreUpdateBanner: () => void;
 
   // обновить preview конкретного файла после смены стока
   updateJobPreview: (fileId: string, preview: FilePreview) => void;
@@ -200,11 +214,10 @@ export const useAppStore = create<AppState>()(
         const dismissedVersion = localStorage.getItem(
           "update_dismissed_version",
         );
-        const isUpdateBannerVisible =
-          updateInfo.status === "ok" &&
-          updateInfo.update_available &&
-          updateInfo.latest_version !== null &&
-          dismissedVersion !== updateInfo.latest_version;
+        const isUpdateBannerVisible = shouldShowUpdateBanner(
+          updateInfo,
+          dismissedVersion,
+        );
 
         set({ updateInfo, isUpdateBannerVisible });
       } catch {
@@ -218,6 +231,19 @@ export const useAppStore = create<AppState>()(
         localStorage.setItem("update_dismissed_version", latestVersion);
       }
       set({ isUpdateBannerVisible: false });
+    },
+
+    hideUpdateBanner: () => set({ isUpdateBannerVisible: false }),
+
+    restoreUpdateBanner: () => {
+      const { updateInfo } = get();
+      const dismissedVersion = localStorage.getItem("update_dismissed_version");
+      set({
+        isUpdateBannerVisible: shouldShowUpdateBanner(
+          updateInfo,
+          dismissedVersion,
+        ),
+      });
     },
 
     addJobs: (newJobs: ProcessingJob[]) => {

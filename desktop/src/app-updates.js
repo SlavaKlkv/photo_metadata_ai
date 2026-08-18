@@ -22,8 +22,8 @@ async function fetchDesktopUpdate(appUrl, fetchImpl = globalThis.fetch) {
 async function checkForUpdatesFromMenu({
   requestUpdate,
   showMessageBox,
+  downloadAndQuit,
   openExternal,
-  quit,
 }) {
   let updateInfo;
   try {
@@ -73,26 +73,45 @@ async function checkForUpdatesFromMenu({
     return;
   }
 
-  const downloadUrl = updateInfo.download_url ?? updateInfo.release_url;
+  const downloadUrl = updateInfo.download_url;
+  const releaseUrl = updateInfo.release_url;
   const result = await showMessageBox({
     type: 'info',
     title: 'Photo Metadata AI',
     message: `Version ${updateInfo.latest_version} is available.`,
     detail: downloadUrl
-      ? 'Download the new DMG and replace the application in Applications.'
+      ? 'The DMG will download to your Downloads folder. The app will quit when the download finishes so you can replace it in Applications.'
       : 'Open GitHub Releases to view the new version.',
-    buttons: downloadUrl ? ['Download', 'Later'] : ['OK'],
+    buttons: downloadUrl
+      ? ['Download', 'Later']
+      : releaseUrl
+        ? ['Open in Browser', 'Later']
+        : ['OK'],
     defaultId: 0,
-    cancelId: downloadUrl ? 1 : 0,
+    cancelId: downloadUrl || releaseUrl ? 1 : 0,
   });
 
-  if (downloadUrl && result.response === 0) {
-    await openExternal(downloadUrl);
-    // Закрываем приложение после Download: установщик — ручная
-    // замена бандла из DMG, пока процесс жив файл занят.
-    if (typeof quit === 'function') {
-      quit();
+  if (result.response !== 0) {
+    return;
+  }
+
+  if (downloadUrl) {
+    try {
+      await downloadAndQuit(downloadUrl);
+    } catch {
+      await showMessageBox({
+        type: 'warning',
+        title: 'Photo Metadata AI',
+        message: 'Could not download the update.',
+        detail: 'Check your internet connection and try again.',
+        buttons: ['OK'],
+      });
     }
+    return;
+  }
+
+  if (releaseUrl) {
+    await openExternal(releaseUrl);
   }
 }
 

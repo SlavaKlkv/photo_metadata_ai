@@ -2,8 +2,8 @@
 
 /**
  * Подтверждение выхода, пока в приложении идёт процесс
- * (обработка, экспорт, regenerate). Состояние busy приходит
- * из рендерера через IPC; диалог — нативный Electron.
+ * (обработка, экспорт, regenerate) или загрузка обновления.
+ * Состояние busy приходит из рендерера через IPC; диалог — нативный Electron.
  */
 
 function buildQuitConfirmOptions() {
@@ -19,6 +19,20 @@ function buildQuitConfirmOptions() {
     message: 'A process is still running.',
     detail:
       'Quitting now will interrupt it, and progress may be lost.\n\n' +
+      '【Enter】 Quit  ·  【Esc】 Cancel  ·  【Space】 Confirm selection',
+  };
+}
+
+function buildUpdateDownloadQuitConfirmOptions() {
+  return {
+    type: 'warning',
+    buttons: ['Cancel', 'Quit'],
+    defaultId: 1,
+    cancelId: 0,
+    title: 'Quit Photo Metadata AI?',
+    message: 'An update is still downloading.',
+    detail:
+      'Quitting now will stop the download.\n\n' +
       '【Enter】 Quit  ·  【Esc】 Cancel  ·  【Space】 Confirm selection',
   };
 }
@@ -70,14 +84,20 @@ function createCloseGuard({ isBusy, showConfirm, requestQuit }) {
     void confirmAndQuit();
   }
 
+  function allowNextQuit() {
+    allowQuit = true;
+  }
+
   return {
     handleWindowClose,
     handleBeforeQuit,
+    allowNextQuit,
   };
 }
 
 module.exports = {
   buildQuitConfirmOptions,
+  buildUpdateDownloadQuitConfirmOptions,
   createCloseGuard,
   isQuitConfirmed,
 };

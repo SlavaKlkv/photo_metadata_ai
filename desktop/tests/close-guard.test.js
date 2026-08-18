@@ -2,6 +2,7 @@
 
 const {
   buildQuitConfirmOptions,
+  buildUpdateDownloadQuitConfirmOptions,
   createCloseGuard,
   isQuitConfirmed,
 } = require('../src/close-guard');
@@ -20,6 +21,15 @@ test('quit confirm dialog warns about interrupting a running process', () => {
   expect(options.detail).toContain(
     '【Enter】 Quit  ·  【Esc】 Cancel  ·  【Space】 Confirm selection'
   );
+});
+
+test('update download quit confirm warns about interrupting the download', () => {
+  const options = buildUpdateDownloadQuitConfirmOptions();
+
+  expect(options.type).toBe('warning');
+  expect(options.buttons).toEqual(['Cancel', 'Quit']);
+  expect(options.message).toMatch(/update is still downloading/i);
+  expect(options.detail).toMatch(/stop the download/i);
 });
 
 test('Quit button response is treated as confirmation', () => {
@@ -96,6 +106,22 @@ test('blocks before-quit when busy and allows it after confirmation', async () =
   const secondQuit = { preventDefault: jest.fn() };
   guard.handleBeforeQuit(secondQuit);
   expect(secondQuit.preventDefault).not.toHaveBeenCalled();
+});
+
+test('allowNextQuit skips the busy confirm so an update can close the app', () => {
+  const event = { preventDefault: jest.fn() };
+  const showConfirm = jest.fn();
+  const guard = createCloseGuard({
+    isBusy: () => true,
+    showConfirm,
+    requestQuit: jest.fn(),
+  });
+
+  guard.allowNextQuit();
+  guard.handleBeforeQuit(event);
+
+  expect(event.preventDefault).not.toHaveBeenCalled();
+  expect(showConfirm).not.toHaveBeenCalled();
 });
 
 test('does not open a second confirm dialog while one is in flight', async () => {

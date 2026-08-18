@@ -1,7 +1,15 @@
 'use strict';
 
 const path = require('path');
-const { app, BrowserWindow, Menu, dialog, ipcMain, shell } = require('electron');
+const {
+  app,
+  BrowserWindow,
+  Menu,
+  dialog,
+  ipcMain,
+  session,
+  shell,
+} = require('electron');
 
 const {
   spawnBackend,
@@ -11,11 +19,14 @@ const {
   checkForUpdatesFromMenu,
   fetchDesktopUpdate,
 } = require('./app-updates');
+const { downloadUpdateAndQuit, DOWNLOAD_CANCELLED } = require('./update-download');
+const { createUpdateDownloadWindow } = require('./update-download-window');
 const {
   buildApplicationMenuTemplate,
 } = require('./application-menu');
 const {
   buildQuitConfirmOptions,
+  buildUpdateDownloadQuitConfirmOptions,
   createCloseGuard,
 } = require('./close-guard');
 const { installExternalLinkHandler } = require('./external-links');
@@ -37,8 +48,9 @@ const APP_URL = 'http://localhost:8000';
 // рассчитан на Developer ID / нотаризированный дистрибутив, а у нас
 // только ad-hoc. Вместо этого backend проверяет GitHub Releases
 // (/api/v1/desktop/updates), frontend показывает баннер, а сам update
-// flow ручной: скачать новый .dmg и заменить приложение — данные
-// пользователя живут вне бандла и переживают замену.
+// flow ручной: скачать .dmg в Downloads, открыть образ и закрыть
+// приложение, чтобы можно было заменить бандл. Данные пользователя
+// живут вне бандла.
 
 let backendProcess = null;
 let backendExited = false;
@@ -51,15 +63,127 @@ ipcMain.on('app:set-busy', (_event, busy) => {
   appBusy = Boolean(busy);
 });
 
+let updateDownloadWindow = null;
+let updateDownloadAbortController = null;
+
+ipcMain.on('update-download:cancel', () => {
+  if (updateDownloadAbortController) {
+    updateDownloadAbortController.abort();
+  }
+});
+
 const closeGuard = createCloseGuard({
-  isBusy: () => appBusy,
+  isBusy: () => appBusy || updateDownloadAbortController != null,
   showConfirm: () => {
-    const options = buildQuitConfirmOptions();
+    const options = appBusy
+      ? buildQuitConfirmOptions()
+      : buildUpdateDownloadQuitConfirmOptions();
     return mainWindow && !mainWindow.isDestroyed()
       ? dialog.showMessageBox(mainWindow, options)
       : dialog.showMessageBox(options);
   },
   requestQuit: () => app.quit(),
+});
+
+function resetUpdateDownloadProgress() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setProgressBar(-1);
+  }
+  if (updateDownloadWindow) {
+    updateDownloadWindow.close();
+    updateDownloadWindow = null;
+  }
+}
+
+function cancelActiveUpdateDownload() {
+  if (updateDownloadAbortController) {
+    updateDownloadAbortController.abort();
+    updateDownloadAbortController = null;
+  }
+  resetUpdateDownloadProgress();
+}
+
+function isUpdateDownloadCancelled(error) {
+  return error instanceof Error && error.message === DOWNLOAD_CANCELLED;
+}
+
+function notifyUpdateDownloadEnded() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('update-download:ended');
+  }
+}
+
+async function runUpdateDownload(url, { throwIfCancelled = false } = {}) {
+  cancelActiveUpdateDownload();
+
+  updateDownloadAbortController = new AbortController();
+  updateDownloadWindow = createUpdateDownloadWindow();
+  updateDownloadWindow.show({
+    parent: mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined,
+    onCancel: () => {
+      if (updateDownloadAbortController) {
+        updateDownloadAbortController.abort();
+      }
+    },
+  });
+
+  try {
+    await downloadUpdateAndQuit({
+      url,
+      session: session.defaultSession,
+      downloadDir: app.getPath('downloads'),
+      openPath: (file) => shell.openPath(file),
+      showItemInFolder: (file) => {
+        shell.showItemInFolder(file);
+      },
+      quit: () => {
+        closeGuard.allowNextQuit();
+        app.quit();
+      },
+      abortSignal: updateDownloadAbortController.signal,
+      onProgress: (ratio) => {
+        updateDownloadWindow?.setProgress(ratio);
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.setProgressBar(ratio);
+        }
+      },
+    });
+  } catch (error) {
+    resetUpdateDownloadProgress();
+    if (isUpdateDownloadCancelled(error)) {
+      notifyUpdateDownloadEnded();
+      if (throwIfCancelled) {
+        throw error;
+      }
+      return;
+    }
+    notifyUpdateDownloadEnded();
+    throw error;
+  } finally {
+    updateDownloadAbortController = null;
+  }
+}
+
+ipcMain.handle('app:download-update', async () => {
+  const updateInfo = await fetchDesktopUpdate(APP_URL);
+  if (!updateInfo?.download_url) {
+    throw new Error('No download URL');
+  }
+  try {
+    await runUpdateDownload(updateInfo.download_url, { throwIfCancelled: true });
+  } catch (error) {
+    if (isUpdateDownloadCancelled(error)) {
+      throw error;
+    }
+    await dialog.showMessageBox({
+      type: 'warning',
+      title: 'Photo Metadata AI',
+      message: 'Could not download the update.',
+      detail: 'Check your internet connection and try again.',
+      buttons: ['OK'],
+    });
+    throw new Error('Update download failed');
+  }
 });
 
 // Вторая копия приложения не запускается: у обеих был бы один порт 8000
@@ -121,6 +245,7 @@ function createMainWindow() {
   mainWindow.on('close', (event) => {
     closeGuard.handleWindowClose(event);
     if (!event.defaultPrevented) {
+      cancelActiveUpdateDownload();
       saveWindowState(mainWindow);
     }
   });
@@ -143,8 +268,8 @@ function installApplicationMenu() {
           mainWindow
             ? dialog.showMessageBox(mainWindow, options)
             : dialog.showMessageBox(options),
+        downloadAndQuit: (url) => runUpdateDownload(url),
         openExternal: (url) => shell.openExternal(url),
-        quit: () => app.quit(),
       }),
     onResetWindowSize: () => {
       if (mainWindow) {
