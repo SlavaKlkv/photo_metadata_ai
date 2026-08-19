@@ -2349,7 +2349,7 @@
      четыре группы и их объём. */
   .metadata-orbit {
     --metadata-cycle: 10.5s;
-    --metadata-core-size: clamp(96px, 16vw, 148px);
+    --metadata-core-size: clamp(104px, 12vw, 124px);
     /* На широком — воздух у круга; на узком зазор растёт, чтобы блоки
        у края экрана не врезались в окружность. */
     --metadata-node-gap: max(16px, min(120px, 12%), calc(100px - 10vw));
@@ -2371,20 +2371,68 @@
     top: 50%;
     left: 50%;
     z-index: 2;
-    display: grid;
-    place-items: center;
-    align-content: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    /* Всё от диаметра, без clamp: вокруг ~12.5%, между строками ~4.5%. */
+    --metadata-core-pad: calc(var(--metadata-core-size) * .125);
+    --metadata-core-gap: calc(var(--metadata-core-size) * .045);
+    padding: var(--metadata-core-pad) calc(var(--metadata-core-size) * .12);
+    gap: var(--metadata-core-gap);
     width: var(--metadata-core-size);
     height: var(--metadata-core-size);
     border: 1px solid rgba(139, 136, 248, .58);
     border-radius: 50%;
-    background: var(--panel);
+    background: radial-gradient(circle, rgba(139, 136, 248, .22), var(--panel) 66%, var(--bg-soft));
+    box-shadow: 0 0 0 10px rgba(139, 136, 248, .035), 0 0 60px rgba(129, 125, 240, .2);
     text-align: center;
     transform: var(--metadata-core-final-transform);
   }
-  .metadata-core strong { font-size: 50px; font-weight: 600; line-height: .9; letter-spacing: -.05em; }
-  .metadata-core span { margin-top: 8px; color: var(--accent-2); font-family: inherit; font-size: 12.5px; font-weight: 600; letter-spacing: 0; }
-  .metadata-core small { margin-top: 5px; color: var(--dim); font-family: inherit; font-size: 11.5px; }
+  .metadata-core::after {
+    content: "";
+    position: absolute;
+    inset: -13px;
+    z-index: -1;
+    border: 1px solid rgba(139, 136, 248, .12);
+    border-radius: 50%;
+    box-shadow: 0 0 48px rgba(129, 125, 240, .16);
+    animation: metadata-breathe var(--metadata-cycle) cubic-bezier(.45, 0, .55, 1) infinite;
+  }
+  .metadata-core strong {
+    display: block;
+    font-size: calc(var(--metadata-core-size) * .32);
+    font-weight: 600;
+    line-height: .84;
+    letter-spacing: -.05em;
+  }
+  .metadata-core > span {
+    display: block;
+    color: var(--accent-2);
+    font-family: inherit;
+    font-size: calc(var(--metadata-core-size) * .092);
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0;
+  }
+  .metadata-core small {
+    display: block;
+    max-width: 78%;
+    color: var(--dim);
+    font-family: inherit;
+    font-size: calc(var(--metadata-core-size) * .076);
+    line-height: 1.05;
+    text-wrap: balance;
+  }
+  /* Круг = clamp(104px, 12vw, 124px): пол 104px с ~867px.
+     Трёхсловная строка туда уже не встаёт — сначала убираем «один». */
+  @media (max-width: 870px) {
+    .metadata-core-one { display: none; }
+  }
+  @media (max-width: 480px) {
+    /* В самом маленьком круге даже «за проход» не читается — убираем. */
+    .metadata-core small { display: none; }
+  }
 
   .metadata-ray {
     position: absolute;
@@ -2406,7 +2454,6 @@
     width: auto;
     min-width: 0;
     max-width: 100%;
-    overflow-wrap: anywhere;
     transition: opacity .22s ease;
   }
   /* Внешняя кромка чуть внутри края, внутренняя — вертикаль за окружностью. */
@@ -2461,10 +2508,27 @@
     font-size: 17.5px;
     font-weight: 600;
     letter-spacing: -.01em;
-    overflow-wrap: anywhere;
+    overflow-wrap: normal;
+    word-break: keep-all;
     animation: metadata-label-glow var(--metadata-cycle) ease-in-out infinite;
   }
   .metadata-node p { margin: 0; color: #8c8c9a; font-family: inherit; font-size: 13.5px; line-height: 1.5; }
+  /* Ломка заголовка или бейджа «N полей» — то же правило для всех четырёх
+     блоков: к центру, колонки шире. Стоит после базовых h3/small, иначе
+     font-size 17.5px / flex-wrap: wrap перебивают. */
+  @media (max-width: 860px) {
+    .metadata-orbit {
+      --metadata-node-gap: clamp(8px, 2.6vw, 22px);
+      --metadata-node-edge: clamp(8px, 2.2vw, 18px);
+    }
+    .metadata-node h3 { font-size: 16px; }
+    .metadata-node small {
+      font-size: 10.5px;
+      padding: 3px 6px;
+      flex-wrap: nowrap;
+      white-space: nowrap;
+    }
+  }
   .metadata-node h3, .metadata-node p { transition: color .22s ease, transform .22s cubic-bezier(.22, .8, .3, 1), text-shadow .22s ease; }
   .metadata-node:hover h3 { color: var(--accent-2); transform: translateY(-2px); }
   .metadata-node:hover p { color: var(--muted); }
@@ -2624,6 +2688,11 @@
   @keyframes metadata-core-in { to { opacity: 1; transform: var(--metadata-core-final-transform); } }
   @keyframes metadata-ray-in { to { opacity: 1; scale: 1 1; } }
   @keyframes metadata-node-in { to { opacity: 1; transform: none; } }
+  @keyframes metadata-breathe {
+    0% { opacity: .18; transform: scale(.9); }
+    24%, 78% { opacity: 1; transform: scale(1.08); }
+    100% { opacity: .18; transform: scale(.9); }
+  }
   @keyframes metadata-focus {
     0%, 28%, 100% { opacity: 0; transform: scale(.96); }
     46%, 62% { opacity: .9; transform: scale(1.02); }
@@ -3491,6 +3560,7 @@
       scale: 1 1;
       transform: none;
     }
+    .metadata-core::after { animation: none; opacity: .55; transform: none; }
     .metadata-node::before { animation: none; opacity: 0; transform: none; }
     .metadata-node h3 { animation: none; }
     .metadata-node { transition: none; }
@@ -3835,7 +3905,7 @@
         <div class="metadata-core">
           <strong>17</strong>
           <span>полей</span>
-          <small>за один проход</small>
+          <small>за&nbsp;<span class="metadata-core-one">один </span>проход</small>
         </div>
 
         <div class="metadata-node" data-group="text">

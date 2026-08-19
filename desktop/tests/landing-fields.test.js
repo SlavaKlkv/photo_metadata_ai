@@ -61,6 +61,9 @@ test('орбита метаданных держит 17 полей в четыр
   expect(fields[1]).toMatch(/<small>5 полей<\/small>/);
   expect(fields[1]).toMatch(/<small>4 поля<\/small>/);
   expect(fields[1]).toMatch(/<small>5 полей · по ситуации<\/small>/);
+  expect(fields[1]).toMatch(
+    /за(?:&nbsp;|\u00a0)<span class="metadata-core-one">один <\/span>проход/,
+  );
 });
 
 test('детали со всеми 17 полями свёрнуты по умолчанию и перечисляют имена', () => {
@@ -201,4 +204,42 @@ test('круг 17 полей центрирован, схема орбиты н�
   // Телефонная сетка больше не перестраивает орбиту: блоки остаются у краёв.
   expect(compact).toBeNull();
   expect(css).not.toMatch(/@media \(max-width: 520px\)/);
+});
+
+test('когда правые категории начинают ломаться, все блоки сдвигаются к центру', () => {
+  const css = styleSheet(readLanding());
+  const mid = mediaBlock(css, '(max-width: 860px)');
+
+  expect(css).toMatch(/\.metadata-node h3\s*\{[^}]*word-break:\s*keep-all/s);
+  expect(mid).toMatch(/\.metadata-orbit\s*\{[^}]*--metadata-node-gap:\s*clamp\(8px/s);
+  expect(mid).toMatch(/\.metadata-node h3\s*\{\s*font-size:\s*16px/);
+  expect(mid).toMatch(/\.metadata-node small\s*\{[^}]*white-space:\s*nowrap/s);
+  expect(mid).toMatch(/\.metadata-node small\s*\{[^}]*flex-wrap:\s*nowrap/s);
+});
+
+test('подпись круга: полная → без «один» → скрыта', () => {
+  const html = readLanding();
+  const css = styleSheet(html);
+  const dropOne = mediaBlock(css, '(max-width: 870px)');
+  const tiny = mediaBlock(css, '(max-width: 480px)');
+
+  expect(html).toMatch(
+    /<small>за(?:&nbsp;|\u00a0)<span class="metadata-core-one">один <\/span>проход<\/small>/,
+  );
+  expect(css).toMatch(/\.metadata-orbit\s*\{[^}]*--metadata-core-size:\s*clamp\(104px/s);
+  expect(css).toMatch(
+    /\.metadata-core\s*\{[^}]*--metadata-core-pad:\s*calc\(var\(--metadata-core-size\) \* \.125\)/s,
+  );
+  expect(css).toMatch(
+    /\.metadata-core\s*\{[^}]*--metadata-core-gap:\s*calc\(var\(--metadata-core-size\) \* \.045\)/s,
+  );
+  expect(css).toMatch(/\.metadata-core\s*\{[^}]*gap:\s*var\(--metadata-core-gap\)/s);
+  expect(css).not.toMatch(/\.metadata-core\s*\{[^}]*gap:\s*clamp\(/s);
+  expect(css).toMatch(/\.metadata-core strong\s*\{[^}]*font-size:\s*calc\(var\(--metadata-core-size\) \* \.32\)/s);
+  expect(css).toMatch(/\.metadata-core strong\s*\{[^}]*line-height:\s*\.84/s);
+  expect(css).toMatch(/\.metadata-core > span\s*\{[^}]*font-size:\s*calc\(var\(--metadata-core-size\) \* \.092\)/s);
+  expect(css).not.toMatch(/\.metadata-core > span\s*\{[^}]*margin-top:\s*calc\([^)]*-\./s);
+  expect(css).toMatch(/\.metadata-core small\s*\{[^}]*max-width:\s*78%/s);
+  expect(dropOne).toMatch(/\.metadata-core-one\s*\{\s*display:\s*none/);
+  expect(tiny).toMatch(/\.metadata-core small\s*\{\s*display:\s*none/);
 });
