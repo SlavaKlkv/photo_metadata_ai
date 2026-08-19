@@ -6,6 +6,7 @@ declare global {
       setAppBusy?: (busy: boolean) => void;
       downloadUpdate?: () => Promise<void>;
       onUpdateDownloadEnded?: (callback: () => void) => () => void;
+      onEnterFullscreen?: (callback: () => void) => () => void;
     };
   }
 }
