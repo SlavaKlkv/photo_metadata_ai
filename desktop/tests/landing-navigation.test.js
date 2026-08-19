@@ -217,6 +217,7 @@ test.each(['index.html', 'screens.html'])(
     const lockup = html.match(/\n  \.brand-lockup \{([^}]*)\}/);
     expect(lockup).not.toBeNull();
     expect(lockup[1]).toMatch(/display:\s*inline-flex/);
+    expect(lockup[1]).toMatch(/width:\s*max-content/);
     expect(lockup[1]).toMatch(/min-width:\s*0/);
     expect(lockup[1]).toMatch(/max-width:\s*100%/);
     expect((html.match(/class="brand-sparkle(?:\s|")/g) || []).length).toBe(16);

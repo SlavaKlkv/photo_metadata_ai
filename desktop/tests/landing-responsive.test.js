@@ -25,7 +25,7 @@ function mediaBlock(html, condition) {
 describe('навигация по разделам доступна на узких экранах', () => {
   test('вместо обрезанной ленты — бургер и та же #nav-links панелью', () => {
     const html = readLanding();
-    const narrow = mediaBlock(html, '(max-width: 860px)');
+    const narrow = mediaBlock(html, '(max-width: 1080px)');
 
     expect(narrow).not.toBeNull();
     // Лента со скроллом обрезала пункты на реальном телефоне.
@@ -36,11 +36,12 @@ describe('навигация по разделам доступна на узк�
     expect(html).toMatch(/id="nav-toggle"/);
     expect(html).toMatch(/aria-controls="nav-links"/);
     expect(html).toMatch(/aria-expanded="false"/);
+    expect(html).toMatch(/matchMedia\('\(max-width: 1080px\)'\)/);
   });
 
   test('шапка одной строки: --header-h снова 64px', () => {
     const html = readLanding();
-    const narrow = mediaBlock(html, '(max-width: 860px)');
+    const narrow = mediaBlock(html, '(max-width: 1080px)');
 
     // scroll-margin-top якорей считается от --header-h.
     expect(narrow).toMatch(/:root\s*\{[^}]*--header-h:\s*64px/s);
@@ -54,16 +55,40 @@ describe('навигация по разделам доступна на узк�
     expect((nav[0].match(/<a /g) || []).length).toBe(5);
   });
 
-  test('на узкой ширине бренд уступает место бургеру', () => {
+  test('на узкой ширине бренд уступает место бургеру и не растягивает зону', () => {
     const html = readLanding();
-    const narrow = mediaBlock(html, '(max-width: 860px)');
+    const narrow = mediaBlock(html, '(max-width: 1080px)');
 
     expect(narrow).toMatch(/\.brand\s*\{[^}]*min-width:\s*0/s);
+    // Зона искр/hover остаётся вокруг локапа, а не заполняет шапку до бургера.
+    expect(narrow).toMatch(/\.brand\s*\{[^}]*flex:\s*0 1 auto/s);
+    expect(narrow).toMatch(/\.brand\s*\{[^}]*width:\s*max-content/s);
+    expect(narrow).not.toMatch(/\.brand\s*\{[^}]*flex:\s*1 1 auto/s);
     expect(narrow).toMatch(/\.brand-name\s*\{[^}]*text-overflow:\s*ellipsis/s);
     // .dmg прячет html.not-mac (mac-desktop.js), не этот media query.
     expect(narrow).not.toMatch(/releases\/download/);
     expect(narrow).not.toMatch(/\.cta-note/);
     expect(narrow).not.toMatch(/margin-right:\s*118px/);
+  });
+
+  test('бургер справа от края только без «Скачать»; иначе слева от кнопки', () => {
+    const html = readLanding();
+    const narrow = mediaBlock(html, '(max-width: 1080px)');
+    const header = html.match(/<header[\s\S]*?<\/header>/)[0];
+
+    expect(narrow).not.toBeNull();
+    // Порядок в разметке: бургер, затем «Скачать» — когда кнопка в шапке.
+    expect(header).toMatch(/id="nav-toggle"[\s\S]*class="[^"]*nav-cta/);
+    expect(narrow).toMatch(/\.nav-toggle\s*\{[^}]*margin-left:\s*auto/s);
+    expect(narrow).not.toMatch(/\.nav-toggle\s*\{[^}]*order:\s*3/s);
+    expect(narrow).not.toMatch(/Бургер всегда крайний справа/);
+    // Скрытая кнопка не держит слот — иначе бургер не у правого края.
+    expect(narrow).toMatch(
+      /header\.hero-cta-visible \.nav-cta\s*\{[^}]*position:\s*absolute/s,
+    );
+    expect(narrow).toMatch(
+      /header\.hero-cta-visible \.nav-cta\s*\{[^}]*width:\s*0/s,
+    );
   });
 
   test('скрипт открывает и закрывает меню', () => {

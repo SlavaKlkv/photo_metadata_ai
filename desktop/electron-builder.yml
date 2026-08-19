@@ -62,16 +62,16 @@ mac:
 # позиции ниже согласованы с ним.
 dmg:
   window:
-    width: 600
-    height: 400
+    width: 660
+    height: 440
   iconSize: 128
   iconTextSize: 16
   contents:
-    - x: 160
-      y: 150
+    - x: 190
+      y: 153
       type: file
-    - x: 440
-      y: 150
+    - x: 470
+      y: 153
       type: link
       path: /Applications
 
