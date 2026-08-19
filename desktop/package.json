@@ -1,7 +1,7 @@
 {
   "name": "photo-metadata-ai-desktop",
   "productName": "Photo Metadata AI",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "Photo Metadata AI — macOS desktop shell",
   "main": "src/main.js",
   "private": true,
