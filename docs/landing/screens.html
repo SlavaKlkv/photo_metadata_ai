@@ -195,13 +195,14 @@
     -webkit-tap-highlight-color: transparent;
   }
   .brand:hover { text-decoration: none; }
-  /* Метка + надпись. На узкой ширине .brand тянется до бургера,
-     а искры сидят только на этой связке (и на расширенных краях). */
+  /* Метка + надпись. Искры и hover живут на этой связке (плюс inset слоя).
+     Локап по содержимому: зона не растягивается на пустое место шапки. */
   .brand-lockup {
     position: relative;
     display: inline-flex;
     align-items: center;
     gap: 11px;
+    width: max-content;
     min-width: 0;
     max-width: 100%;
   }

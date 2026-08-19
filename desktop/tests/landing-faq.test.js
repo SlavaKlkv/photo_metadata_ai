@@ -36,13 +36,13 @@ test('ответы фиксируют Gatekeeper, AI-вариант, JPEG и р�
   const faq = faqSection(html)[1];
 
   // Основной путь — через настройки безопасности; терминальная команда
-  // остаётся запасной. Порядок обязателен к упоминанию: разрешение
-  // Gatekeeper выдаётся конкретной копии, и приложение, разрешённое в
-  // папке загрузок, после переноса в «Программы» блокируется снова.
+  // остаётся запасной. Сначала перенос в Applications, запуск уже оттуда:
+  // разрешение Gatekeeper выдаётся конкретной копии, и приложение,
+  // разрешённое в папке загрузок, после переноса блокируется снова.
   expect(faq).toContain('карантин');
   expect(faq).toContain('Открыть всё равно');
   expect(faq).toContain('Конфиденциальность');
-  expect(faq).toMatch(/до<\/b> первого запуска|до\s*<b>первого запуска/);
+  expect(faq).toMatch(/Перетащите в «Applications» и запустите оттуда/);
   expect(faq).toContain('xattr -dr com.apple.quarantine');
   expect(faq).toMatch(/Ollama|Qwen2\.5-VL|Gemini|OpenRouter/);
   expect(faq).toContain('JPEG');
