@@ -1,0 +1,68 @@
+@import '../../../styles/variables.module.scss';
+
+.hint {
+  position: fixed;
+  top: var(--spacing-lg);
+  left: 50%;
+  z-index: var(--z-tooltip);
+  padding: 10px var(--spacing-md);
+  color: var(--text-primary);
+  background: rgba(27, 27, 34, 0.94);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: fullscreenHint 2500ms ease forwards;
+
+  kbd {
+    display: inline-block;
+    margin: 0 2px;
+    padding: 1px 6px;
+    color: var(--text-primary);
+    background: var(--bg-foreground);
+    border: 1px solid var(--border-hover);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.16);
+    font: inherit;
+    font-size: var(--font-size-sm);
+  }
+}
+
+@keyframes fullscreenHint {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+
+  12%,
+  76% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hint {
+    animation-name: fullscreenHintReducedMotion;
+  }
+}
+
+@keyframes fullscreenHintReducedMotion {
+  0%,
+  76% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
