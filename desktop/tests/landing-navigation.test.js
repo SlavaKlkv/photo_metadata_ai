@@ -34,6 +34,15 @@ test('ссылки шапки ведут на существующие якор�
   }
 });
 
+test('все разделы используют уменьшенное смещение при переходе по якорю', () => {
+  const html = fs.readFileSync(indexPath, 'utf8');
+
+  expect(html).toMatch(
+    /section\[id\]\s*\{[^}]*scroll-margin-top:\s*calc\(var\(--header-h\) - 40px\)/
+  );
+  expect(html).not.toMatch(/section\[id\],\s*div\[id\]/);
+});
+
 test('брендовый якорь и hero-ссылка «Как это работает» указывают на существующие цели', () => {
   const html = fs.readFileSync(indexPath, 'utf8');
 
@@ -317,57 +326,22 @@ test.each(['index.html', 'screens.html'])(
     expect(html).toMatch(/clip-path:\s*inset\(46% 42%\)/);
     expect(html).toMatch(/\.brand-sparkle\.is-restarting::before/);
 
-    // Среди 16: 5 одиночных, 5 парных, 6 триад (2↑ + dur + dul + hr + hl).
+    // Среди 16: 5 одиночных, 5 парных и 6 одинаковых компактных триад.
     const sparkleTags = html.match(/<i class="brand-sparkle(?: [^"]*)?"/g) || [];
     expect(sparkleTags).toHaveLength(16);
     expect((html.match(/class="brand-sparkle brand-sparkle-pair"/g) || [])).toHaveLength(5);
-    expect((html.match(/class="brand-sparkle brand-sparkle-triad"/g) || [])).toHaveLength(2);
-    expect(
-      (html.match(/class="brand-sparkle brand-sparkle-triad brand-sparkle-triad-dur"/g) || [])
-    ).toHaveLength(1);
-    expect(
-      (html.match(/class="brand-sparkle brand-sparkle-triad brand-sparkle-triad-dul"/g) || [])
-    ).toHaveLength(1);
-    expect(
-      (html.match(/class="brand-sparkle brand-sparkle-triad brand-sparkle-triad-hr"/g) || [])
-    ).toHaveLength(1);
-    expect(
-      (html.match(/class="brand-sparkle brand-sparkle-triad brand-sparkle-triad-hl"/g) || [])
-    ).toHaveLength(1);
+    expect((html.match(/class="brand-sparkle brand-sparkle-triad"/g) || [])).toHaveLength(6);
+    expect(html).not.toMatch(/brand-sparkle-triad-(?:dur|dul|hr|hl)/);
     expect(
       sparkleTags.filter((tag) => !tag.includes('pair') && !tag.includes('triad'))
     ).toHaveLength(5);
     expect((html.match(/brand-sparkle-step-2/g) || []).length).toBeGreaterThanOrEqual(7);
     expect((html.match(/brand-sparkle-step-3/g) || []).length).toBeGreaterThanOrEqual(7);
     expect(html).toMatch(
-      /\.brand-sparkle-step-2\s*\{[^}]*left:\s*19%[^}]*top:\s*-72%[^}]*width:\s*62%[^}]*brand-sparkle-chain-2/
+      /\.brand-sparkle-step-2\s*\{[^}]*left:\s*-38%[^}]*top:\s*-22%[^}]*width:\s*58%[^}]*brand-sparkle-chain-2/
     );
     expect(html).toMatch(
-      /\.brand-sparkle-step-3\s*\{[^}]*left:\s*31%[^}]*top:\s*-118%[^}]*width:\s*38%[^}]*brand-sparkle-chain-3/
-    );
-    expect(html).toMatch(
-      /\.brand-sparkle-triad-dur \.brand-sparkle-step-2\s*\{[^}]*left:\s*78%[^}]*top:\s*-72%/
-    );
-    expect(html).toMatch(
-      /\.brand-sparkle-triad-dur \.brand-sparkle-step-3\s*\{[^}]*left:\s*128%[^}]*top:\s*-118%/
-    );
-    expect(html).toMatch(
-      /\.brand-sparkle-triad-dul \.brand-sparkle-step-2\s*\{[^}]*left:\s*-40%[^}]*top:\s*-72%/
-    );
-    expect(html).toMatch(
-      /\.brand-sparkle-triad-dul \.brand-sparkle-step-3\s*\{[^}]*left:\s*-66%[^}]*top:\s*-118%/
-    );
-    expect(html).toMatch(
-      /\.brand-sparkle-triad-hr \.brand-sparkle-step-2\s*\{[^}]*left:\s*108%[^}]*top:\s*19%/
-    );
-    expect(html).toMatch(
-      /\.brand-sparkle-triad-hr \.brand-sparkle-step-3\s*\{[^}]*left:\s*180%[^}]*top:\s*31%/
-    );
-    expect(html).toMatch(
-      /\.brand-sparkle-triad-hl \.brand-sparkle-step-2\s*\{[^}]*left:\s*-70%[^}]*top:\s*19%/
-    );
-    expect(html).toMatch(
-      /\.brand-sparkle-triad-hl \.brand-sparkle-step-3\s*\{[^}]*left:\s*-118%[^}]*top:\s*31%/
+      /\.brand-sparkle-step-3\s*\{[^}]*left:\s*10%[^}]*top:\s*-52%[^}]*width:\s*34%[^}]*brand-sparkle-chain-3/
     );
     expect(html).toMatch(/@keyframes brand-sparkle-chain-2\s*\{[\s\S]*?17%[\s\S]*?28%/);
     expect(html).toMatch(/@keyframes brand-sparkle-chain-3\s*\{[\s\S]*?28%[\s\S]*?39%/);

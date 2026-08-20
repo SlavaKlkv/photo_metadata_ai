@@ -61,8 +61,9 @@ describe('галерея экранов', () => {
     expect(html).toContain('id="lb-prev"');
     expect(html).toContain('id="lb-next"');
     expect(html).toContain('id="lb-close"');
-    // Стрелки с document; focus shell — dialog, не «первая нажатая» chrome-кнопка.
-    expect(html).toContain("document.addEventListener('keydown'");
+    // Capture на window ловит стрелку сразу после deep-link, ещё до перевода фокуса.
+    expect(html).toContain("window.addEventListener('keydown'");
+    expect(html).toMatch(/window\.addEventListener\('keydown',[\s\S]*?\}, true\)/);
     expect(html).toContain('if (!dialog.open) return');
     expect(html).toContain('function openAt');
     expect(html).toContain('function shellFocus');
@@ -72,6 +73,9 @@ describe('галерея экранов', () => {
     expect(html).toMatch(/\.lb-btn:focus-visible/);
     expect(html).toMatch(/event\.key === 'ArrowRight'/);
     expect(html).toMatch(/event\.key === 'ArrowLeft'/);
+    expect(html).toMatch(/event\.key === 'Escape'/);
+    expect(html).toContain("dialog.addEventListener('cancel'");
+    expect(html).toMatch(/event\.preventDefault\(\);\s*dialog\.close\(\)/);
     // Зацикливание: 1→15 и 15→1 через go/wrap, кнопки не disabled на краях.
     expect(html).toContain('function wrap');
     expect(html).toContain('function go');

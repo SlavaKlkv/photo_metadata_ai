@@ -138,18 +138,40 @@ test('поля связаны с группами орбиты: hover стопи
   expect(css).toMatch(/\.field-cloud span\s*\{[^}]*transition:/s);
 });
 
-test('ниже 1000px лучи и фоновая подсветка групп уходят вместе', () => {
-  const css = styleSheet(readLanding());
+test('лучи сохраняются на всех ширинах и следуют за блоками', () => {
+  const html = readLanding();
+  const css = styleSheet(html);
   const narrow = mediaBlock(css, '(max-width: 1000px)');
 
   expect(narrow).not.toBeNull();
-  // Луч в 31% орбиты дотягивается до подписи, только пока орбита держит
-  // проектные 960px. Ниже — лучи режут круг, поэтому уходят вместе с ореолом.
-  expect(narrow).toMatch(/\.metadata-ray\s*\{\s*display:\s*none;?\s*\}/);
+  expect(narrow).not.toMatch(/\.metadata-ray\s*\{[^}]*display:\s*none/s);
+  expect(css).toMatch(/\.metadata-ray\s*\{[^}]*top:\s*var\(--metadata-ray-y,\s*50%\)/s);
+  expect(css).toMatch(/\.metadata-ray\s*\{[^}]*left:\s*var\(--metadata-ray-x,\s*50%\)/s);
+  expect(css).toMatch(/\.metadata-ray\s*\{[^}]*width:\s*var\(--metadata-ray-length,\s*31%\)/s);
+  expect(css).toMatch(/\.metadata-ray\s*\{[^}]*rotate\(var\(--metadata-ray-angle\)\)/s);
+  expect(html).toMatch(/function syncMetadataRays\(\)/);
+  expect(html).toMatch(/var distance = Math\.hypot\(dx, dy\)/);
+  expect(html).toMatch(/Math\.max\(0, distance - coreRadius\)/);
+  expect(html).toMatch(/Math\.atan2\(dy, dx\)/);
+  expect(html).toMatch(/new ResizeObserver\(scheduleMetadataRays\)/);
+  expect(html).toMatch(/function syncMetadataCenter\(\)/);
+  expect(html).toMatch(/function syncMetadataColumns\(\)/);
+  expect(html).toMatch(/function metadataDiagramInset\(\)/);
+  expect(html).toMatch(/function metadataAdaptiveProgress\(\)/);
+  expect(html).toMatch(/Math\.min\(\s*816,\s*window\.innerWidth - metadataDiagramInset\(\) \* 2/s);
+  expect(html).toMatch(/var topGap = 35\.3 \+ \(118\.2 - 35\.3\) \* progress/);
+  expect(html).toMatch(/var bottomGap = 44\.6 \+ \(120\.9 - 44\.6\) \* progress/);
+  expect(html).toMatch(/var columnOutset = Math\.min\(fieldOutset, maximumColumnOutset\)/);
+  expect(html).toMatch(/var nodeEdge = Math\.max\(4, Math\.min\(18, window\.innerWidth \* \.05 - 18\)\)/);
+  expect(html).toMatch(/rayTrackingUntil = performance\.now\(\) \+ 240/);
+  expect(html).toMatch(/range\.selectNodeContents\(element\)/);
+  expect(html).toMatch(/--metadata-orbit-shift-x/);
+  expect(html).toMatch(/window\.innerWidth >= 1008/);
+  expect(html).toMatch(/window\.innerWidth \/ 2 - inkCenter/);
   // content: none снимает псевдоэлемент целиком, поэтому и автоцикл, и
   // подсветка от pill остаются без фона — opacity в других правилах не оживит.
   expect(narrow).toMatch(/\.metadata-node::before\s*\{\s*content:\s*none;?\s*\}/);
-  // Исчезновение декора не должно перестраивать диаграмму.
+  // Отключение только фонового ореола не должно перестраивать диаграмму.
   expect(narrow).not.toMatch(/\.metadata-orbit\s*\{[^}]*display:\s*grid/s);
   expect(narrow).not.toMatch(/\.metadata-core\s*\{[^}]*order:/s);
   // Орбита продолжает сжиматься с окном — без скачка на 720px.
@@ -164,31 +186,32 @@ test('ниже 1000px лучи и фоновая подсветка групп �
   expect(css).toMatch(/\.metadata-node h3\s*\{[^}]*animation:\s*metadata-label-glow/s);
 });
 
-test('категории якорятся внутренней вертикалью от круга', () => {
+test('на широком экране группы сохраняют исходные отступы', () => {
   const css = styleSheet(readLanding());
   const node = css.match(/\n  \.metadata-node\s*\{([^}]*)\}/);
+  const narrow = mediaBlock(css, '(max-width: 1000px)');
 
   expect(node).not.toBeNull();
-  expect(node[1]).toMatch(/width:\s*auto/);
+  expect(node[1]).toMatch(/width:\s*clamp\(/);
+  expect(node[1]).toMatch(/var\(--metadata-node-min-width\)/);
+  expect(node[1]).toMatch(/260px/);
   expect(css).toMatch(
-    /\.metadata-node:nth-of-type\(2\),\s*\n\s*\.metadata-node:nth-of-type\(4\)\s*\{[^}]*text-align:\s*right/s,
-  );
-  expect(node[1]).toMatch(/min-width:\s*0/);
-  expect(css).toMatch(
-    /\.metadata-node:nth-of-type\(2\),\s*\n\s*\.metadata-node:nth-of-type\(4\)\s*\{[^}]*left:\s*var\(--metadata-node-edge\)/s,
+    /\.metadata-node:nth-of-type\(2\)\s*\{[^}]*top:\s*28px;[^}]*left:\s*calc\(var\(--metadata-node-edge\) - var\(--metadata-column-outset\)\)/s,
   );
   expect(css).toMatch(
-    /\.metadata-node:nth-of-type\(2\),\s*\n\s*\.metadata-node:nth-of-type\(4\)\s*\{[^}]*right:\s*calc\(50% \+ \(var\(--metadata-core-size\) \/ 2\) \+ var\(--metadata-node-gap\)\)/s,
+    /\.metadata-node:nth-of-type\(3\)\s*\{[^}]*top:\s*28px;[^}]*right:\s*calc\(var\(--metadata-node-edge\) - var\(--metadata-column-outset\)\)/s,
   );
   expect(css).toMatch(
-    /\.metadata-node:nth-of-type\(3\),\s*\n\s*\.metadata-node:nth-of-type\(5\)\s*\{[^}]*text-align:\s*left/s,
+    /\.metadata-node:nth-of-type\(4\)\s*\{[^}]*bottom:\s*28px;[^}]*left:\s*calc\(var\(--metadata-node-edge\) - var\(--metadata-column-outset\)\)/s,
   );
   expect(css).toMatch(
-    /\.metadata-node:nth-of-type\(3\),\s*\n\s*\.metadata-node:nth-of-type\(5\)\s*\{[^}]*right:\s*var\(--metadata-node-edge\)/s,
+    /\.metadata-node:nth-of-type\(5\)\s*\{[^}]*right:\s*calc\(var\(--metadata-node-edge\) - var\(--metadata-column-outset\)\);[^}]*bottom:\s*28px/s,
   );
-  expect(css).toMatch(
-    /\.metadata-node:nth-of-type\(3\),\s*\n\s*\.metadata-node:nth-of-type\(5\)\s*\{[^}]*left:\s*calc\(50% \+ \(var\(--metadata-core-size\) \/ 2\) \+ var\(--metadata-node-gap\)\)/s,
-  );
+
+  expect(narrow).not.toMatch(/\.metadata-node\s*\{[^}]*width:\s*auto/s);
+  expect(narrow).toMatch(/\.metadata-node\s*\{[^}]*min-width:\s*0/s);
+  expect(narrow).not.toMatch(/right:\s*calc\(50% \+ \(var\(--metadata-core-size\)/);
+  expect(narrow).not.toMatch(/left:\s*calc\(50% \+ \(var\(--metadata-core-size\)/);
 });
 
 test('круг 17 полей центрирован, схема орбиты не ломается на узком', () => {
@@ -206,40 +229,92 @@ test('круг 17 полей центрирован, схема орбиты н�
   expect(css).not.toMatch(/@media \(max-width: 520px\)/);
 });
 
-test('когда правые категории начинают ломаться, все блоки сдвигаются к центру', () => {
+test('при уменьшении ширины все четыре блока сжимаются синхронно', () => {
   const css = styleSheet(readLanding());
-  const mid = mediaBlock(css, '(max-width: 860px)');
+  const mid = mediaBlock(css, '(max-width: 1000px)');
 
   expect(css).toMatch(/\.metadata-node h3\s*\{[^}]*word-break:\s*keep-all/s);
-  expect(mid).toMatch(/\.metadata-orbit\s*\{[^}]*--metadata-node-gap:\s*clamp\(8px/s);
-  expect(mid).toMatch(/\.metadata-node h3\s*\{\s*font-size:\s*16px/);
-  expect(mid).toMatch(/\.metadata-node small\s*\{[^}]*white-space:\s*nowrap/s);
-  expect(mid).toMatch(/\.metadata-node small\s*\{[^}]*flex-wrap:\s*nowrap/s);
+  expect(mid).not.toMatch(/--metadata-node-gap:/);
+  expect(css).toMatch(
+    /\.metadata-node h3\s*\{[^}]*font-size:\s*clamp\(16px,\s*calc\(8\.5px \+ \.75vw\),\s*17\.5px\)/s,
+  );
+  expect(css).toMatch(/\.metadata-node small\s*\{[^}]*white-space:\s*nowrap/s);
+  expect(css).toMatch(/\.metadata-node small\s*\{[^}]*flex-wrap:\s*nowrap/s);
 });
 
-test('подпись круга: полная → без «один» → скрыта', () => {
+test('на телефоне орбита использует viewport и держит описания в двух строках', () => {
+  const css = styleSheet(readLanding());
+  const responsive = mediaBlock(css, '(max-width: 1000px)');
+  const sharedWrap = mediaBlock(css, '(max-width: 840px)');
+  const phone = mediaBlock(css, '(max-width: 440px)');
+  const tiny = mediaBlock(css, '(max-width: 380px)');
+
+  expect(css).toMatch(
+    /--metadata-orbit-width:\s*min\(960px,\s*calc\(100vw - 48px\)\)/,
+  );
+  expect(css).toMatch(
+    /--metadata-orbit-half-width:\s*min\(480px,\s*calc\(50vw - 24px\)\)/,
+  );
+  expect(css).toMatch(/\.metadata-orbit\s*\{[^}]*width:\s*var\(--metadata-orbit-width\)/s);
+  expect(css).toMatch(
+    /\.metadata-orbit\s*\{[^}]*margin:\s*46px 0 0 calc\([^}]*50% - var\(--metadata-orbit-half-width\) \+ var\(--metadata-orbit-shift-x\)[^}]*\)/s,
+  );
+  expect(responsive).toMatch(/height:\s*clamp\(400px,\s*calc\(360px \+ 6vw\),\s*410px\)/);
+  expect(responsive).toMatch(/overflow-x:\s*visible/);
+  expect(css).toMatch(
+    /--metadata-node-min-width:\s*clamp\(88px,\s*calc\(50vw - 38px\),\s*142px\)/,
+  );
+  expect(css).toMatch(
+    /--metadata-node-edge:\s*clamp\(4px,\s*calc\(5vw - 18px\),\s*18px\)/,
+  );
+  expect(css).toMatch(
+    /\.metadata-node\s*\{[^}]*width:\s*clamp\([^}]*var\(--metadata-node-min-width\)[^}]*260px/s,
+  );
+  const responsiveNode = responsive.match(/\.metadata-node\s*\{([^}]*)\}/);
+  expect(responsiveNode).not.toBeNull();
+  expect(responsiveNode[1]).not.toMatch(/(?:^|;)\s*width:/);
+  expect(phone).toMatch(/\.metadata-node p\s*\{[^}]*text-wrap:\s*balance/s);
+  expect(sharedWrap).toMatch(/\.metadata-node p\s*\{[^}]*max-width:\s*175px/s);
+  expect(phone).not.toMatch(/--metadata-node-width|--metadata-bottom-row-height/);
+  expect(tiny).toMatch(
+    /\.metadata-node small\s*\{[^}]*font-size:\s*clamp\(7px,\s*calc\(-2\.8px \+ 3\.5vw\),\s*10\.5px\)/s,
+  );
+  expect(tiny).toMatch(
+    /\.metadata-node h3\s*\{[^}]*font-size:\s*clamp\(11\.5px,\s*calc\(-1\.1px \+ 4\.5vw\),\s*16px\)/s,
+  );
+  expect(tiny).toMatch(
+    /\.metadata-node p\s*\{[^}]*font-size:\s*clamp\(9\.5px,\s*calc\(2\.05px \+ 2\.66vw\),\s*12\.2px\)/s,
+  );
+});
+
+test('круг сохраняет исходный масштаб и сжимается только на узком экране', () => {
   const html = readLanding();
   const css = styleSheet(html);
-  const dropOne = mediaBlock(css, '(max-width: 870px)');
+  const scaled = mediaBlock(css, '(max-width: 759px)');
+  const dropOne = mediaBlock(css, '(max-width: 780px)');
   const tiny = mediaBlock(css, '(max-width: 480px)');
 
   expect(html).toMatch(
     /<small>за(?:&nbsp;|\u00a0)<span class="metadata-core-one">один <\/span>проход<\/small>/,
   );
-  expect(css).toMatch(/\.metadata-orbit\s*\{[^}]*--metadata-core-size:\s*clamp\(104px/s);
   expect(css).toMatch(
+    /\.metadata-orbit\s*\{[^}]*--metadata-core-size:\s*clamp\(104px,\s*calc\(43\.5px \+ 13\.75vw\),\s*148px\)/s,
+  );
+  expect(css).toMatch(/\.metadata-core\s*\{[^}]*display:\s*grid/s);
+  expect(css).toMatch(/\.metadata-core\s*\{[^}]*place-items:\s*center/s);
+  expect(css).toMatch(/\.metadata-core strong\s*\{[^}]*font-size:\s*50px/s);
+  expect(css).toMatch(/\.metadata-core > span\s*\{[^}]*margin-top:\s*8px/s);
+  expect(css).toMatch(/\.metadata-core small\s*\{[^}]*margin-top:\s*5px/s);
+  expect(scaled).toMatch(
     /\.metadata-core\s*\{[^}]*--metadata-core-pad:\s*calc\(var\(--metadata-core-size\) \* \.125\)/s,
   );
-  expect(css).toMatch(
+  expect(scaled).toMatch(
     /\.metadata-core\s*\{[^}]*--metadata-core-gap:\s*calc\(var\(--metadata-core-size\) \* \.045\)/s,
   );
-  expect(css).toMatch(/\.metadata-core\s*\{[^}]*gap:\s*var\(--metadata-core-gap\)/s);
-  expect(css).not.toMatch(/\.metadata-core\s*\{[^}]*gap:\s*clamp\(/s);
-  expect(css).toMatch(/\.metadata-core strong\s*\{[^}]*font-size:\s*calc\(var\(--metadata-core-size\) \* \.32\)/s);
-  expect(css).toMatch(/\.metadata-core strong\s*\{[^}]*line-height:\s*\.84/s);
-  expect(css).toMatch(/\.metadata-core > span\s*\{[^}]*font-size:\s*calc\(var\(--metadata-core-size\) \* \.092\)/s);
-  expect(css).not.toMatch(/\.metadata-core > span\s*\{[^}]*margin-top:\s*calc\([^)]*-\./s);
-  expect(css).toMatch(/\.metadata-core small\s*\{[^}]*max-width:\s*78%/s);
+  expect(scaled).toMatch(/\.metadata-core\s*\{[^}]*gap:\s*var\(--metadata-core-gap\)/s);
+  expect(scaled).toMatch(/\.metadata-core strong\s*\{[^}]*font-size:\s*calc\(var\(--metadata-core-size\) \* \.32\)/s);
+  expect(scaled).toMatch(/\.metadata-core > span\s*\{[^}]*margin-top:\s*0/s);
+  expect(scaled).toMatch(/\.metadata-core small\s*\{[^}]*max-width:\s*78%/s);
   expect(dropOne).toMatch(/\.metadata-core-one\s*\{\s*display:\s*none/);
   expect(tiny).toMatch(/\.metadata-core small\s*\{\s*display:\s*none/);
 });

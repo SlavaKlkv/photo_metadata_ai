@@ -15,9 +15,9 @@
 #     иконки через NSWorkspace (резурс-форк + флаг custom icon);
 #   - дописывает их в settings-JSON от dmg-builder: dmgbuild копирует
 #     contents-файлы через /usr/bin/ditto, сохраняя резурс-форки;
-#   - фиксирует окну размер 660x440 (3:2, как у 600x400) и держит
-#     композицию по центру с запасом снизу, чтобы Finder не показывал
-#     нижний скролл.
+#   - фиксирует окну размер 660x440 (3:2, как у 600x400) и распределяет
+#     композицию по доступной площади с безопасными полями, чтобы Finder
+#     не показывал нижний скролл.
 # Затем вызывает python-бандл dmgbuild (путь бинарника в
 # REAL_DMGBUILD, задаётся в build-mac.sh) через мини-драйвер.
 
@@ -137,14 +137,14 @@ arrow = '\u00a0'
 tiles = ['\u2002', '\u2003', '\u2004', '\u2005']
 contents.append({
     'x': 330,
-    'y': 153,
+    'y': 155,
     'type': 'file',
     'path': os.path.join(extra_dir, arrow),
 })
 for x, name in zip([138, 266, 394, 522], tiles):
     contents.append({
         'x': x,
-        'y': 303,
+        'y': 310,
         'type': 'file',
         'path': os.path.join(extra_dir, name),
     })
