@@ -11,6 +11,8 @@ const {
 } = require('../scripts/update-landing-release.js');
 
 const landingPath = path.resolve(__dirname, '../../docs/landing/index.html');
+const screensPath = path.resolve(__dirname, '../../docs/landing/screens.html');
+const readmePath = path.resolve(__dirname, '../../README.md');
 
 function readLanding() {
   return fs.readFileSync(landingPath, 'utf8');
@@ -44,6 +46,35 @@ test('подстановка переписывает все ссылки на D
   expect([...new Set(hrefs)]).toEqual([
     'https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v9.9.9/Photo-Metadata-AI-9.9.9-arm64.dmg',
   ]);
+});
+
+test('подстановка обновляет ссылку галереи без требования строки размеров', () => {
+  const updated = applyReleaseInfo(fs.readFileSync(screensPath, 'utf8'), {
+    version: '9.9.9',
+    dmgBytes: 140_000_000,
+    appBytes: 330_000_000,
+    requireSizes: false,
+  });
+
+  expect(updated).toContain(
+    'releases/download/v9.9.9/Photo-Metadata-AI-9.9.9-arm64.dmg',
+  );
+});
+
+test('подстановка обновляет прямую ссылку скачивания в README', () => {
+  const updated = applyReleaseInfo(fs.readFileSync(readmePath, 'utf8'), {
+    version: '9.9.9',
+    dmgBytes: 140_000_000,
+    appBytes: 330_000_000,
+    requireSizes: false,
+  });
+
+  expect(updated).toContain(
+    '[Скачать `.dmg`](https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v9.9.9/Photo-Metadata-AI-9.9.9-arm64.dmg)',
+  );
+  expect(updated).toContain(
+    '[актуальный `.dmg`](https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v9.9.9/Photo-Metadata-AI-9.9.9-arm64.dmg)',
+  );
 });
 
 test('подстановка обновляет оба размера, не трогая остальной текст', () => {
