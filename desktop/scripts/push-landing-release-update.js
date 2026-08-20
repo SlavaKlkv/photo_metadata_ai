@@ -56,30 +56,38 @@ function checkoutBranch(branch, remoteRef) {
   runCommand('git', ['checkout', '-B', branch, remoteRef]);
 }
 
-function landingHasChanges(landingPath) {
-  const { status } = runCommand('git', ['diff', '--quiet', '--', landingPath], {
+function normalizeLandingPaths({ landingPath, landingPaths }) {
+  return landingPaths ?? [landingPath];
+}
+
+function landingHasChanges(landingPaths) {
+  const { status } = runCommand('git', ['diff', '--quiet', '--', ...landingPaths], {
     allowFailure: true,
   });
   return status !== 0;
 }
 
-function applyLandingUpdateScript({ version, appPath, dmgPath, landingPath }) {
+function applyLandingUpdateScript({ version, appPath, dmgPath, landingPaths }) {
   const scriptPath = path.join(__dirname, 'update-landing-release.js');
-  runCommand('node', [
-    scriptPath,
-    '--app',
-    appPath,
-    '--dmg',
-    dmgPath,
-    '--landing',
-    landingPath,
-    '--version',
-    version,
-  ]);
+  landingPaths.forEach((landingPath, index) => {
+    const args = [
+      scriptPath,
+      '--app',
+      appPath,
+      '--dmg',
+      dmgPath,
+      '--landing',
+      landingPath,
+      '--version',
+      version,
+    ];
+    if (index > 0) args.push('--links-only', 'true');
+    runCommand('node', args);
+  });
 }
 
-function commitLandingUpdate({ landingPath, version }) {
-  runCommand('git', ['add', landingPath]);
+function commitLandingUpdate({ landingPaths, version }) {
+  runCommand('git', ['add', '--', ...landingPaths]);
   runCommand('git', ['commit', '-m', buildCommitMessage(version)]);
 }
 
@@ -123,7 +131,7 @@ function createPullRequest({ baseBranch, headBranch, version }) {
       '- Коммит создан release workflow после сборки фактических артефактов.',
       '',
       '## Checking',
-      '1. Открыть `docs/landing/index.html` и проверить ссылки на DMG `v' + version + '`.',
+      '1. Открыть `docs/landing/index.html`, `docs/landing/screens.html` и `README.md` и проверить ссылки на DMG `v' + version + '`.',
       '2. Убедиться, что в `cta-note` указаны актуальные размеры загрузки и установки.',
     ].join('\n'),
   ]);
@@ -165,6 +173,7 @@ function updateBranch({
   appPath,
   dmgPath,
   landingPath,
+  landingPaths,
   checkoutBranchImpl = checkoutBranch,
   applyLandingUpdateScriptImpl = applyLandingUpdateScript,
   landingHasChangesImpl = landingHasChanges,
@@ -176,17 +185,23 @@ function updateBranch({
   mergePullRequestImpl = mergePullRequest,
 }) {
   const strategy = getUpdateStrategy(branch);
+  const resolvedLandingPaths = normalizeLandingPaths({ landingPath, landingPaths });
 
   if (strategy === 'direct') {
     checkoutBranchImpl(branch, `origin/${branch}`);
-    applyLandingUpdateScriptImpl({ version, appPath, dmgPath, landingPath });
+    applyLandingUpdateScriptImpl({
+      version,
+      appPath,
+      dmgPath,
+      landingPaths: resolvedLandingPaths,
+    });
 
-    if (!landingHasChangesImpl(landingPath)) {
+    if (!landingHasChangesImpl(resolvedLandingPaths)) {
       console.log(`==> ${branch}: лендинг уже актуален`);
       return { branch, strategy, changed: false };
     }
 
-    commitLandingUpdateImpl({ landingPath, version });
+    commitLandingUpdateImpl({ landingPaths: resolvedLandingPaths, version });
     pushDirectBranchImpl(branch);
     console.log(`==> ${branch}: обновление запушено`);
     return { branch, strategy, changed: true };
@@ -194,14 +209,19 @@ function updateBranch({
 
   const prBranch = buildPrBranchName(version);
   checkoutBranchImpl(prBranch, `origin/${branch}`);
-  applyLandingUpdateScriptImpl({ version, appPath, dmgPath, landingPath });
+  applyLandingUpdateScriptImpl({
+    version,
+    appPath,
+    dmgPath,
+    landingPaths: resolvedLandingPaths,
+  });
 
-  if (!landingHasChangesImpl(landingPath)) {
+  if (!landingHasChangesImpl(resolvedLandingPaths)) {
     console.log(`==> ${branch}: лендинг уже актуален`);
     return { branch, strategy, changed: false };
   }
 
-  commitLandingUpdateImpl({ landingPath, version });
+  commitLandingUpdateImpl({ landingPaths: resolvedLandingPaths, version });
   pushPrBranchImpl(prBranch);
 
   let prNumber = findOpenPrNumberImpl({ baseBranch: branch, headBranch: prBranch });
@@ -227,13 +247,19 @@ function main(argv) {
   const version = args.get('--version');
   const appPath = args.get('--app');
   const dmgPath = args.get('--dmg');
-  const landingPath = args.get('--landing') ?? 'docs/landing/index.html';
+  const landingPaths = (
+    args.get('--landing') ?? 'docs/landing/index.html,docs/landing/screens.html,README.md'
+  )
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
   const branchesArg = args.get('--branches') ?? 'develop,main';
 
   if (!version || !appPath || !dmgPath) {
     console.error(
       'Использование: push-landing-release-update.js --version <x.y.z> ' +
-        '--app <.app> --dmg <.dmg> [--landing docs/landing/index.html] ' +
+        '--app <.app> --dmg <.dmg> ' +
+        '[--landing docs/landing/index.html,docs/landing/screens.html,README.md] ' +
         '[--branches develop,main]',
     );
     process.exit(1);
@@ -242,7 +268,7 @@ function main(argv) {
   configureGitIdentity();
 
   for (const branch of branchesArg.split(',').map((item) => item.trim()).filter(Boolean)) {
-    updateBranch({ branch, version, appPath, dmgPath, landingPath });
+    updateBranch({ branch, version, appPath, dmgPath, landingPaths });
   }
 }
 

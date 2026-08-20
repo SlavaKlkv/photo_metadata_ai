@@ -28,14 +28,21 @@ function readLanding() {
 // иначе главная и галерея расходятся по версиям.
 test('кнопки скачивания на всех страницах сходятся на один релиз arm64', () => {
   const screensPath = path.resolve(__dirname, '../../docs/landing/screens.html');
-  const pages = [readLanding(), fs.readFileSync(screensPath, 'utf8')];
+  const readmePath = path.resolve(__dirname, '../../README.md');
+  const pages = [
+    readLanding(),
+    fs.readFileSync(screensPath, 'utf8'),
+    fs.readFileSync(readmePath, 'utf8'),
+  ];
   const dmgHrefs = pages.flatMap((html) =>
-    [...html.matchAll(/href="(https:\/\/github\.com\/SlavaKlkv\/photo_metadata_ai\/releases\/download\/[^"]+\.dmg)"/g)].map(
-      (m) => m[1],
-    ),
+    [
+      ...html.matchAll(
+        /(https:\/\/github\.com\/SlavaKlkv\/photo_metadata_ai\/releases\/download\/[^"\s)]+\.dmg)/g,
+      ),
+    ].map((m) => m[1]),
   );
 
-  expect(dmgHrefs).toHaveLength(4);
+  expect(dmgHrefs).toHaveLength(6);
   expect([...new Set(dmgHrefs)]).toEqual([dmgUrl]);
 });
 

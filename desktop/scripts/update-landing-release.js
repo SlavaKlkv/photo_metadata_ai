@@ -46,14 +46,14 @@ function formatMb(bytes) {
 
 // Возвращает изменённый HTML, не трогая файл: так одну и ту же правку
 // можно применить к разным веткам, а тесты обходятся без записи.
-function applyReleaseInfo(html, { version, dmgBytes, appBytes }) {
+function applyReleaseInfo(html, { version, dmgBytes, appBytes, requireSizes = true }) {
   const dmgUrl =
     `https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v${version}/` +
     `Photo-Metadata-AI-${version}-arm64.dmg`;
 
   const updated = html
     .replace(
-      /https:\/\/github\.com\/SlavaKlkv\/photo_metadata_ai\/releases\/download\/v[^"]+\.dmg/g,
+      /https:\/\/github\.com\/SlavaKlkv\/photo_metadata_ai\/releases\/download\/v[^"'\s)]+\.dmg/g,
       dmgUrl,
     )
     // Размеры живут в начале строки-примечания; остальная её часть (про
@@ -69,7 +69,10 @@ function applyReleaseInfo(html, { version, dmgBytes, appBytes }) {
     throw new Error('в лендинге не найдено ни одной ссылки на DMG');
   }
 
-  if (!/<p class="cta-note">Загрузка \d+ МБ · после установки \d+ МБ/.test(updated)) {
+  if (
+    requireSizes &&
+    !/<p class="cta-note">Загрузка \d+ МБ · после установки \d+ МБ/.test(updated)
+  ) {
     throw new Error('в лендинге не найдена строка cta-note с размерами');
   }
 
@@ -84,6 +87,7 @@ function main(argv) {
   const dmgPath = args.get('--dmg');
   const landingPath = args.get('--landing');
   const version = args.get('--version');
+  const requireSizes = args.get('--links-only') !== 'true';
 
   if (!appPath || !dmgPath || !landingPath || !version) {
     console.error(
@@ -96,7 +100,7 @@ function main(argv) {
   const appBytes = appSizeBytes(appPath);
   const dmgBytes = fs.statSync(dmgPath).size;
   const html = fs.readFileSync(landingPath, 'utf8');
-  const updated = applyReleaseInfo(html, { version, dmgBytes, appBytes });
+  const updated = applyReleaseInfo(html, { version, dmgBytes, appBytes, requireSizes });
 
   fs.writeFileSync(landingPath, updated);
   console.log(
