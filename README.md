@@ -18,7 +18,7 @@ AI анализирует каждый кадр, генерирует полны
 
 [**Страница проекта**](https://slavaklkv.github.io/photo_metadata_ai/landing/) ·
 [Все экраны](https://slavaklkv.github.io/photo_metadata_ai/landing/screens.html) ·
-[Скачать `.dmg`](https://github.com/SlavaKlkv/photo_metadata_ai/releases) ·
+[Скачать `.dmg`](https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.2.6/Photo-Metadata-AI-1.2.6-arm64.dmg) ·
 [Установка](#установка) ·
 [Как это устроено](#как-это-устроено) ·
 [Разработка](#разработка) ·
@@ -39,7 +39,7 @@ AI анализирует каждый кадр, генерирует полны
 
 ## Установка
 
-1. Скачайте `.dmg` из [Releases](https://github.com/SlavaKlkv/photo_metadata_ai/releases).
+1. Скачайте [актуальный `.dmg`](https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.2.6/Photo-Metadata-AI-1.2.6-arm64.dmg).
 2. Откройте образ и перетащите **Photo Metadata AI.app** в `Applications`.
 3. При первом запуске приложение проведёт через AI Setup: подключение локальной Ollama
    и/или ввод ключей Gemini и OpenRouter.
@@ -286,5 +286,3 @@ Source available, not open source. Copyright (c) 2026 Photo Metadata AI. All rig
 ## Credits
 
 **Contributors:** [Nastassja](https://github.com/nastassja-dev), [Konstantin Borodich](https://github.com/KoBorodich)
-
-

@@ -32,16 +32,19 @@ describe('push-landing-release-update', () => {
       version: '1.2.4',
       appPath: 'app.app',
       dmgPath: 'app.dmg',
-      landingPath: 'docs/landing/index.html',
+      landingPaths: ['docs/landing/index.html', 'docs/landing/screens.html', 'README.md'],
       checkoutBranchImpl: (branch, remoteRef) => {
         calls.push(['checkout', branch, remoteRef]);
       },
       applyLandingUpdateScriptImpl: (payload) => {
-        calls.push(['apply', payload.version]);
+        calls.push(['apply', payload.version, payload.landingPaths]);
       },
-      landingHasChangesImpl: () => true,
-      commitLandingUpdateImpl: ({ version }) => {
-        calls.push(['commit', version]);
+      landingHasChangesImpl: (landingPaths) => {
+        calls.push(['changed', landingPaths]);
+        return true;
+      },
+      commitLandingUpdateImpl: ({ version, landingPaths }) => {
+        calls.push(['commit', version, landingPaths]);
       },
       pushPrBranchImpl: (prBranch) => {
         calls.push(['push', prBranch]);
@@ -61,8 +64,9 @@ describe('push-landing-release-update', () => {
     });
     expect(calls).toEqual([
       ['checkout', 'chore/landing-size-v1.2.4', 'origin/main'],
-      ['apply', '1.2.4'],
-      ['commit', '1.2.4'],
+      ['apply', '1.2.4', ['docs/landing/index.html', 'docs/landing/screens.html', 'README.md']],
+      ['changed', ['docs/landing/index.html', 'docs/landing/screens.html', 'README.md']],
+      ['commit', '1.2.4', ['docs/landing/index.html', 'docs/landing/screens.html', 'README.md']],
       ['push', 'chore/landing-size-v1.2.4'],
       ['merge', '42'],
     ]);

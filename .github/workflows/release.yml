@@ -149,5 +149,5 @@ jobs:
             --version "$version" \
             --app "desktop/out/mac-arm64/Photo Metadata AI.app" \
             --dmg "desktop/out/Photo Metadata AI-$version-arm64.dmg" \
-            --landing docs/landing/index.html \
+            --landing docs/landing/index.html,docs/landing/screens.html,README.md \
             --branches develop,main
