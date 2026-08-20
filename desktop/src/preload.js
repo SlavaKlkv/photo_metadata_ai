@@ -15,4 +15,9 @@ contextBridge.exposeInMainWorld('desktopShell', {
     ipcRenderer.on('update-download:ended', handler);
     return () => ipcRenderer.removeListener('update-download:ended', handler);
   },
+  onEnterFullscreen: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('app:entered-fullscreen', handler);
+    return () => ipcRenderer.removeListener('app:entered-fullscreen', handler);
+  },
 });

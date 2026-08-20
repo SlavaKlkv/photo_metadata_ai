@@ -874,28 +874,23 @@ test('временные искры добавляются на старте и 
   expect(stage.extraStars.every((star) => star.className.includes('brand-sparkle'))).toBe(true);
   expect(stage.extraStars.every((star) => star.getAttribute('data-spark-cell') != null)).toBe(true);
 
-  const hrExtras = stage.extraStars.filter((star) =>
-    /\bbrand-sparkle-triad-hr\b/.test(star.className)
+  const triadExtras = stage.extraStars.filter((star) =>
+    /\bbrand-sparkle-triad\b/.test(star.className)
   );
-  const hlExtras = stage.extraStars.filter((star) =>
-    /\bbrand-sparkle-triad-hl\b/.test(star.className)
-  );
-  expect(hrExtras).toHaveLength(1);
-  expect(hlExtras).toHaveLength(1);
-  expect(hrExtras[0].className).toMatch(/\bbrand-sparkle-extra\b/);
-  expect(hlExtras[0].className).toMatch(/\bbrand-sparkle-extra\b/);
-  expect(hrExtras[0].style.getPropertyValue('--sz')).toBe('11px');
-  expect(hlExtras[0].style.getPropertyValue('--sz')).toBe('11px');
-  expect(Number(hrExtras[0].getAttribute('data-spark-cell')) % 4).toBeGreaterThanOrEqual(2);
-  expect(Number(hlExtras[0].getAttribute('data-spark-cell')) % 4).toBeLessThanOrEqual(1);
-  expect(hrExtras[0].children.map((c) => c.className)).toEqual([
-    'brand-sparkle-step brand-sparkle-step-2',
-    'brand-sparkle-step brand-sparkle-step-3',
-  ]);
-  expect(hlExtras[0].children.map((c) => c.className)).toEqual([
-    'brand-sparkle-step brand-sparkle-step-2',
-    'brand-sparkle-step brand-sparkle-step-3',
-  ]);
+  expect(triadExtras).toHaveLength(2);
+  expect(triadExtras.every((star) => /\bbrand-sparkle-extra\b/.test(star.className))).toBe(true);
+  expect(triadExtras.every((star) => star.style.getPropertyValue('--sz') === '11px')).toBe(true);
+  expect(
+    triadExtras.every(
+      (star) => !/\bbrand-sparkle-triad-(?:dur|dul|hr|hl)\b/.test(star.className)
+    )
+  ).toBe(true);
+  triadExtras.forEach((star) => {
+    expect(star.children.map((c) => c.className)).toEqual([
+      'brand-sparkle-step brand-sparkle-step-2',
+      'brand-sparkle-step brand-sparkle-step-3',
+    ]);
+  });
   expect(
     stage.extraStars.filter((star) => !/\bbrand-sparkle-triad\b/.test(star.className))
   ).toHaveLength(2);

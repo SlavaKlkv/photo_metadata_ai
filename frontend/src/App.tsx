@@ -15,6 +15,7 @@ import { SuccessModal } from './components/organisms/SuccessModal/SuccessModal';
 import { OnboardingModal } from './components/organisms/OnboardingModal/OnboardingModal';
 import { AISetupModal } from './components/organisms/AISetupModal/AISetupModal';
 import { UpdateBanner } from './components/organisms/UpdateBanner/UpdateBanner';
+import { FullscreenHint } from './components/organisms/FullscreenHint/FullscreenHint';
 import { SectionHeader } from './components/molecules/SectionHeader/SectionHeader';
 import { Button } from './components/atoms/Button/Button';
 import { Icon } from './components/atoms/Icon/Icon';
@@ -111,6 +112,7 @@ function App() {
       <OnboardingModal />
       <AISetupModal />
       <UpdateBanner />
+      <FullscreenHint />
     </div>
   );
 }

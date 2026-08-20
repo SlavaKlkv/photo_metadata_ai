@@ -129,6 +129,30 @@ describe('настройки окна DMG в Finder', () => {
     expect(wrapper).toMatch(/settings\['show_sidebar'\] = False/);
     expect(wrapper).toMatch(/window\['size'\] = \{'width': 660, 'height': 440\}/);
   });
+
+  it('распределяет установочную композицию по окну с симметричными полями', () => {
+    const config = fs.readFileSync(
+      path.resolve(__dirname, '../electron-builder.yml'),
+      'utf8',
+    );
+    const wrapper = fs.readFileSync(
+      path.resolve(__dirname, '../scripts/dmgbuild-wrapper.sh'),
+      'utf8',
+    );
+    const iconGenerator = fs.readFileSync(
+      path.resolve(__dirname, '../scripts/generate-dmg-icons.py'),
+      'utf8',
+    );
+
+    expect(config).toMatch(/- x: 155\n\s+y: 155\n\s+type: file/);
+    expect(config).toMatch(/- x: 505\n\s+y: 155\n\s+type: link/);
+    expect(config).toMatch(/iconTextSize: 16/);
+    expect(wrapper).toMatch(/settings\['text_size'\] = 16/);
+    expect(wrapper).toMatch(/'x': 330,\n\s+'y': 155,/);
+    expect(wrapper).toMatch(/'y': 310,/);
+    expect(iconGenerator).toMatch(/ARROW_WIDTH_PT = 120/);
+    expect(iconGenerator).toMatch(/HINT_WIDTH_PT = 480/);
+  });
 });
 
 // Workflow не должен возвращаться к публикации силами electron-builder.

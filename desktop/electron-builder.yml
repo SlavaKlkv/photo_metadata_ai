@@ -67,11 +67,11 @@ dmg:
   iconSize: 128
   iconTextSize: 16
   contents:
-    - x: 190
-      y: 153
+    - x: 155
+      y: 155
       type: file
-    - x: 470
-      y: 153
+    - x: 505
+      y: 155
       type: link
       path: /Applications
 

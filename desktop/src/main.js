@@ -30,6 +30,7 @@ const {
   createCloseGuard,
 } = require('./close-guard');
 const { installExternalLinkHandler } = require('./external-links');
+const { installFullscreenControls } = require('./fullscreen');
 const { waitForBackend } = require('./health-check');
 const { pipeBackendLogs } = require('./logging');
 const { clearRendererCacheOnVersionChange } = require('./render-cache');
@@ -239,6 +240,7 @@ function createMainWindow() {
     },
   });
   installExternalLinkHandler(mainWindow.webContents);
+  installFullscreenControls(mainWindow);
   if (state.isMaximized) {
     mainWindow.maximize();
   }

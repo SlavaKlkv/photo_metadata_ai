@@ -24,15 +24,18 @@ function readLanding() {
   return fs.readFileSync(landingPath, 'utf8');
 }
 
-// Все CTA скачивания обязаны указывать на один и тот же релиз: иначе
-// шапка, hero и финальный блок разъедутся по версиям.
-test('кнопки скачивания DMG сходятся на один релиз arm64', () => {
-  const html = readLanding();
-  const dmgHrefs = [...html.matchAll(/href="(https:\/\/github\.com\/SlavaKlkv\/photo_metadata_ai\/releases\/download\/[^"]+\.dmg)"/g)].map(
-    (m) => m[1],
+// Все CTA скачивания на обеих страницах обязаны указывать на один релиз:
+// иначе главная и галерея расходятся по версиям.
+test('кнопки скачивания на всех страницах сходятся на один релиз arm64', () => {
+  const screensPath = path.resolve(__dirname, '../../docs/landing/screens.html');
+  const pages = [readLanding(), fs.readFileSync(screensPath, 'utf8')];
+  const dmgHrefs = pages.flatMap((html) =>
+    [...html.matchAll(/href="(https:\/\/github\.com\/SlavaKlkv\/photo_metadata_ai\/releases\/download\/[^"]+\.dmg)"/g)].map(
+      (m) => m[1],
+    ),
   );
 
-  expect(dmgHrefs.length).toBeGreaterThanOrEqual(3);
+  expect(dmgHrefs).toHaveLength(4);
   expect([...new Set(dmgHrefs)]).toEqual([dmgUrl]);
 });
 

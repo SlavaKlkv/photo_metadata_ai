@@ -74,8 +74,8 @@
     --line: rgba(255, 255, 255, 0.09);
     --line-strong: rgba(255, 255, 255, 0.16);
     --text: #ececf1;
-    --muted: #a1a1ae;
-    --dim: #77778a;
+    --muted: #adadba;
+    --dim: #89899b;
     --accent: #8b88f8;
     --accent-2: #aaa8ff;
     --accent-dim: rgba(139, 136, 248, 0.14);
@@ -317,9 +317,9 @@
     animation-timing-function: ease-in-out, ease-out;
     animation-iteration-count: infinite, infinite;
   }
-  /* Generative-триада: 2 вертикальных вверх, 2 диагональных вверх в разные
-     стороны и 2 горизонтальных в разные стороны. Одна группа = одна ячейка;
-     среди 16 их 6. */
+  /* Generative-триада повторяет компактный знак с референса: крупная искра
+     снизу справа, средняя сверху слева и самая малая над ними. Все шесть
+     триад имеют одну геометрию и занимают по одной ячейке. */
   .brand-sparkle-step {
     position: absolute;
     display: block;
@@ -332,50 +332,18 @@
     filter: drop-shadow(0 0 4px rgba(121, 212, 255, .42));
   }
   .brand-sparkle-step-2 {
-    left: 19%;
-    top: -72%;
-    width: 62%;
-    height: 62%;
+    left: -38%;
+    top: -22%;
+    width: 58%;
+    height: 58%;
     animation: brand-sparkle-chain-2 var(--dur, 5s) var(--delay, 0s) ease-in-out infinite;
   }
   .brand-sparkle-step-3 {
-    left: 31%;
-    top: -118%;
-    width: 38%;
-    height: 38%;
+    left: 10%;
+    top: -52%;
+    width: 34%;
+    height: 34%;
     animation: brand-sparkle-chain-3 var(--dur, 5s) var(--delay, 0s) ease-in-out infinite;
-  }
-  .brand-sparkle-triad-dur .brand-sparkle-step-2 {
-    left: 78%;
-    top: -72%;
-  }
-  .brand-sparkle-triad-dur .brand-sparkle-step-3 {
-    left: 128%;
-    top: -118%;
-  }
-  .brand-sparkle-triad-dul .brand-sparkle-step-2 {
-    left: -40%;
-    top: -72%;
-  }
-  .brand-sparkle-triad-dul .brand-sparkle-step-3 {
-    left: -66%;
-    top: -118%;
-  }
-  .brand-sparkle-triad-hr .brand-sparkle-step-2 {
-    left: 108%;
-    top: 19%;
-  }
-  .brand-sparkle-triad-hr .brand-sparkle-step-3 {
-    left: 180%;
-    top: 31%;
-  }
-  .brand-sparkle-triad-hl .brand-sparkle-step-2 {
-    left: -70%;
-    top: 19%;
-  }
-  .brand-sparkle-triad-hl .brand-sparkle-step-3 {
-    left: -118%;
-    top: 31%;
   }
   /* Спокойный desktop-режим: один знак поблёскивает раз в 3–6 секунд.
      Исходная сетка скрыта; половина импульсов — двойной знак с signal-ring. */
@@ -794,6 +762,34 @@
     padding-bottom: 80px;
   }
 
+  .gallery-group {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 22px 0 -2px;
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 620;
+    line-height: 1.3;
+    letter-spacing: .01em;
+  }
+  .gallery-group:first-child { margin-top: 0; }
+  .gallery-group::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--line-strong), transparent);
+  }
+  .gallery-group small {
+    order: 2;
+    color: var(--dim);
+    font-size: 12.5px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .gallery-group::after { order: 3; }
+
   .gallery button {
     display: block;
     position: relative;
@@ -1085,6 +1081,11 @@
       gap: 14px;
       padding-bottom: 64px;
     }
+    .gallery-group {
+      gap: 10px;
+      margin: 20px 0 0;
+      font-size: 14.5px;
+    }
     .gallery .meta { padding: 13px 14px 15px; }
     .to-top { right: 14px; bottom: 14px; }
     dialog.lightbox {
@@ -1164,16 +1165,16 @@
       <span class="brand-sparkles" aria-hidden="true">
         <i class="brand-sparkle" style="--x:3%;--y:36%;--sz:8px;--dur:5s;--delay:0s;--rot:-11deg"></i>
         <i class="brand-sparkle brand-sparkle-pair" style="--x:8%;--y:58%;--sz:6px;--dur:5s;--delay:-2.5s;--rot:9deg"></i>
-        <i class="brand-sparkle brand-sparkle-triad brand-sparkle-triad-hr" style="--x:14%;--y:28%;--sz:11px;--dur:5s;--delay:-1.25s;--rot:5deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
+        <i class="brand-sparkle brand-sparkle-triad" style="--x:14%;--y:28%;--sz:11px;--dur:5s;--delay:-1.25s;--rot:5deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
         <i class="brand-sparkle" style="--x:20%;--y:64%;--sz:8px;--dur:5s;--delay:-3.75s;--rot:-8deg"></i>
         <i class="brand-sparkle brand-sparkle-pair" style="--x:27%;--y:40%;--sz:6px;--dur:5s;--delay:-0.62s;--rot:12deg"></i>
         <i class="brand-sparkle" style="--x:33%;--y:18%;--sz:8px;--dur:5s;--delay:-3.12s;--rot:-6deg"></i>
-        <i class="brand-sparkle brand-sparkle-triad brand-sparkle-triad-dur" style="--x:40%;--y:52%;--sz:11px;--dur:5s;--delay:-1.88s;--rot:8deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
+        <i class="brand-sparkle brand-sparkle-triad" style="--x:40%;--y:52%;--sz:11px;--dur:5s;--delay:-1.88s;--rot:8deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
         <i class="brand-sparkle brand-sparkle-pair" style="--x:46%;--y:34%;--sz:6px;--dur:5s;--delay:-4.38s;--rot:-12deg"></i>
         <i class="brand-sparkle" style="--x:52%;--y:68%;--sz:6px;--dur:5s;--delay:-0.31s;--rot:6deg"></i>
-        <i class="brand-sparkle brand-sparkle-triad brand-sparkle-triad-dul" style="--x:58%;--y:24%;--sz:11px;--dur:5s;--delay:-2.81s;--rot:-9deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
+        <i class="brand-sparkle brand-sparkle-triad" style="--x:58%;--y:24%;--sz:11px;--dur:5s;--delay:-2.81s;--rot:-9deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
         <i class="brand-sparkle brand-sparkle-pair" style="--x:64%;--y:48%;--sz:8px;--dur:5s;--delay:-1.56s;--rot:11deg"></i>
-        <i class="brand-sparkle brand-sparkle-triad brand-sparkle-triad-hl" style="--x:70%;--y:72%;--sz:11px;--dur:5s;--delay:-4.06s;--rot:-5deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
+        <i class="brand-sparkle brand-sparkle-triad" style="--x:70%;--y:72%;--sz:11px;--dur:5s;--delay:-4.06s;--rot:-5deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
         <i class="brand-sparkle" style="--x:76%;--y:30%;--sz:6px;--dur:5s;--delay:-0.94s;--rot:12deg"></i>
         <i class="brand-sparkle brand-sparkle-pair" style="--x:81%;--y:56%;--sz:11px;--dur:5s;--delay:-3.44s;--rot:-10deg"></i>
         <i class="brand-sparkle brand-sparkle-triad" style="--x:85%;--y:22%;--sz:11px;--dur:5s;--delay:-2.19s;--rot:3deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
@@ -1192,7 +1193,7 @@
       </span>
       </span>
     </a>
-    <a class="btn btn-primary" href="https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.2.0/Photo-Metadata-AI-1.2.0-arm64.dmg">Скачать</a>
+    <a class="btn btn-primary" href="https://github.com/SlavaKlkv/photo_metadata_ai/releases/download/v1.2.5/Photo-Metadata-AI-1.2.5-arm64.dmg">Скачать</a>
     <a class="btn nav-home" href="index.html">← На главную</a>
   </div>
 </header>
@@ -1209,6 +1210,7 @@
   </div>
 
   <div class="gallery" id="gallery">
+    <h2 class="gallery-group">Установка <small>3 экрана</small></h2>
     <button type="button" id="shot-01_dmg_installer" data-src="../screenshots/01_dmg_installer.png" data-title="Установка" data-caption="Смонтированный DMG: перетаскивание «Photo Metadata AI.app» в папку Applications.">
       <img src="../screenshots/01_dmg_installer.png" width="1424" height="1024" alt="Смонтированный DMG" loading="lazy">
       <span class="meta"><b>Установка</b><span>Перетаскивание «Photo Metadata AI.app» в папку Applications.</span></span>
@@ -1221,6 +1223,7 @@
       <img class="shot-tall" src="../screenshots/03_ai_setup.png" width="923" height="1016" alt="Окно AI Setup" loading="lazy">
       <span class="meta"><b>AI Setup</b><span>Подключение провайдеров и проверка ключа с понятной ошибкой.</span></span>
     </button>
+    <h2 class="gallery-group">Обработка <small>8 экранов</small></h2>
     <button type="button" id="shot-04_start_screen" data-src="../screenshots/04_start_screen.png" data-title="Шаг 1 — Upload" data-caption="Пустая зона drag &amp; drop, панель «Context &amp; Settings» с выбором провайдера (Gemini), стоковой площадки (Getty Images) и формата экспорта, а также карточки возможностей.">
       <img src="../screenshots/04_start_screen_1200.png" width="1200" height="920" alt="Шаг Upload" loading="lazy">
       <span class="meta"><b>Шаг 1 — Upload</b><span>Пустая зона drag &amp; drop, провайдер, площадка и формат экспорта.</span></span>
@@ -1258,6 +1261,7 @@
       <img src="../screenshots/11_select_ready_only_1200.png" width="1200" height="920" alt="Редакционные поля" loading="lazy">
       <span class="meta"><b>Editorial-поля</b><span>Подпись, локация и ошибка об обязательной editorial-дате.</span></span>
     </button>
+    <h2 class="gallery-group">Экспорт <small>4 экрана</small></h2>
     <button type="button" id="shot-12_export_in_progress" data-src="../screenshots/12_export_in_progress.png" data-title="Шаг 5 — Export" data-caption="Модальное окно прогресса «Exporting: 48/70» с возможностью отмены.">
       <img src="../screenshots/12_export_in_progress_1200.png" width="1200" height="920" alt="Экспорт в процессе" loading="lazy">
       <span class="meta"><b>Шаг 5 — Export</b><span>Запись CSV и копий фотографий с метаданными.</span></span>
@@ -1305,13 +1309,13 @@
   <p class="lb-caption" id="lb-caption"></p>
 </dialog>
 
-<script src="ambient-particle-flags.js?v=flags6"></script>
+<script src="ambient-particle-flags.js?v=flags9"></script>
 <script src="brand-iris/geometry.js?v=spark7"></script>
 <script src="brand-iris/motion.js?v=spark7"></script>
 <script src="brand-iris/handoff.js?v=spark7"></script>
 <script src="brand-iris/presence.js?v=spark7"></script>
 <script src="brand-iris/init.js?v=spark7"></script>
-<script src="brand-sparkles.js?v=spark67"></script>
+<script src="brand-sparkles.js?v=spark68"></script>
 <script src="header-swap.js"></script>
 <script>
   (function () {
@@ -1576,12 +1580,19 @@
       dialog.close();
     });
 
-    // Слушаем document: надёжнее, чем только dialog — стрелки работают сразу,
-    // даже если фокус ещё не внутри (и после клика по картинке).
-    document.addEventListener('keydown', function (event) {
+    // Capture на window ловит первую клавишу даже при deep-link с главной:
+    // showModal и перевод фокуса могут завершиться уже после его нажатия.
+    window.addEventListener('keydown', function (event) {
       if (!dialog.open) return;
       if (event.key === 'ArrowRight') { event.preventDefault(); go(1); }
       if (event.key === 'ArrowLeft') { event.preventDefault(); go(-1); }
+      if (event.key === 'Escape') { event.preventDefault(); dialog.close(); }
+    }, true);
+
+    // Нативный cancel страхует Esc в браузерах, где keydown забирает UA.
+    dialog.addEventListener('cancel', function (event) {
+      event.preventDefault();
+      dialog.close();
     });
 
     // Колесо / трекпад: горизонталь — кадры, вниз — закрыть, ctrl — pinch-zoom.
