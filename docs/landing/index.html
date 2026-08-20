@@ -87,8 +87,8 @@
     --line: rgba(255, 255, 255, 0.09);
     --line-strong: rgba(255, 255, 255, 0.16);
     --text: #ececf1;
-    --muted: #a1a1ae;
-    --dim: #77778a;
+    --muted: #adadba;
+    --dim: #89899b;
     --accent: #8b88f8;
     --accent-2: #aaa8ff;
     --accent-dim: rgba(139, 136, 248, 0.14);
@@ -140,8 +140,9 @@
 
   .wrap { width: 100%; max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
 
-  /* Якоря не должны уезжать под липкую шапку */
-  section[id], div[id] { scroll-margin-top: calc(var(--header-h) + 8px); }
+  /* При переходе по якорю часть обычного верхнего воздуха секции уходит под
+     липкую шапку: заголовок остаётся виден, но не отрывается от навигации. */
+  section[id] { scroll-margin-top: calc(var(--header-h) - 40px); }
 
   /* ---------- header ---------- */
 
@@ -369,9 +370,9 @@
     animation-timing-function: ease-in-out, ease-out;
     animation-iteration-count: infinite, infinite;
   }
-  /* Generative-триада: 2 вертикальных вверх, 2 диагональных вверх в разные
-     стороны и 2 горизонтальных в разные стороны. Одна группа = одна ячейка;
-     среди 16 их 6. */
+  /* Generative-триада повторяет компактный знак с референса: крупная искра
+     снизу справа, средняя сверху слева и самая малая над ними. Все шесть
+     триад имеют одну геометрию и занимают по одной ячейке. */
   .brand-sparkle-step {
     position: absolute;
     display: block;
@@ -384,50 +385,18 @@
     filter: drop-shadow(0 0 4px rgba(121, 212, 255, .42));
   }
   .brand-sparkle-step-2 {
-    left: 19%;
-    top: -72%;
-    width: 62%;
-    height: 62%;
+    left: -38%;
+    top: -22%;
+    width: 58%;
+    height: 58%;
     animation: brand-sparkle-chain-2 var(--dur, 5s) var(--delay, 0s) ease-in-out infinite;
   }
   .brand-sparkle-step-3 {
-    left: 31%;
-    top: -118%;
-    width: 38%;
-    height: 38%;
+    left: 10%;
+    top: -52%;
+    width: 34%;
+    height: 34%;
     animation: brand-sparkle-chain-3 var(--dur, 5s) var(--delay, 0s) ease-in-out infinite;
-  }
-  .brand-sparkle-triad-dur .brand-sparkle-step-2 {
-    left: 78%;
-    top: -72%;
-  }
-  .brand-sparkle-triad-dur .brand-sparkle-step-3 {
-    left: 128%;
-    top: -118%;
-  }
-  .brand-sparkle-triad-dul .brand-sparkle-step-2 {
-    left: -40%;
-    top: -72%;
-  }
-  .brand-sparkle-triad-dul .brand-sparkle-step-3 {
-    left: -66%;
-    top: -118%;
-  }
-  .brand-sparkle-triad-hr .brand-sparkle-step-2 {
-    left: 108%;
-    top: 19%;
-  }
-  .brand-sparkle-triad-hr .brand-sparkle-step-3 {
-    left: 180%;
-    top: 31%;
-  }
-  .brand-sparkle-triad-hl .brand-sparkle-step-2 {
-    left: -70%;
-    top: 19%;
-  }
-  .brand-sparkle-triad-hl .brand-sparkle-step-3 {
-    left: -118%;
-    top: 31%;
   }
   /* Спокойный desktop-режим: один знак поблёскивает раз в 3–6 секунд.
      Исходная сетка скрыта; половина импульсов — двойной знак с signal-ring. */
@@ -2349,18 +2318,34 @@
      четыре группы и их объём. */
   .metadata-orbit {
     --metadata-cycle: 10.5s;
-    --metadata-core-size: clamp(104px, 12vw, 124px);
+    /* 960px — исходный и максимальный размер схемы. Ниже 1008px она
+       непрерывно сжимается вместе с viewport, сохраняя обычные поля документа
+       по 24px. После раскладки JS центрирует уже всю видимую схему целиком. */
+    --metadata-orbit-width: min(960px, calc(100vw - 48px));
+    --metadata-orbit-half-width: min(480px, calc(50vw - 24px));
+    --metadata-orbit-shift-x: 0px;
+    --metadata-column-outset: 0px;
+    /* Исходные 148px сохраняются до первого общего переноса описаний. Затем
+       круг плавно доходит до мобильных 104px к 440px, не меняя крайние
+       состояния схемы. */
+    --metadata-core-size: clamp(104px, calc(43.5px + 13.75vw), 148px);
+    /* Две колонки держат 142px до 360px viewport, затем сужаются вместе с
+       окном. Это не даёт блокам наложиться друг на друга на 320px и уже. */
+    --metadata-node-min-width: clamp(88px, calc(50vw - 38px), 142px);
     /* На широком — воздух у круга; на узком зазор растёт, чтобы блоки
        у края экрана не врезались в окружность. */
     --metadata-node-gap: max(16px, min(120px, 12%), calc(100px - 10vw));
     /* Верхние уезжают вверх, нижние вниз, когда орбита уже. */
     --metadata-node-inset: clamp(0px, 3vw, 28px);
-    /* Небольшой сдвиг от края орбиты, чтобы длинные слова не резались clip. */
-    --metadata-node-edge: clamp(6px, 2vw, 14px);
+    /* До 720px исходные 18px не меняются. Ниже отступ плавно уменьшается до
+       4px; это не позволяет схеме визуально расшириться в начале сужения. */
+    --metadata-node-edge: clamp(4px, calc(5vw - 18px), 18px);
     position: relative;
-    width: min(100%, 960px);
+    width: var(--metadata-orbit-width);
     height: clamp(410px, calc(560px - 18vw), 500px);
-    margin: 46px auto 0;
+    margin: 46px 0 0 calc(
+      50% - var(--metadata-orbit-half-width) + var(--metadata-orbit-shift-x)
+    );
     /* Ореолы узлов (отрицательный inset + scale) не должны раздувать
        body.scrollWidth — на iOS это даёт дрожь visualViewport при скролле. */
     overflow-x: clip;
@@ -2371,15 +2356,9 @@
     top: 50%;
     left: 50%;
     z-index: 2;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    /* Всё от диаметра, без clamp: вокруг ~12.5%, между строками ~4.5%. */
-    --metadata-core-pad: calc(var(--metadata-core-size) * .125);
-    --metadata-core-gap: calc(var(--metadata-core-size) * .045);
-    padding: var(--metadata-core-pad) calc(var(--metadata-core-size) * .12);
-    gap: var(--metadata-core-gap);
+    display: grid;
+    place-items: center;
+    align-content: center;
     width: var(--metadata-core-size);
     height: var(--metadata-core-size);
     border: 1px solid rgba(139, 136, 248, .58);
@@ -2401,32 +2380,60 @@
   }
   .metadata-core strong {
     display: block;
-    font-size: calc(var(--metadata-core-size) * .32);
+    font-size: 50px;
     font-weight: 600;
-    line-height: .84;
+    line-height: .9;
     letter-spacing: -.05em;
   }
   .metadata-core > span {
     display: block;
+    margin-top: 8px;
     color: var(--accent-2);
     font-family: inherit;
-    font-size: calc(var(--metadata-core-size) * .092);
+    font-size: 12.5px;
     font-weight: 600;
-    line-height: 1;
     letter-spacing: 0;
   }
   .metadata-core small {
     display: block;
-    max-width: 78%;
+    margin-top: 5px;
     color: var(--dim);
     font-family: inherit;
-    font-size: calc(var(--metadata-core-size) * .076);
-    line-height: 1.05;
-    text-wrap: balance;
+    font-size: 11.5px;
   }
-  /* Круг = clamp(104px, 12vw, 124px): пол 104px с ~867px.
-     Трёхсловная строка туда уже не встаёт — сначала убираем «один». */
-  @media (max-width: 870px) {
+  /* Пока круг 148px, внутренние отступы остаются исходными. Вместе с
+     уменьшением круга сжимаем его типографику как одну систему. */
+  @media (max-width: 759px) {
+    .metadata-core {
+      --metadata-core-pad: calc(var(--metadata-core-size) * .125);
+      --metadata-core-gap: calc(var(--metadata-core-size) * .045);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: var(--metadata-core-pad) calc(var(--metadata-core-size) * .12);
+      gap: var(--metadata-core-gap);
+    }
+    .metadata-core strong {
+      font-size: calc(var(--metadata-core-size) * .32);
+      line-height: .84;
+    }
+    .metadata-core > span {
+      margin-top: 0;
+      font-size: calc(var(--metadata-core-size) * .092);
+      line-height: 1;
+    }
+    .metadata-core small {
+      max-width: 78%;
+      margin-top: 0;
+      font-size: calc(var(--metadata-core-size) * .076);
+      line-height: 1.05;
+      text-wrap: balance;
+    }
+  }
+  /* Примерно с 780px круг становится меньше 125px: трёхсловная строка
+     начинает тесниться, поэтому сначала убираем только «один». */
+  @media (max-width: 780px) {
     .metadata-core-one { display: none; }
   }
   @media (max-width: 480px) {
@@ -2436,43 +2443,53 @@
 
   .metadata-ray {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 31%;
+    top: var(--metadata-ray-y, 50%);
+    left: var(--metadata-ray-x, 50%);
+    width: var(--metadata-ray-length, 31%);
     height: 1px;
     background: linear-gradient(90deg, rgba(139, 136, 248, .2), rgba(139, 136, 248, .07));
+    pointer-events: none;
+    transform: rotate(var(--metadata-ray-angle));
     transform-origin: left center;
   }
-  .metadata-ray:nth-child(1) { transform: rotate(-148deg); }
-  .metadata-ray:nth-child(2) { transform: rotate(-32deg); }
-  .metadata-ray:nth-child(3) { transform: rotate(148deg); }
-  .metadata-ray:nth-child(4) { transform: rotate(32deg); }
+  .metadata-ray:nth-child(1) { --metadata-ray-angle: -148deg; }
+  .metadata-ray:nth-child(2) { --metadata-ray-angle: -32deg; }
+  .metadata-ray:nth-child(3) { --metadata-ray-angle: 148deg; }
+  .metadata-ray:nth-child(4) { --metadata-ray-angle: 32deg; }
   .metadata-node {
     position: absolute;
     isolation: isolate;
     box-sizing: border-box;
-    width: auto;
-    min-width: 0;
-    max-width: 100%;
-    transition: opacity .22s ease;
+    /* Пока 260px помещаются, сохраняем исходный размер. Затем все четыре
+       блока синхронно сужаются до ширины длинного мобильного бейджа. */
+    width: clamp(
+      var(--metadata-node-min-width),
+      calc(50% - (var(--metadata-core-size) / 2) - var(--metadata-node-gap) - var(--metadata-node-edge)),
+      260px
+    );
+    transition:
+      opacity .22s ease,
+      left .18s cubic-bezier(.22, .8, .3, 1),
+      right .18s cubic-bezier(.22, .8, .3, 1);
   }
-  /* Внешняя кромка чуть внутри края, внутренняя — вертикаль за окружностью. */
-  .metadata-node:nth-of-type(2),
-  .metadata-node:nth-of-type(4) {
-    left: var(--metadata-node-edge);
-    right: calc(50% + (var(--metadata-core-size) / 2) + var(--metadata-node-gap));
+  .metadata-node:nth-of-type(2) {
+    top: 28px;
+    left: calc(var(--metadata-node-edge) - var(--metadata-column-outset));
     text-align: right;
   }
-  .metadata-node:nth-of-type(3),
-  .metadata-node:nth-of-type(5) {
-    right: var(--metadata-node-edge);
-    left: calc(50% + (var(--metadata-core-size) / 2) + var(--metadata-node-gap));
-    text-align: left;
+  .metadata-node:nth-of-type(3) {
+    top: 28px;
+    right: calc(var(--metadata-node-edge) - var(--metadata-column-outset));
   }
-  .metadata-node:nth-of-type(2),
-  .metadata-node:nth-of-type(3) { top: var(--metadata-node-inset); }
-  .metadata-node:nth-of-type(4),
-  .metadata-node:nth-of-type(5) { bottom: var(--metadata-node-inset); }
+  .metadata-node:nth-of-type(4) {
+    bottom: 28px;
+    left: calc(var(--metadata-node-edge) - var(--metadata-column-outset));
+    text-align: right;
+  }
+  .metadata-node:nth-of-type(5) {
+    right: calc(var(--metadata-node-edge) - var(--metadata-column-outset));
+    bottom: 28px;
+  }
   .metadata-node::before {
     content: "";
     position: absolute;
@@ -2495,39 +2512,44 @@
     background: var(--panel);
     color: #c0beff;
     font-family: inherit;
-    font-size: 11.5px;
+    font-size: clamp(10.5px, calc(5.5px + .5vw), 11.5px);
     font-weight: 600;
     line-height: 1;
     letter-spacing: .01em;
     max-width: 100%;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    white-space: nowrap;
     transition: border-color .22s ease, background .22s ease, color .22s ease;
   }
   .metadata-node h3 {
     margin: 9px 0 5px;
-    font-size: 17.5px;
+    font-size: clamp(16px, calc(8.5px + .75vw), 17.5px);
     font-weight: 600;
     letter-spacing: -.01em;
     overflow-wrap: normal;
     word-break: keep-all;
     animation: metadata-label-glow var(--metadata-cycle) ease-in-out infinite;
   }
-  .metadata-node p { margin: 0; color: #8c8c9a; font-family: inherit; font-size: 13.5px; line-height: 1.5; }
-  /* Ломка заголовка или бейджа «N полей» — то же правило для всех четырёх
-     блоков: к центру, колонки шире. Стоит после базовых h3/small, иначе
-     font-size 17.5px / flex-wrap: wrap перебивают. */
-  @media (max-width: 860px) {
-    .metadata-orbit {
-      --metadata-node-gap: clamp(8px, 2.6vw, 22px);
-      --metadata-node-edge: clamp(8px, 2.2vw, 18px);
-    }
-    .metadata-node h3 { font-size: 16px; }
-    .metadata-node small {
-      font-size: 10.5px;
-      padding: 3px 6px;
-      flex-wrap: nowrap;
-      white-space: nowrap;
-    }
+  .metadata-node p {
+    margin: 0;
+    color: #8c8c9a;
+    font-family: inherit;
+    font-size: 13.5px;
+    line-height: 1.5;
+    /* Глобальный pretty в Safari может разложить помещающийся текст на три
+       строки. balance сохраняет две строки и распределяет слова равномерно. */
+    text-wrap: balance;
+  }
+  /* 840px — первая ширина, на которой самое длинное описание просит вторую
+     строку. С этого же кадра все четыре подписи получают общий двухстрочный
+     ритм, а скрипт одним движением перестраивает обе колонки. Верхний и
+     нижний ряды сохраняют свои исходные уровни, поэтому крест не сплющивается. */
+  @media (max-width: 840px) {
+    .metadata-node p { max-width: 175px; }
+    .metadata-node:nth-of-type(2) p,
+    .metadata-node:nth-of-type(4) p { margin-left: auto; }
+    .metadata-node:nth-of-type(3) p,
+    .metadata-node:nth-of-type(5) p { margin-right: auto; }
   }
   .metadata-node h3, .metadata-node p { transition: color .22s ease, transform .22s cubic-bezier(.22, .8, .3, 1), text-shadow .22s ease; }
   .metadata-node:hover h3 { color: var(--accent-2); transform: translateY(-2px); }
@@ -3210,6 +3232,15 @@
     transition: opacity .7s cubic-bezier(.22, .8, .3, 1), transform .7s cubic-bezier(.22, .8, .3, 1);
     transition-delay: var(--d, 0s);
   }
+  /* Общий горизонтальный сдвиг орбиты не меняет взаимное положение круга,
+     блоков и лучей. При переносе текста центр меняется мягко, без скачка. */
+  .metadata-orbit.reveal {
+    transition:
+      opacity .7s cubic-bezier(.22, .8, .3, 1),
+      transform .7s cubic-bezier(.22, .8, .3, 1),
+      margin-left .18s cubic-bezier(.22, .8, .3, 1);
+    transition-delay: var(--d, 0s), var(--d, 0s), 0s;
+  }
   .reveal.in { opacity: 1; transform: none; }
 
   /* Снимки экрана — чуть заметнее, с лёгким приближением. */
@@ -3297,10 +3328,25 @@
   }
 
   @media (max-width: 1000px) {
-    /* Когда лучи перестают попадать в подписи, убираем их вместе с фоновыми
-       ореолами. Радиальная схема и ширина орбиты остаются: блоки сами
-       сжимаются от круга, без скачка на фиксированные 720px. */
-    .metadata-ray { display: none; }
+    /* К этому порогу орбита уже плавно дошла до ширины viewport. Здесь
+       исчезает только фоновая подсветка категорий и продолжается такое же
+       непрерывное вертикальное сжатие; лучи пересчитываются скриптом. */
+    .metadata-orbit {
+      /* Ряды не прижимаются к свечению: от исходных 410px высота плавно
+         доходит до мобильного минимума 400px и дальше не уменьшается. */
+      height: clamp(400px, calc(360px + 6vw), 410px);
+      /* На узком ореолы категорий уже сняты, поэтому блоки могут использовать
+         пространство до полей документа; общий body всё равно защищён clip. */
+      overflow-x: visible;
+    }
+    .metadata-node {
+      min-width: 0;
+      max-width: 100%;
+    }
+    .metadata-node:nth-of-type(2),
+    .metadata-node:nth-of-type(3) { top: var(--metadata-node-inset); }
+    .metadata-node:nth-of-type(4),
+    .metadata-node:nth-of-type(5) { bottom: var(--metadata-node-inset); }
     .metadata-node::before { content: none; }
     /* Мокап под текстом: в узкой колонке его подписи становятся нечитаемы. */
     .hero-grid { grid-template-columns: 1fr; gap: 46px; }
@@ -3463,6 +3509,12 @@
     10%, 82% { opacity: .9; }
     100% { opacity: 0; transform: translateY(500%); }
   }
+  @media (max-width: 440px) {
+    .metadata-node p {
+      font-size: clamp(12px, 3.2vw, 13.5px);
+      text-wrap: balance;
+    }
+  }
   @media (max-width: 420px) {
     .cta {
       flex-direction: column;
@@ -3479,6 +3531,25 @@
     .mock-title { display: none; }
     .mock-chips span { padding-inline: calc(5 * var(--u)); }
     .mock-steps { gap: calc(4 * var(--u)); padding-inline: calc(8 * var(--u)); }
+  }
+  @media (max-width: 380px) {
+    /* Экстремально узкий viewport: все четыре блока деформируются одинаково.
+       Типографика начинает уменьшаться чуть раньше ширины колонок, поэтому
+       длинные подписи входят без резкого скачка и без третьей строки. */
+    .metadata-node small {
+      min-height: clamp(20px, calc(8.8px + 4vw), 24px);
+      padding-block: clamp(2px, calc(-.8px + 1vw), 3px);
+      padding-inline: clamp(3px, calc(-11px + 5vw), 8px);
+      font-size: clamp(7px, calc(-2.8px + 3.5vw), 10.5px);
+    }
+    .metadata-node h3 {
+      font-size: clamp(11.5px, calc(-1.1px + 4.5vw), 16px);
+      line-height: 1.25;
+    }
+    .metadata-node p {
+      font-size: clamp(9.5px, calc(2.05px + 2.66vw), 12.2px);
+      line-height: 1.45;
+    }
   }
   @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
@@ -3564,6 +3635,7 @@
     .metadata-node::before { animation: none; opacity: 0; transform: none; }
     .metadata-node h3 { animation: none; }
     .metadata-node { transition: none; }
+    .metadata-orbit.reveal { transition: none; }
     .metadata-node::before, .metadata-node small { transition: none; }
     .field-details summary::after { transition: none; }
     .metadata-node h3, .metadata-node p { transition: none; }
@@ -3610,16 +3682,16 @@
       <span class="brand-sparkles" aria-hidden="true">
         <i class="brand-sparkle" style="--x:3%;--y:36%;--sz:8px;--dur:5s;--delay:0s;--rot:-11deg"></i>
         <i class="brand-sparkle brand-sparkle-pair" style="--x:8%;--y:58%;--sz:6px;--dur:5s;--delay:-2.5s;--rot:9deg"></i>
-        <i class="brand-sparkle brand-sparkle-triad brand-sparkle-triad-hr" style="--x:14%;--y:28%;--sz:11px;--dur:5s;--delay:-1.25s;--rot:5deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
+        <i class="brand-sparkle brand-sparkle-triad" style="--x:14%;--y:28%;--sz:11px;--dur:5s;--delay:-1.25s;--rot:5deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
         <i class="brand-sparkle" style="--x:20%;--y:64%;--sz:8px;--dur:5s;--delay:-3.75s;--rot:-8deg"></i>
         <i class="brand-sparkle brand-sparkle-pair" style="--x:27%;--y:40%;--sz:6px;--dur:5s;--delay:-0.62s;--rot:12deg"></i>
         <i class="brand-sparkle" style="--x:33%;--y:18%;--sz:8px;--dur:5s;--delay:-3.12s;--rot:-6deg"></i>
-        <i class="brand-sparkle brand-sparkle-triad brand-sparkle-triad-dur" style="--x:40%;--y:52%;--sz:11px;--dur:5s;--delay:-1.88s;--rot:8deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
+        <i class="brand-sparkle brand-sparkle-triad" style="--x:40%;--y:52%;--sz:11px;--dur:5s;--delay:-1.88s;--rot:8deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
         <i class="brand-sparkle brand-sparkle-pair" style="--x:46%;--y:34%;--sz:6px;--dur:5s;--delay:-4.38s;--rot:-12deg"></i>
         <i class="brand-sparkle" style="--x:52%;--y:68%;--sz:6px;--dur:5s;--delay:-0.31s;--rot:6deg"></i>
-        <i class="brand-sparkle brand-sparkle-triad brand-sparkle-triad-dul" style="--x:58%;--y:24%;--sz:11px;--dur:5s;--delay:-2.81s;--rot:-9deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
+        <i class="brand-sparkle brand-sparkle-triad" style="--x:58%;--y:24%;--sz:11px;--dur:5s;--delay:-2.81s;--rot:-9deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
         <i class="brand-sparkle brand-sparkle-pair" style="--x:64%;--y:48%;--sz:8px;--dur:5s;--delay:-1.56s;--rot:11deg"></i>
-        <i class="brand-sparkle brand-sparkle-triad brand-sparkle-triad-hl" style="--x:70%;--y:72%;--sz:11px;--dur:5s;--delay:-4.06s;--rot:-5deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
+        <i class="brand-sparkle brand-sparkle-triad" style="--x:70%;--y:72%;--sz:11px;--dur:5s;--delay:-4.06s;--rot:-5deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
         <i class="brand-sparkle" style="--x:76%;--y:30%;--sz:6px;--dur:5s;--delay:-0.94s;--rot:12deg"></i>
         <i class="brand-sparkle brand-sparkle-pair" style="--x:81%;--y:56%;--sz:11px;--dur:5s;--delay:-3.44s;--rot:-10deg"></i>
         <i class="brand-sparkle brand-sparkle-triad" style="--x:85%;--y:22%;--sz:11px;--dur:5s;--delay:-2.19s;--rot:3deg"><b class="brand-sparkle-step brand-sparkle-step-2"></b><b class="brand-sparkle-step brand-sparkle-step-3"></b></i>
@@ -4310,13 +4382,13 @@ ollama pull qwen2.5vl</code></pre>
   </div>
 </footer>
 
-<script src="ambient-particle-flags.js?v=flags6"></script>
+<script src="ambient-particle-flags.js?v=flags9"></script>
 <script src="brand-iris/geometry.js?v=spark7"></script>
 <script src="brand-iris/motion.js?v=spark7"></script>
 <script src="brand-iris/handoff.js?v=spark7"></script>
 <script src="brand-iris/presence.js?v=spark7"></script>
 <script src="brand-iris/init.js?v=spark7"></script>
-<script src="brand-sparkles.js?v=spark67"></script>
+<script src="brand-sparkles.js?v=spark68"></script>
 <script src="header-swap.js"></script>
 <script>
   // Мобильное меню: бургер открывает ту же #nav-links панелью под шапкой.
@@ -4412,6 +4484,219 @@ ollama pull qwen2.5vl</code></pre>
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll);
     update();
+  })();
+
+  // Лучи всегда соединяют центр круга с внутренней кромкой соответствующего
+  // блока. offset* не учитывает reveal-transform, поэтому линия сразу знает
+  // конечную геометрию и не дёргается во время появления секции.
+  (function () {
+    var orbit = document.querySelector('.metadata-orbit');
+    if (!orbit) return;
+
+    var core = orbit.querySelector('.metadata-core');
+    var rays = Array.prototype.slice.call(orbit.querySelectorAll('.metadata-ray'));
+    var nodes = Array.prototype.slice.call(orbit.querySelectorAll('.metadata-node'));
+    if (!core || rays.length !== nodes.length) return;
+
+    var rayFrame = 0;
+    var rayTrackingUntil = 0;
+
+    function setMetadataLength(name, value) {
+      var nextValue = Math.round(value * 100) / 100 + 'px';
+      if (orbit.style.getPropertyValue(name) !== nextValue) {
+        orbit.style.setProperty(name, nextValue);
+      }
+    }
+
+    function metadataTextRect(element) {
+      var range = document.createRange();
+      range.selectNodeContents(element);
+      return range.getBoundingClientRect();
+    }
+
+    function metadataNodeInkBounds(node) {
+      var nodeRect = node.getBoundingClientRect();
+      var inkRects = [
+        node.querySelector('small').getBoundingClientRect(),
+        metadataTextRect(node.querySelector('h3')),
+        metadataTextRect(node.querySelector('p'))
+      ];
+      return {
+        left: Math.min.apply(null, inkRects.map(function (rect) {
+          return rect.left - nodeRect.left;
+        })),
+        right: Math.max.apply(null, inkRects.map(function (rect) {
+          return rect.right - nodeRect.left;
+        })),
+        top: Math.min.apply(null, inkRects.map(function (rect) {
+          return rect.top - nodeRect.top;
+        })),
+        bottom: Math.max.apply(null, inkRects.map(function (rect) {
+          return rect.bottom - nodeRect.top;
+        }))
+      };
+    }
+
+    // Поле диаграммы не скачет вместе с breakpoint .wrap: 24px плавно
+    // переходят в мобильные 16px на 720–688px. Поэтому при дальнейшем
+    // сужении видимая ширина схемы никогда не увеличивается.
+    function metadataDiagramInset() {
+      if (window.innerWidth >= 720) return 24;
+      if (window.innerWidth <= 688) return 16;
+      return 16 + (window.innerWidth - 688) * .25;
+    }
+
+    function metadataAdaptiveProgress() {
+      if (window.innerWidth >= 1008) return 1;
+      if (window.innerWidth <= 280) return 0;
+      return (window.innerWidth - 280) / (1008 - 280);
+    }
+
+    function syncMetadataColumns() {
+      // Пиксельный эквивалент CSS clamp(4px, 5vw - 18px, 18px). Значение
+      // нельзя брать parseFloat от custom property: браузер возвращает сам
+      // текст clamp(), а не вычисленный результат.
+      var nodeEdge = Math.max(4, Math.min(18, window.innerWidth * .05 - 18));
+      var startX = orbit.clientWidth / 2;
+      var coreGlowRadius = core.offsetWidth / 2 + 30;
+      var baseBounds = nodes.map(function (node, index) {
+        var ink = metadataNodeInkBounds(node);
+        var isLeft = index % 2 === 0;
+        var nodeLeft = isLeft
+          ? nodeEdge
+          : orbit.clientWidth - nodeEdge - node.offsetWidth;
+        return {
+          left: nodeLeft + ink.left,
+          right: nodeLeft + ink.right
+        };
+      });
+      var baseInkLeft = Math.min.apply(null, baseBounds.map(function (bounds) {
+        return bounds.left;
+      }));
+      var baseInkRight = Math.max.apply(null, baseBounds.map(function (bounds) {
+        return bounds.right;
+      }));
+      var baseInkWidth = baseInkRight - baseInkLeft;
+      var targetInkWidth = Math.min(
+        816,
+        window.innerWidth - metadataDiagramInset() * 2
+      );
+      var fieldOutset = Math.max(0, (targetInkWidth - baseInkWidth) / 2);
+      var progress = metadataAdaptiveProgress();
+      // 1008px и 280px — измеренные неизменные ориентиры исходного и
+      // минимального состояний. Между ними допустимый зазор меняется только
+      // непрерывно, но вертикальные уровни блоков остаются неизменными.
+      var topGap = 35.3 + (118.2 - 35.3) * progress;
+      var bottomGap = 44.6 + (120.9 - 44.6) * progress;
+      // После общего переноса строки текст становится уже. Не раздвигаем
+      // из-за этого колонки дальше допустимой орбиты: лишнюю ширину отдаём
+      // кругу и сохраняем связь блоков с центром.
+      var maximumColumnOutset = Math.min.apply(null, baseBounds.map(function (bounds, index) {
+        var currentHorizontal = index % 2 === 0
+          ? startX - bounds.right
+          : bounds.left - startX;
+        var rowGap = index < 2 ? topGap : bottomGap;
+        return Math.max(0, coreGlowRadius + rowGap - currentHorizontal);
+      }));
+      var columnOutset = Math.min(fieldOutset, maximumColumnOutset);
+      setMetadataLength('--metadata-column-outset', columnOutset);
+    }
+
+    // Сначала CSS формирует круг и четыре блока на текущей ширине. Только
+    // после этого вся готовая схема одним margin-сдвигом получает визуальный
+    // центр viewport. Взаимные расстояния элементов при этом не меняются.
+    function syncMetadataCenter() {
+      // 1008px — точка, где орбита впервые становится уже исходных 960px.
+      // До неё исходная композиция неизменна; ниже центрируется вся схема.
+      if (window.innerWidth >= 1008) {
+        orbit.style.setProperty('--metadata-orbit-shift-x', '0px');
+        return;
+      }
+
+      var orbitRect = orbit.getBoundingClientRect();
+      var inkRects = [];
+      nodes.forEach(function (node) {
+        inkRects.push(node.querySelector('small').getBoundingClientRect());
+        inkRects.push(metadataTextRect(node.querySelector('h3')));
+        inkRects.push(metadataTextRect(node.querySelector('p')));
+      });
+
+      var inkLeft = Math.min.apply(null, inkRects.map(function (rect) {
+        return rect.left - orbitRect.left;
+      }));
+      var inkRight = Math.max.apply(null, inkRects.map(function (rect) {
+        return rect.right - orbitRect.left;
+      }));
+
+      var parent = orbit.parentElement;
+      var parentRect = parent.getBoundingClientRect();
+      var parentStyle = getComputedStyle(parent);
+      var paddingLeft = parseFloat(parentStyle.paddingLeft) || 0;
+      var paddingRight = parseFloat(parentStyle.paddingRight) || 0;
+      var contentWidth = parent.clientWidth - paddingLeft - paddingRight;
+      var baseLeft = parentRect.left + paddingLeft +
+        (contentWidth - orbit.offsetWidth) / 2;
+      var inkCenter = baseLeft + (inkLeft + inkRight) / 2;
+      var centerShift = window.innerWidth / 2 - inkCenter;
+
+      orbit.style.setProperty('--metadata-orbit-shift-x', centerShift + 'px');
+    }
+
+    function syncMetadataRays() {
+      syncMetadataColumns();
+      syncMetadataCenter();
+      var startX = orbit.clientWidth / 2;
+      var startY = orbit.clientHeight / 2;
+      var coreRadius = core.offsetWidth / 2 + 14;
+
+      rays.forEach(function (ray, index) {
+        var node = nodes[index];
+        var isLeft = index % 2 === 0;
+        var targetX = isLeft
+          ? node.offsetLeft + node.offsetWidth
+          : node.offsetLeft;
+        var targetY = node.offsetTop + node.offsetHeight / 2;
+        var dx = targetX - startX;
+        var dy = targetY - startY;
+        var distance = Math.hypot(dx, dy);
+        var rayX = startX + dx / distance * coreRadius;
+        var rayY = startY + dy / distance * coreRadius;
+
+        ray.style.setProperty('--metadata-ray-x', rayX + 'px');
+        ray.style.setProperty('--metadata-ray-y', rayY + 'px');
+        ray.style.setProperty('--metadata-ray-length', Math.max(0, distance - coreRadius) + 'px');
+        ray.style.setProperty(
+          '--metadata-ray-angle',
+          Math.atan2(dy, dx) * 180 / Math.PI + 'deg'
+        );
+      });
+    }
+
+    function syncMetadataFrame(now) {
+      rayFrame = 0;
+      syncMetadataRays();
+      if (now < rayTrackingUntil) {
+        rayFrame = requestAnimationFrame(syncMetadataFrame);
+      }
+    }
+
+    function scheduleMetadataRays() {
+      rayTrackingUntil = performance.now() + 240;
+      if (rayFrame) return;
+      rayFrame = requestAnimationFrame(syncMetadataFrame);
+    }
+
+    window.addEventListener('resize', scheduleMetadataRays, { passive: true });
+    window.addEventListener('load', scheduleMetadataRays, { once: true });
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(scheduleMetadataRays);
+    }
+    if ('ResizeObserver' in window) {
+      var rayObserver = new ResizeObserver(scheduleMetadataRays);
+      rayObserver.observe(orbit);
+      rayObserver.observe(core);
+    }
+    scheduleMetadataRays();
   })();
 
   // Появление блоков при скролле. Классы вешаем из JS: если скрипт не

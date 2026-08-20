@@ -879,16 +879,6 @@ function brandSparklesAppendTriadSteps(doc, extra) {
   extra.appendChild(step3);
 }
 
-function brandSparklesTakeCell(cells, preferRight) {
-  for (var i = 0; i < cells.length; i++) {
-    var col = cells[i] % 4;
-    if (preferRight ? col >= 2 : col <= 1) {
-      return cells.splice(i, 1)[0];
-    }
-  }
-  return cells.length ? cells.shift() : -1;
-}
-
 function brandSparklesCreateExtras(doc, layer, win, count, cellCount) {
   var extras = [];
   if (!doc || !doc.createElement || !layer || !layer.appendChild) return extras;
@@ -901,26 +891,15 @@ function brandSparklesCreateExtras(doc, layer, win, count, cellCount) {
     })(),
     win
   );
-  // Из четырёх доп.: триада вправо (правая половина), триада влево (левая),
-  // и две одиночные. Так цепочки не упираются в край локапа.
-  var hrCell = brandSparklesTakeCell(cells, true);
-  var hlCell = brandSparklesTakeCell(cells, false);
-
   for (var j = 0; j < count; j++) {
     var extra = doc.createElement('i');
-    var cell = -1;
-    if (j === 0 && hrCell >= 0) {
-      extra.className =
-        'brand-sparkle brand-sparkle-extra brand-sparkle-triad brand-sparkle-triad-hr';
+    var cell = cells.length ? cells.shift() : 0;
+    // Две компактные триады повторяют одну и ту же геометрию с референса;
+    // оставшиеся extras — одиночные искры.
+    if (j < 2) {
+      extra.className = 'brand-sparkle brand-sparkle-extra brand-sparkle-triad';
       extra.style.setProperty('--sz', '11px');
       brandSparklesAppendTriadSteps(doc, extra);
-      cell = hrCell;
-    } else if (j === 1 && hlCell >= 0) {
-      extra.className =
-        'brand-sparkle brand-sparkle-extra brand-sparkle-triad brand-sparkle-triad-hl';
-      extra.style.setProperty('--sz', '11px');
-      brandSparklesAppendTriadSteps(doc, extra);
-      cell = hlCell;
     } else {
       extra.className = 'brand-sparkle brand-sparkle-extra';
       extra.style.setProperty(
@@ -930,7 +909,6 @@ function brandSparklesCreateExtras(doc, layer, win, count, cellCount) {
             BRAND_SPARKLES_EXTRA_SIZES.length
         ]
       );
-      cell = cells.length ? cells.shift() : 0;
     }
     brandSparklesPositionInCell(extra, cell, rows, win);
     extra.setAttribute('aria-hidden', 'true');
