@@ -65,19 +65,12 @@ AI анализирует каждый кадр, генерирует полны
 
 ```mermaid
 flowchart TB
-  E["`**desktop/** · Electron
-окно приложения`"] --> B["`**backend/** · FastAPI
-127.0.0.1:8000`"]
+  E["desktop/ · Electron<br/>окно приложения"] --> B["backend/ · FastAPI<br/>127.0.0.1:8000"]
 
-  B --> AI["`**services/ai**
-провайдеры, fallback, throttling`"]
-  B --> META["`**services/metadata**
-правила стоков, валидация,
-автофикс, вшивание IPTC`"]
-  B --> EXP["`**services/export**
-CSV, выгрузка файлов`"]
-  B --> UI["`**frontend/** · React + TS
-раздача через StaticFiles`"]
+  B --> AI["services/ai<br/>провайдеры, fallback, throttling"]
+  B --> META["services/metadata<br/>правила стоков, валидация,<br/>автофикс, вшивание IPTC"]
+  B --> EXP["services/export<br/>CSV, выгрузка файлов"]
+  B --> UI["frontend/ · React + TS<br/>раздача через StaticFiles"]
 ```
 
 - **Один бандл, один origin, без CORS.** Electron и бэкенд-бинарник едут внутри одного
